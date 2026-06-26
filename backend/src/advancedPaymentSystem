@@ -1,0 +1,260 @@
+       
+                       DATABASE SCHEMA
+
+	CREATE TABLE students(
+        id SERIAL PRIMARY KEY,
+        name TEXT NOT NULL,
+        class TEXT NOT NULL,
+        total_fee NUMERIC NOT NULL
+    );
+
+	CREATE TABLE payments(
+        id SERIAL PRIMARY KEY,
+        student_id INT REFERENCES students(id),
+        phone TEXT,
+        amount NUMERIC,
+        mpesa_code TEXT UNIQUE,
+        type TEXT,
+        status TEXT DEFAULT 'SUCCESS',
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+
+BUN / ELYSIA TYPESCRIPT
+
+
+import { Elysia } from "elysia";
+import axios from "axios";
+import { Pool } from "pg";
+import PDFDocument from "pdfkit";
+import fs from "fs";
+import dotenv from "dotenv";
+
+dotenv.config();
+
+const app = new Elysia();
+
+/* ---------------- DB ---------------- */
+const db = new Pool({
+    connectionString: process.env.DATABASE_URL
+});
+
+/* ---------------- M-PESA CONFIG ---------------- */
+const {
+    MPESA_CONSUMER_KEY,
+    MPESA_CONSUMER_SECRET,
+    MPESA_SHORTCODE,
+    MPESA_PASSKEY,
+    BASE_URL,
+    CALLBACK_URL
+} = process.env;
+
+/* =====================================================
+   GET ACCESS TOKEN
+===================================================== */
+async function getToken() {
+    const auth = Buffer.from(
+        `${MPESA_CONSUMER_KEY}:${MPESA_CONSUMER_SECRET}`
+    ).toString("base64");
+
+    const res = await axios.get(
+        `${BASE_URL}/oauth/v1/generate?grant_type=client_credentials`,
+        {
+            headers: { Authorization: `Basic ${auth}` }
+        }
+    );
+
+    return res.data.access_token;
+}
+
+/* =====================================================
+   ADD STUDENT
+===================================================== */
+app.post("/students", async ({ body }) => {
+    const { name, className, totalFee } = body as any;
+
+    const result = await db.query(
+        `INSERT INTO students(name, class, total_fee)
+	     VALUES($1,$2,$3) RETURNING *`,
+        [name, className, totalFee]
+    );
+
+    return result.rows[0];
+});
+
+/* =====================================================
+   GET STUDENT + BALANCE
+===================================================== */
+app.get("/students/:id", async ({ params }) => {
+    const studentId = params.id;
+
+    const student = await db.query(
+        `SELECT * FROM students WHERE id=$1`,
+        [studentId]
+    );
+
+    const payments = await db.query(
+        `SELECT COALESCE(SUM(amount),0) AS paid
+	     FROM payments WHERE student_id=$1`,
+        [studentId]
+    );
+
+    const data = student.rows[0];
+    const paid = payments.rows[0].paid;
+    const balance = data.total_fee - paid;
+
+    return {
+        student: data,
+        paid,
+        balance
+    };
+});
+
+/* =====================================================
+   STK PUSH (UPDATED WITH student_id)
+===================================================== */
+app.post("/stk", async ({ body }) => {
+    const { phone, amount, student_id } = body as any;
+
+    const token = await getToken();
+
+    const timestamp = new Date()
+        .toISOString()
+        .replace(/[-T:.Z]/g, "")
+        .slice(0, 14);
+
+    const password = Buffer.from(
+        `${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`
+    ).toString("base64");
+
+    const payload = {
+        BusinessShortCode: MPESA_SHORTCODE,
+        Password: password,
+        Timestamp: timestamp,
+        TransactionType: "CustomerPayBillOnline",
+        Amount: amount,
+        PartyA: phone,
+        PartyB: MPESA_SHORTCODE,
+        PhoneNumber: phone,
+        CallBackURL: CALLBACK_URL,
+        AccountReference: "SCHOOL FEES",
+        TransactionDesc: "STK Payment"
+    };
+
+    // store pending mapping (IMPORTANT)
+    await db.query(
+        `INSERT INTO payments(student_id, phone, amount, type, status)
+	     VALUES($1,$2,$3,$4,$5)`,
+        [student_id, phone, amount, "STK_PENDING", "PENDING"]
+    );
+
+    const res = await axios.post(
+        `${BASE_URL}/mpesa/stkpush/v1/processrequest`,
+        payload,
+        { headers: { Authorization: `Bearer ${token}` } }
+    );
+
+    return res.data;
+});
+
+/* =====================================================
+   CALLBACK (UPDATE PAYMENT + LINK STUDENT)
+===================================================== */
+app.post("/mpesa/callback", async ({ body }) => {
+    try {
+        const result = body.Body.stkCallback;
+
+        if (result.ResultCode === 0) {
+            const items = result.CallbackMetadata.Item;
+
+            const amount = items.find((i: any) => i.Name === "Amount")?.Value;
+            const phone = items.find((i: any) => i.Name === "PhoneNumber")?.Value;
+            const code = items.find((i: any) => i.Name === "MpesaReceiptNumber")?.Value;
+
+            // find pending payment by phone + amount
+            const pending = await db.query(
+                `SELECT * FROM payments
+		 WHERE phone=$1 AND amount=$2 AND status='PENDING'
+		 ORDER BY created_at DESC LIMIT 1`,
+                [phone, amount]
+            );
+
+            if (pending.rows.length > 0) {
+                const payment = pending.rows[0];
+
+                await db.query(
+                    `UPDATE payments
+		   SET mpesa_code=$1, status='SUCCESS'
+		   WHERE id=$2`,
+                    [code, payment.id]
+                );
+
+                console.log("✅ Payment linked to student");
+            }
+        }
+    } catch (err) {
+        console.log(err);
+    }
+
+    return { ResultCode: 0, ResultDesc: "OK" };
+});
+
+/* =====================================================
+   BALANCE ENDPOINT (AUTO CALCULATION)
+===================================================== */
+app.get("/balance/:id", async ({ params }) => {
+    const studentId = params.id;
+
+    const student = await db.query(
+        `SELECT * FROM students WHERE id=$1`,
+        [studentId]
+    );
+
+    const paid = await db.query(
+        `SELECT COALESCE(SUM(amount),0) AS total
+	     FROM payments WHERE student_id=$1 AND status='SUCCESS'`,
+        [studentId]
+    );
+
+    const totalPaid = paid.rows[0].total;
+    const balance = student.rows[0].total_fee - totalPaid;
+
+    return {
+        student: student.rows[0],
+        paid: totalPaid,
+        balance
+    };
+});
+
+/* =====================================================
+   RECEIPT GENERATION (PDF)
+===================================================== */
+app.get("/receipt/:payment_id", async ({ params }) => {
+    const payment = await db.query(
+        `SELECT * FROM payments WHERE id=$1`,
+        [params.payment_id]
+    );
+
+    const data = payment.rows[0];
+
+    const doc = new PDFDocument();
+    const filePath = `receipt_${data.id}.pdf`;
+    const stream = fs.createWriteStream(filePath);
+
+    doc.pipe(stream);
+
+    doc.fontSize(20).text("SCHOOL PAYMENT RECEIPT");
+    doc.moveDown();
+
+    doc.fontSize(14).text(`Payment ID: ${data.id}`);
+    doc.text(`Phone: ${data.phone}`);
+    doc.text(`Amount: ${data.amount}`);
+    doc.text(`M-Pesa Code: ${data.mpesa_code}`);
+    doc.text(`Date: ${data.created_at}`);
+
+    doc.end();
+
+    return {
+        message: "Receipt generated",
+        file: filePath
+    };
+});
