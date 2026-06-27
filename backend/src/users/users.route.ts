@@ -9,8 +9,7 @@ export const userRoute = new Elysia()
         })
     })
     .post("/users", async ({store, body})=>{
-        return({
-            message: "New user has been created",
-            body: await postNewUser(store, body)
-        })
+        return(
+            await postNewUser(store, body)
+        )
     }) 

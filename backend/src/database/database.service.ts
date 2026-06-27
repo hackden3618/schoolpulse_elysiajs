@@ -8,17 +8,24 @@ export async function createUsersTable(store: any) {
     try {
         const query = "CREATE TABLE IF NOT EXISTS users (\
                  id UUID PRIMARY KEY,\
-                 fname TEXT NOT NULL,\
-                 sname TEXT,\
-                 lname TEXT,\
-                 phone TEXT NOT NULL,\
-                 schoolID TEXT,\
-                 hashPwd TEXT NOT NULL,\
-                 email TEXT\
+                 first_name TEXT NOT NULL,\
+                 second_name TEXT NULL,\
+                 last_name TEXT,\
+                 phone TEXT UNIQUE NOT NULL,\
+                 hashed_password TEXT NOT NULL,\
+                 email TEXT UNIQUE\
                 );"
-        db.query(query);
+        await db.query(query);
         console.log("database is connected and users table is created");
     } catch (error: any) {
-        return ({ status: 500, message: "Error creating table", body: error.message })
+        console.log("database failed to connect and table wasn't created error: ", error.message);
+    }
+}
+export async function alterUsersTable(store: any) {
+    const db = store.db;
+    try {
+        console.log("constraints added successfully");
+    } catch (error: any) {
+        console.log("database failed to alter and table wasn't changed error: ", error.message);
     }
 }

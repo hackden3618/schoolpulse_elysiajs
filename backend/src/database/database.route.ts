@@ -1,8 +1,10 @@
 import { Elysia } from "elysia"
-import { createUsersTable, dropUsersTable } from "./database.service";
+import { alterUsersTable, createUsersTable, dropUsersTable } from "./database.service";
 
 export const dbRoute = new Elysia()
     .onStart(async ({ store }) => {
+        await createUsersTable(store)
+        await alterUsersTable(store)
     })
     .get("/health", async ({ store }: any) => {
         try {
