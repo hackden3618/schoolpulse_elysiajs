@@ -1,6 +1,10 @@
 import { Elysia } from "elysia"
+import { createTables } from "./database.service";
 
 export const dbRoute = new Elysia()
+    .onStart(async ({ store }) => {
+        await createTables(store)
+    })
     .get("/health", async ({ store }: any) => {
         try {
             const result = await store.db.query("SELECT NOW()")
