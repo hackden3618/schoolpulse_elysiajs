@@ -13,13 +13,6 @@ new Elysia()
     .use(dbRoute)
     .use(userRoute)
     .get("/", () => ("Hello, you have reached your elysia server Dennis"))
-    .get("/json", () => ({
-        status: 200,
-        message: "Hello, you have done your first route and are in /json now",
-        body: { name: "Dennis", password: "password", amount: "$4,000" }
-    }))
-    .get("/hello/:name", (request: any) => ("Hello, " + request.params.name))
-    .post("/post", (request: any) => ("successfully posted data: " + (request.body.name)))
     .listen(3000);
 
 console.log("Your app is currently running in http://localhost:3000");
