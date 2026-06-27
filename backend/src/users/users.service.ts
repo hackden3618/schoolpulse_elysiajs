@@ -1,7 +1,7 @@
 import bcrypt from 'bcrypt';
 
 export async function listAllUsers(store: any) {
-    const result = await store.db.query("SELECT * FROM users");
+    const result = await store.db.query("SELECT * FROM users WHERE status != 'active'");
     return result.rows;
 
 }
@@ -18,10 +18,13 @@ const verify = async (password: string, hash: string) => {
 
 export async function postNewUser(store: any, body: any) {
     const id = crypto.randomUUID();
-    const {first_name, second_name, last_name, phone, password, email} = body;
+    const { first_name, second_name, last_name, phone, password, email } = body;
     const hashedPassword = await hash(password);
     try {
-        const query = "INSERT INTO users (id, first_name, second_name, last_name, phone, hashedPassword, email) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
+        const query = "\
+        INSERT INTO users (\
+        id, first_name, second_name, last_name, phone, hashed_password, email\
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *";
         const values = [id, first_name, second_name, last_name, phone, hashedPassword, email];
         const result = await store.db.query(query, values);
         return ({

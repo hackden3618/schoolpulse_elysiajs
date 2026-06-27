@@ -12,8 +12,8 @@ new Elysia()
     .use(openapi())
     .use(dbRoute)
     .use(userRoute)
-    .get("/", () => ("Hello, you have reached your elysia server Dennis"))
+    .get("/", "Hello, you have reached your elysia server Dennis")
     .listen(3000);
 
-console.log("Your app is currently running in http://localhost:3000");
+console.log("The app is currently running in http://localhost:3000");
 
