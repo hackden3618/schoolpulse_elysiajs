@@ -1,18 +1,22 @@
-# PURPOSE
-The users directory contains the source for the user management system.
-that is, the database and the api endpoints for user management.
+# Users Module
 
-# FILE STRUCTURE
-* users.route.ts: contains the routes for the user management system and the endpoints related.
-* users.controller.ts: contains the controllers described for the routes in users.route.ts, this is for separation of concerns.
+## Purpose
+Manages user accounts, authentication credentials (passwords), and personal information.
 
-# DESCRIPTION & DECISIONS made
--- NOTE: I am not going to write the controllers for the user management system, just the routes and the service.
---
- 
-* Users are not going to be deleted, they are just going to be suspended.
-* Users can exist under different schools while complying with multitenancy - This will be done in a table that deals with a one to many relationship between schools and users.
+## Responsibilities
+- Create and manage user records.
+- Handle password hashing.
+- Expose RESTful endpoints for user management.
 
+## Dependencies
+- `PrismaClient` (Database access)
+- `bcrypt` (Password hashing)
 
+## Public API
+- `GET /users`: List all users.
+- `POST /users`: Create a new user.
 
-
+## Future Work
+- Add user authentication (login/logout).
+- Add update and delete user endpoints.
+- Role-based access control integration.
