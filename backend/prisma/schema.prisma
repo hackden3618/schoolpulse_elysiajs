@@ -134,11 +134,8 @@ model Class {
     school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
     students Student[]
 
-<<<<<<< HEAD
     @@unique([id, schoolId])
-=======
     @@map("classes")
->>>>>>> b2e12db (quick push to get a hold of fixes)
 }
 
 model Student {
