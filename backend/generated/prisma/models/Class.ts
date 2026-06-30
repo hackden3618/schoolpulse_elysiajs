@@ -216,6 +216,7 @@ export type ClassOrderByWithRelationInput = {
 
 export type ClassWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  id_schoolId?: Prisma.ClassIdSchoolIdCompoundUniqueInput
   AND?: Prisma.ClassWhereInput | Prisma.ClassWhereInput[]
   OR?: Prisma.ClassWhereInput[]
   NOT?: Prisma.ClassWhereInput | Prisma.ClassWhereInput[]
@@ -227,7 +228,7 @@ export type ClassWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"Class"> | Date | string
   school?: Prisma.XOR<Prisma.SchoolScalarRelationFilter, Prisma.SchoolWhereInput>
   students?: Prisma.StudentListRelationFilter
-}, "id">
+}, "id" | "id_schoolId">
 
 export type ClassOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -336,6 +337,11 @@ export type ClassListRelationFilter = {
 
 export type ClassOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
+}
+
+export type ClassIdSchoolIdCompoundUniqueInput = {
+  id: string
+  schoolId: string
 }
 
 export type ClassCountOrderByAggregateInput = {

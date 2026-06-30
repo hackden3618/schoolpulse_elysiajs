@@ -1,6 +1,6 @@
 import { listAllSchools, createSchool } from "./schools.service";
 
-export async function getSchoolsController() {
+export async function getSchoolsController({ set }: any) {
     try {
         const schools = await listAllSchools();
         return {
@@ -8,15 +8,15 @@ export async function getSchoolsController() {
             body: schools
         };
     } catch (error: any) {
+        console.error("Failed to fetch schools:", error);
+        set.status = 500;
         return {
-            status: 500,
-            message: "Failed to fetch schools",
-            error: error.message
+            message: "Failed to fetch schools"
         };
     }
 }
 
-export async function createSchoolController({ body }: any) {
+export async function createSchoolController({ body, set }: any) {
     try {
         const newSchool = await createSchool(body);
         return {
@@ -24,10 +24,10 @@ export async function createSchoolController({ body }: any) {
             body: newSchool
         };
     } catch (error: any) {
+        console.error("Error creating school:", error);
+        set.status = 500;
         return {
-            status: 500,
-            message: "Error creating school",
-            error: error.message
+            message: "Error creating school"
         };
     }
 }

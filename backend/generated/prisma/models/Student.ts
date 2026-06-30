@@ -624,7 +624,6 @@ export type StudentUncheckedCreateWithoutClassInput = {
   id?: string
   dateOfBirth: Date | string
   admissionNumber: string
-  schoolId: string
   firstName: string
   secondName?: string | null
   lastName: string
@@ -781,7 +780,6 @@ export type StudentCreateManyClassInput = {
   id?: string
   dateOfBirth: Date | string
   admissionNumber: string
-  schoolId: string
   firstName: string
   secondName?: string | null
   lastName: string
@@ -806,7 +804,6 @@ export type StudentUncheckedUpdateWithoutClassInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   dateOfBirth?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   admissionNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  schoolId?: Prisma.StringFieldUpdateOperationsInput | string
   firstName?: Prisma.StringFieldUpdateOperationsInput | string
   secondName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastName?: Prisma.StringFieldUpdateOperationsInput | string
@@ -819,7 +816,6 @@ export type StudentUncheckedUpdateManyWithoutClassInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   dateOfBirth?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   admissionNumber?: Prisma.StringFieldUpdateOperationsInput | string
-  schoolId?: Prisma.StringFieldUpdateOperationsInput | string
   firstName?: Prisma.StringFieldUpdateOperationsInput | string
   secondName?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   lastName?: Prisma.StringFieldUpdateOperationsInput | string

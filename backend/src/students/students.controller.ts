@@ -1,6 +1,6 @@
 import { listAllStudents, createStudent } from "./students.service";
 
-export async function getStudentsController() {
+export async function getStudentsController({ set }: any) {
     try {
         const students = await listAllStudents();
         return {
@@ -8,15 +8,15 @@ export async function getStudentsController() {
             body: students
         };
     } catch (error: any) {
+        console.error("Failed to fetch students:", error);
+        set.status = 500;
         return {
-            status: 500,
-            message: "Failed to fetch students",
-            error: error.message
+            message: "Failed to fetch students"
         };
     }
 }
 
-export async function createStudentController({ body }: any) {
+export async function createStudentController({ body, set }: any) {
     try {
         const newStudent = await createStudent(body);
         return {
@@ -24,10 +24,10 @@ export async function createStudentController({ body }: any) {
             body: newStudent
         };
     } catch (error: any) {
+        console.error("Error creating student:", error);
+        set.status = 500;
         return {
-            status: 500,
-            message: "Error creating student",
-            error: error.message
+            message: "Error creating student"
         };
     }
 }

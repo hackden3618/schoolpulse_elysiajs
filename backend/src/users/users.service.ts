@@ -11,13 +11,25 @@ export const verify = async (password: string, hashString: string) => {
 };
 
 export async function listAllUsers() {
-    return await prisma.user.findMany();
+    return await prisma.user.findMany({
+        select: {
+            id: true,
+            firstName: true,
+            secondName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true
+        }
+    });
 }
 
 export async function postNewUser(data: any) {
     const { first_name, second_name, last_name, phone, password, email } = data;
     const hashedPassword = await hash(password);
-    
+
     return await prisma.user.create({
         data: {
             firstName: first_name,
@@ -26,6 +38,17 @@ export async function postNewUser(data: any) {
             phone,
             hashedPassword,
             email,
+        },
+        select: {
+            id: true,
+            firstName: true,
+            secondName: true,
+            lastName: true,
+            phone: true,
+            email: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true
         }
     });
 }
