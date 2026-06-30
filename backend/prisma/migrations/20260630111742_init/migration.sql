@@ -67,10 +67,11 @@ CREATE TABLE "SchoolMembership" (
 
 -- CreateTable
 CREATE TABLE "SchoolMembershipRole" (
+    "id" UUID NOT NULL,
     "membershipId" UUID NOT NULL,
     "roleId" UUID NOT NULL,
 
-    CONSTRAINT "SchoolMembershipRole_pkey" PRIMARY KEY ("membershipId","roleId")
+    CONSTRAINT "SchoolMembershipRole_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateTable
@@ -134,6 +135,9 @@ CREATE UNIQUE INDEX "Role_name_key" ON "Role"("name");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "SchoolMembership_schoolId_userId_key" ON "SchoolMembership"("schoolId", "userId");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "SchoolMembershipRole_membershipId_roleId_key" ON "SchoolMembershipRole"("membershipId", "roleId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "StudentGuardian_studentId_guardianId_key" ON "StudentGuardian"("studentId", "guardianId");
