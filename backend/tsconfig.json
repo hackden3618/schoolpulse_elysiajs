@@ -17,9 +17,13 @@
         "allowImportingTsExtensions": true,
         "verbatimModuleSyntax": true,
         "noEmit": true,
+        "baseUrl": ".",
         "paths": {
             "@/*": [
                 "./src/*"
+            ],
+            "@root/*": [
+                "./*"
             ]
         },
         // Best practices
