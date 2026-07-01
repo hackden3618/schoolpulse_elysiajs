@@ -1,4 +1,4 @@
-import { listAllSchools, createSchool } from "./schools.service";
+import { listAllSchools, createSchool } from "./service";
 
 export async function getSchoolsController({ set }: any) {
     try {
@@ -19,15 +19,16 @@ export async function getSchoolsController({ set }: any) {
 export async function createSchoolController({ body, set }: any) {
     try {
         const newSchool = await createSchool(body);
+        set.status = 201;
         return {
             message: `School has been created with ID: ${newSchool.id}`,
             body: newSchool
         };
     } catch (error: any) {
         console.error("Error creating school:", error);
-        set.status = 500;
+        set.status = 409;
         return {
-            message: "Error creating school"
+            message: "Error creating school" + error.code
         };
     }
 }

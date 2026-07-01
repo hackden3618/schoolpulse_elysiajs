@@ -1,4 +1,4 @@
-import { listAllStudents, createStudent } from "./students.service";
+import { listAllStudents, createStudent } from "./service";
 
 export async function getStudentsController({ set }: any) {
     try {

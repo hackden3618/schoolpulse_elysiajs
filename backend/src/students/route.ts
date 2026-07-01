@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { getStudentsController, createStudentController } from "./students.controller";
+import { getStudentsController, createStudentController } from "./controller";
 
 export const studentRoute = new Elysia()
     .get("/students", getStudentsController)

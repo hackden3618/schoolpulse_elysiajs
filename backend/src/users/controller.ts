@@ -1,4 +1,4 @@
-import { listAllUsers, postNewUser } from "./users.service";
+import { listAllUsers, postNewUser } from "./service";
 
 export async function getUsersController({ set }: any) {
     try {
