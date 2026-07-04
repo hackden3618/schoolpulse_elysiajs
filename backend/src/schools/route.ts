@@ -12,7 +12,7 @@ export const schoolRoute = new Elysia()
             county: t.String(),
             town: t.String(),
             schoolAddress: t.Optional(t.String()),
-            schoolLogo: t.Optional(t.String()),
+            schoolLogo: t.Optional(t.String()) || t.Null(),
             schoolEmail: t.Optional(t.String()),
             schoolWebsite: t.Optional(t.String()),
             postOffice: t.Optional(t.String())
