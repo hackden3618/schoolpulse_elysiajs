@@ -1,4 +1,3 @@
-
 generator client {
     provider = "prisma-client"
     output   = "../generated/prisma-client"
@@ -7,6 +6,12 @@ generator client {
 datasource db {
     provider = "postgresql"
 }
+
+/**
+ * =========================
+ * ENUMS
+ * =========================
+ */
 
 enum SchoolTier {
     small
@@ -85,39 +90,24 @@ enum ArchiveReason {
     other
 }
 
-model School {
-    id                    String             @id @default(uuid()) @db.Uuid
-    schoolCode            String             @map("school_code")
-    schoolName            String             @unique @map("school_name")
-    schoolPhone           String             @unique @map("school_phone")
-    schoolAddress         String?            @map("school_address")
-    schoolLogo            String?            @map("school_logo")
-    schoolEmail           String?            @unique @map("school_email")
-    schoolWebsite         String?            @map("school_website")
-    postOffice            String?            @map("post_office")
-    country               String             @default("Kenya") @map("country")
-    county                String             @map("county")
-    town                  String             @map("town")
-    currency              String             @default("KES")
-    timezone              String             @default("Africa/Nairobi")
-    subscriptionStatus    SubscriptionStatus @default(trial) @map("subscription_status")
-    subscriptionPlan      SubscriptionPlan   @default(free) @map("subscription_plan")
-    subscriptionStartDate DateTime?          @map("subscription_start_date") @db.Timestamptz
-    subscriptionEndDate   DateTime?          @map("subscription_end_date") @db.Timestamptz
-    schoolTier            SchoolTier?        @default(medium) @map("school_tier")
-    createdAt             DateTime           @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt             DateTime           @updatedAt @map("updated_at") @db.Timestamptz
-    deletedAt             DateTime?          @map("deleted_at") @db.Timestamptz
-
-    memberships      SchoolUser[]
-    streams          Stream[]
-    academicYears    AcademicYear[]
-    students         Student[]
-    classAssignments ClassAssignment[]
-
-    @@index([subscriptionStatus])
-    @@map("schools")
+enum AttendanceStatus {
+    present
+    absent
+    late
+    excused
 }
+
+enum SessionType {
+    morning
+    afternoon
+    lesson
+}
+
+/**
+ * =========================
+ * IDENTITY DOMAIN
+ * =========================
+ */
 
 model User {
     id             String     @id @default(uuid()) @db.Uuid
@@ -125,152 +115,228 @@ model User {
     secondName     String?    @map("second_name")
     lastName       String?    @map("last_name")
     phone          String     @unique
-    hashedPassword String     @map("hashed_password")
     email          String?    @unique
+    hashedPassword String     @map("hashed_password")
     profilePic     String?    @map("profile_pic")
     status         UserStatus @default(active)
-    createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt      DateTime   @updatedAt @map("updated_at") @db.Timestamptz
-    deletedAt      DateTime?  @map("deleted_at") @db.Timestamptz
-    lastLogin      DateTime?  @map("last_login")
 
-    memberships   SchoolUser[]
+    createdAt DateTime  @default(now()) @db.Timestamptz
+    updatedAt DateTime  @updatedAt @db.Timestamptz
+    deletedAt DateTime? @db.Timestamptz
+    lastLogin DateTime?
+
+    memberships   SchoolMembership[]
     guardianLinks StudentGuardian[]
 
     @@map("users")
 }
 
+model Role {
+    id          String  @id @default(uuid()) @db.Uuid
+    name        String  @unique
+    description String?
+
+    memberships MembershipRole[]
+
+    @@map("roles")
+}
+
+model School {
+    id         String @id @default(uuid()) @db.Uuid
+    schoolCode String @map("school_code")
+    schoolName String @unique @map("school_name")
+
+    schoolPhone String  @unique @map("school_phone")
+    schoolEmail String? @unique @map("school_email")
+
+    schoolAddress String? @map("school_address")
+    county        String
+    town          String
+    country       String  @default("Kenya")
+
+    currency String @default("KES")
+    timezone String @default("Africa/Nairobi")
+
+    subscriptionStatus SubscriptionStatus @default(trial)
+    subscriptionPlan   SubscriptionPlan   @default(free)
+
+    schoolTier SchoolTier @default(medium)
+
+    createdAt DateTime  @default(now()) @db.Timestamptz
+    updatedAt DateTime  @updatedAt @db.Timestamptz
+    deletedAt DateTime? @db.Timestamptz
+
+    memberships   SchoolMembership[]
+    academicYears AcademicYear[]
+    students      Student[]
+    streams       Stream[]
+
+    @@map("schools")
+}
+
+model SchoolMembership {
+    id       String @id @default(uuid()) @db.Uuid
+    schoolId String @db.Uuid
+    userId   String @db.Uuid
+
+    status MembershipStatus @default(active)
+
+    school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    roles MembershipRole[]
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([schoolId, userId])
+    @@map("school_memberships")
+}
+
+model MembershipRole {
+    id           String @id @default(uuid()) @db.Uuid
+    membershipId String @db.Uuid
+    roleId       String @db.Uuid
+
+    membership SchoolMembership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+    role       Role             @relation(fields: [roleId], references: [id], onDelete: Cascade)
+
+    @@unique([membershipId, roleId])
+    @@map("membership_roles")
+}
+
+/**
+ * =========================
+ * ACADEMIC STRUCTURE DOMAIN
+ * =========================
+ */
+
 model Stream {
-    id         String   @id @default(uuid()) @map("stream_id") @db.Uuid
-    streamName String   @map("stream_name")
-    schoolId   String   @map("school_id") @db.Uuid
-    createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt  DateTime @updatedAt @map("updated_at") @db.Timestamptz
+    id              String  @id @default(uuid()) @db.Uuid
+    name            String
+    schoolId        String  @db.Uuid
+    classTemplateId String? @db.Uuid
 
     school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-    classes Class[]
+    classInstances ClassInstance[]
+    classTemplate  ClassTemplate?  @relation(fields: [classTemplateId], references: [id])
 
-    @@unique([streamName, schoolId])
-    @@index([schoolId])
+    @@unique([name, schoolId])
     @@map("streams")
 }
 
 model AcademicYear {
-    id        String   @id @default(uuid()) @db.Uuid
-    name      String
-    schoolId  String   @map("school_id") @db.Uuid
-    startDate DateTime @map("start_date") @db.Date
-    endDate   DateTime @map("end_date") @db.Date
-    active    Boolean  @default(false) @map("active")
-    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz
+    id       String @id @default(uuid()) @db.Uuid
+    name     String
+    schoolId String @db.Uuid
 
-    school      School       @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-    terms       Term[]
-    classes     Class[]
-    enrollments Enrollment[]
+    startDate DateTime @db.Date
+    endDate   DateTime @db.Date
+
+    active Boolean @default(false)
+
+    school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+    terms          Term[]
+    classInstances ClassInstance[]
+    enrollments    Enrollment[]
 
     @@unique([name, schoolId])
-    @@index([schoolId])
     @@map("academic_years")
 }
 
 model Term {
-    id             String   @id @default(uuid()) @db.Uuid
+    id             String @id @default(uuid()) @db.Uuid
     name           String
-    academicYearId String   @map("academic_year_id") @db.Uuid
-    startDate      DateTime @map("start_date") @db.Date
-    endDate        DateTime @map("end_date") @db.Date
-    active         Boolean  @default(false) @map("active")
-    createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+    academicYearId String @db.Uuid
 
-    year AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+    startDate DateTime @db.Date
+    endDate   DateTime @db.Date
+    active    Boolean  @default(false)
+
+    academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
 
     enrollments Enrollment[]
 
     @@unique([academicYearId, name])
-    @@index([academicYearId])
     @@map("terms")
 }
 
-model Class {
-    id             String   @id @default(uuid()) @db.Uuid
-    streamId       String   @map("stream_id") @db.Uuid
-    academicYearId String   @map("academic_year_id") @db.Uuid
-    classTeacherId String   @map("class_teacher_id") @db.Uuid
-    level          Int      @map("level")
-    createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt      DateTime @updatedAt @map("updated_at") @db.Timestamptz
+/**
+ * =========================
+ * CORE ACADEMIC STRUCTURE (DDD FIX)
+ * =========================
+ */
 
-    stream       Stream       @relation(fields: [streamId], references: [id], onDelete: Cascade)
-    classTeacher SchoolUser   @relation(fields: [classTeacherId], references: [id], onDelete: Cascade)
-    year         AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+model ClassTemplate {
+    id       String @id @default(uuid()) @db.Uuid
+    schoolId String @db.Uuid
 
-    enrollments      Enrollment[]
-    classAssignments ClassAssignment[]
+    name  String
+    level Int
 
-    @@unique([streamId, academicYearId, level])
-    @@index([streamId])
-    @@index([academicYearId])
-    @@index([classTeacherId])
-    @@map("classes")
+    streams        Stream[]
+    classInstances ClassInstance[]
+
+    @@unique([schoolId, name])
+    @@map("class_templates")
 }
 
-model ClassAssignment {
-    id             String    @id @default(uuid()) @db.Uuid
-    classId        String    @map("class_id") @db.Uuid
-    teacherId      String    @map("teacher_id") @db.Uuid
-    schoolId       String    @map("school_id") @db.Uuid
-    academicYearId String    @map("academic_year_id") @db.Uuid
-    isActive       Boolean   @default(false) @map("is_active")
-    startDate      DateTime  @default(now()) @map("start_date") @db.Timestamptz
-    endDate        DateTime? @map("end_date") @db.Timestamptz()
+model ClassInstance {
+    id String @id @default(uuid()) @db.Uuid
 
-    class   Class      @relation(fields: [classId], references: [id], onDelete: Cascade)
-    teacher SchoolUser @relation(fields: [teacherId], references: [id], onDelete: Cascade)
-    school  School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+    classTemplateId String  @db.Uuid
+    academicYearId  String  @db.Uuid
+    streamId        String  @db.Uuid
+    classTeacherId  String? @db.Uuid
 
-    @@unique([classId, teacherId])
-    @@index([classId])
-    @@index([schoolId])
-    @@index([teacherId])
-    @@index([academicYearId])
-    @@map("class_assignments")
+    classTemplate ClassTemplate @relation(fields: [classTemplateId], references: [id], onDelete: Cascade)
+    academicYear  AcademicYear  @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+    stream        Stream        @relation(fields: [streamId], references: [id], onDelete: Cascade)
+
+    enrollments        Enrollment[]
+    classSubjects      ClassSubject[]
+    attendanceSessions AttendanceSession[]
+
+    @@unique([classTemplateId, academicYearId, streamId])
+    @@map("class_instances")
 }
+
+/**
+ * =========================
+ * STUDENT DOMAIN
+ * =========================
+ */
 
 model Student {
-    id              String         @id @default(uuid()) @map("student_id") @db.Uuid
-    dateOfBirth     DateTime       @map("date_of_birth") @db.Date
-    admissionNumber String         @map("admission_number")
-    firstName       String         @map("first_name")
-    schoolId        String         @map("school_id") @db.Uuid
-    secondName      String?        @map("second_name")
-    lastName        String         @map("last_name")
-    status          StudentStatus  @default(active) @map("student_life_cycle_status")
-    createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz
-    deletedAt       DateTime?      @map("deleted_at") @db.Timestamptz
-    archiveReason   ArchiveReason? @map("archive_reason")
+    id              String  @id @default(uuid()) @db.Uuid
+    admissionNumber String
+    firstName       String
+    secondName      String?
+    lastName        String
 
-    school      School            @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-    guardians   StudentGuardian[]
-    enrollments Enrollment[]
+    dateOfBirth DateTime @db.Date
+    schoolId    String @db.Uuid
+
+    status StudentStatus @default(active)
+
+    school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+    guardians         StudentGuardian[]
+    enrollments       Enrollment[]
+    assessmentResults AssessmentResult[]
 
     @@unique([schoolId, admissionNumber])
-    @@index([schoolId])
     @@map("students")
 }
 
 model StudentGuardian {
-    id            String       @id @default(uuid()) @db.Uuid
-    studentId     String       @map("student_id") @db.Uuid
-    guardianId    String       @map("guardian_id") @db.Uuid
-    relationship  Relationship @default(legal_guardian)
-    isPrimary     Boolean      @default(false) @map("is_primary")
-    receivesSms   Boolean      @default(true) @map("receives_sms")
-    receivesEmail Boolean      @default(true) @map("receives_email")
+    id         String @id @default(uuid()) @db.Uuid
+    studentId  String @db.Uuid
+    guardianId String @db.Uuid
+
+    relationship Relationship @default(legal_guardian)
 
     student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
     guardian User    @relation(fields: [guardianId], references: [id], onDelete: Cascade)
@@ -280,68 +346,206 @@ model StudentGuardian {
 }
 
 model Enrollment {
-    id               String           @id @default(uuid()) @db.Uuid
-    studentId        String           @map("student_id") @db.Uuid
-    classId          String           @map("class_id") @db.Uuid
-    academicYearId   String           @map("year_id") @db.Uuid
-    termId           String           @map("term_id") @db.Uuid
-    enrollmentStatus EnrollmentStatus @default(active) @map("enrollment_status")
-    createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt        DateTime         @updatedAt @map("updated_at") @db.Timestamptz
+    id String @id @default(uuid()) @db.Uuid
 
-    student      Student      @relation(fields: [studentId], references: [id], onDelete: Cascade)
-    academicYear AcademicYear @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
-    term         Term         @relation(fields: [termId], references: [id], onDelete: Cascade)
-    class        Class        @relation(fields: [classId], references: [id], onDelete: Cascade)
+    studentId       String @db.Uuid
+    classInstanceId String @db.Uuid
+    academicYearId  String @db.Uuid
+    termId          String? @db.Uuid
 
-    @@unique([studentId, classId, academicYearId, termId])
-    @@index([studentId])
-    @@index([classId])
-    @@index([academicYearId])
-    @@index([termId])
+    status EnrollmentStatus @default(active)
+
+    student       Student       @relation(fields: [studentId], references: [id], onDelete: Cascade)
+    classInstance ClassInstance @relation(fields: [classInstanceId], references: [id], onDelete: Cascade)
+    academicYear  AcademicYear  @relation(fields: [academicYearId], references: [id], onDelete: Cascade)
+    term          Term?         @relation(fields: [termId], references: [id], onDelete: Cascade)
+
+    createdAt DateTime @default(now())
+    updatedAt DateTime @updatedAt
+
+    @@unique([studentId, classInstanceId, academicYearId])
     @@map("enrollments")
 }
 
-model Role {
-    id          String   @id @default(uuid()) @db.Uuid
-    name        String   @unique
-    description String?
-    createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz
+/**
+ * =========================
+ * ACADEMIC DELIVERY DOMAIN
+ * =========================
+ */
 
-    membershipRoles SchoolMembershipRole[]
+model Subject {
+    id       String @id @default(uuid()) @db.Uuid
+    schoolId String @db.Uuid
 
-    @@map("roles")
+    name String
+    code String
+
+    classSubjects ClassSubject[]
+
+    @@unique([schoolId, code])
+    @@map("subjects")
 }
 
-model SchoolUser {
-    id        String           @id @default(uuid()) @db.Uuid
-    schoolId  String           @map("school_id") @db.Uuid
-    userId    String           @map("user_id") @db.Uuid
-    status    MembershipStatus @default(active)
-    createdAt DateTime         @default(now()) @map("created_at") @db.Timestamptz
-    updatedAt DateTime         @updatedAt @map("updated_at") @db.Timestamptz
-    deletedAt DateTime?        @map("deleted_at") @db.Timestamptz
-    leftAt    DateTime?        @map("left_at")
+model ClassSubject {
+    id String @id @default(uuid()) @db.Uuid
 
-    school           School                 @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-    user             User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
-    roles            SchoolMembershipRole[]
-    classes          Class[]
-    classAssignments ClassAssignment[]
+    classInstanceId String @db.Uuid
+    subjectId       String @db.Uuid
+    teacherId       String @db.Uuid
 
-    @@unique([schoolId, userId])
-    @@map("school_users")
+    classInstance ClassInstance @relation(fields: [classInstanceId], references: [id], onDelete: Cascade)
+    subject       Subject       @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+    @@unique([classInstanceId, subjectId])
+    @@map("class_subjects")
 }
 
-model SchoolMembershipRole {
-    id           String @id @default(uuid()) @db.Uuid
-    membershipId String @map("membership_id") @db.Uuid
-    roleId       String @map("role_id") @db.Uuid
+model Assessment {
+    id String @id @default(uuid()) @db.Uuid
 
-    membership SchoolUser @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-    role       Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
+    classInstanceId String @db.Uuid
+    subjectId       String @db.Uuid
 
-    @@unique([membershipId, roleId])
-    @@map("school_membership_roles")
+    type       String
+    totalMarks Int
+
+    results AssessmentResult[]
+
+    @@map("assessments")
+}
+
+model AssessmentResult {
+    id String @id @default(uuid()) @db.Uuid
+
+    assessmentId String @db.Uuid
+    studentId    String @db.Uuid
+
+    marks Float
+
+    assessment Assessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+    student    Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+    @@unique([assessmentId, studentId])
+    @@map("assessment_results")
+}
+
+/**
+ * =========================
+ * ATTENDANCE DOMAIN
+ * =========================
+ */
+
+model AttendanceSession {
+    id String @id @default(uuid()) @db.Uuid
+
+    classInstanceId String @db.Uuid
+    sessionDate     DateTime
+    sessionType     SessionType
+
+    status String @default("open")
+
+    records       AttendanceRecord[]
+    classInstance ClassInstance      @relation(fields: [classInstanceId], references: [id])
+
+    @@map("attendance_sessions")
+}
+
+model AttendanceRecord {
+    id String @id @default(uuid()) @db.Uuid
+
+    sessionId String @db.Uuid
+    studentId String @db.Uuid
+
+    status AttendanceStatus
+
+    checkInTime DateTime?
+
+    session AttendanceSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+    @@unique([sessionId, studentId])
+    @@map("attendance_records")
+}
+
+/**
+ * =========================
+ * FINANCE DOMAIN (SIMPLIFIED CORE)
+ * =========================
+ */
+
+model Invoice {
+    id String @id @default(uuid()) @db.Uuid
+
+    studentId String @db.Uuid
+    total     Float
+    balance   Float
+
+    status String
+
+    payments Payment[]
+
+    @@map("invoices")
+}
+
+model Payment {
+    id String @id @default(uuid()) @db.Uuid
+
+    invoiceId      String @db.Uuid
+    amount         Float
+    method         String
+    transactionRef String
+
+    createdAt DateTime @default(now())
+
+    invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+    @@map("payments")
+}
+
+/**
+ * =========================
+ * DISCIPLINE DOMAIN
+ * =========================
+ */
+
+model DisciplineCase {
+    id String @id @default(uuid()) @db.Uuid
+
+    studentId   String @db.Uuid
+    severity    String
+    status      String
+    description String
+
+    createdAt DateTime @default(now())
+
+    @@map("discipline_cases")
+}
+
+/**
+ * =========================
+ * COMMUNICATION DOMAIN
+ * =========================
+ */
+
+model Conversation {
+    id String @id @default(uuid()) @db.Uuid
+
+    type String
+
+    messages Message[]
+
+    @@map("conversations")
+}
+
+model Message {
+    id String @id @default(uuid()) @db.Uuid
+
+    conversationId String @db.Uuid
+    senderId       String @db.Uuid
+    content        String
+
+    createdAt DateTime @default(now())
+
+    conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+    @@map("messages")
 }
