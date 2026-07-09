@@ -6,6 +6,39 @@
 
 ---
 
+<!--toc:start-->
+- [VOLUME I — PRODUCT FOUNDATION](#volume-i-product-foundation)
+- [Chapter 5 — Navigation Architecture](#chapter-5-navigation-architecture)
+- [5.1 Navigation Philosophy](#51-navigation-philosophy)
+- [5.2 The Four Navigation Layers](#52-the-four-navigation-layers)
+- [5.3 Application Shell](#53-application-shell)
+- [5.4 Header Layout](#54-header-layout)
+    - [Left](#left)
+    - [Center](#center)
+    - [Right](#right)
+- [5.5 Sidebar](#55-sidebar)
+- [5.6 Sidebar Behavior](#56-sidebar-behavior)
+- [5.7 Active State](#57-active-state)
+- [5.8 Module Navigation](#58-module-navigation)
+- [5.9 Breadcrumbs](#59-breadcrumbs)
+- [5.10 Global Search](#510-global-search)
+- [5.11 Quick Actions](#511-quick-actions)
+- [5.12 School Switcher](#512-school-switcher)
+- [5.13 Notifications](#513-notifications)
+- [5.14 Page Layout](#514-page-layout)
+- [5.15 Tabs](#515-tabs)
+- [5.16 Drawers](#516-drawers)
+- [5.17 Dialogs](#517-dialogs)
+- [5.18 Full Pages](#518-full-pages)
+- [5.19 Back Navigation](#519-back-navigation)
+- [5.20 Navigation Memory](#520-navigation-memory)
+- [5.21 Empty Navigation](#521-empty-navigation)
+- [5.22 Mobile Navigation](#522-mobile-navigation)
+- [5.23 Navigation Performance](#523-navigation-performance)
+- [5.24 Navigation Rules](#524-navigation-rules)
+- [5.25 Complete Navigation Blueprint](#525-complete-navigation-blueprint)
+<!--toc:end-->
+
 # VOLUME I — PRODUCT FOUNDATION
 
 # Chapter 5 — Navigation Architecture

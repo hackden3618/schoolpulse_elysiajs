@@ -10,6 +10,43 @@
 
 ---
 
+<!--toc:start-->
+- [6.1 Design Philosophy](#61-design-philosophy)
+- [6.2 Visual Personality](#62-visual-personality)
+- [6.3 Design Keywords](#63-design-keywords)
+- [6.4 Layout Philosophy](#64-layout-philosophy)
+- [6.5 Grid System](#65-grid-system)
+- [6.6 Spacing System](#66-spacing-system)
+- [6.7 Border Radius](#67-border-radius)
+- [6.8 Shadows](#68-shadows)
+- [6.9 Color Philosophy](#69-color-philosophy)
+- [6.10 Primary Brand Color](#610-primary-brand-color)
+- [6.11 Semantic Colors](#611-semantic-colors)
+- [6.12 Neutral Palette](#612-neutral-palette)
+- [6.13 Background Hierarchy](#613-background-hierarchy)
+- [6.14 Typography Philosophy](#614-typography-philosophy)
+- [6.15 Typography Scale](#615-typography-scale)
+- [6.16 Font Characteristics](#616-font-characteristics)
+- [6.17 Icons](#617-icons)
+- [6.18 Illustration Usage](#618-illustration-usage)
+- [6.19 Tables](#619-tables)
+- [6.20 Cards](#620-cards)
+- [6.21 Forms](#621-forms)
+- [6.22 Buttons](#622-buttons)
+- [6.23 Inputs](#623-inputs)
+- [6.24 Badges](#624-badges)
+- [6.25 Chips](#625-chips)
+- [6.26 Animations](#626-animations)
+- [6.27 Loading States](#627-loading-states)
+- [6.28 Empty States](#628-empty-states)
+- [6.29 Feedback Components](#629-feedback-components)
+- [6.30 Component Consistency](#630-component-consistency)
+- [6.31 Accessibility Baseline](#631-accessibility-baseline)
+- [6.32 Future-Proofing](#632-future-proofing)
+- [6.33 Design Tokens](#633-design-tokens)
+- [6.34 Design System Principles](#634-design-system-principles)
+<!--toc:end-->
+
 > **Purpose**
 >
 > The Design System is the visual language of SchoolPulse.
