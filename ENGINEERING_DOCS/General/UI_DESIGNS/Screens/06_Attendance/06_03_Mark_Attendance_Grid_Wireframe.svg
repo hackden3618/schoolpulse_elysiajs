@@ -1,0 +1,170 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" width="100%" height="100%">
+  <!-- Background -->
+  <rect width="1200" height="900" fill="#F9FAFB"/>
+  
+  <!-- Sidebar Navigation -->
+  <rect x="0" y="0" width="240" height="900" fill="#1F2937"/>
+  <rect x="0" y="0" width="240" height="70" fill="#111827"/>
+  <circle cx="45" cy="35" r="16" fill="#1E40AF"/>
+  <text x="75" y="41" font-family="Inter, sans-serif" font-weight="bold" font-size="16" fill="#FFFFFF">SchoolPulse</text>
+  
+  <!-- Sidebar Navigation Links -->
+  <text x="24" y="115" font-family="Inter, sans-serif" font-weight="600" font-size="12" fill="#6B7280" letter-spacing="1">MAIN MENU</text>
+  
+  <!-- Dashboard link -->
+  <text x="56" y="155" font-family="Inter, sans-serif" font-weight="500" font-size="14" fill="#9CA3AF">Dashboard</text>
+  <!-- Students link -->
+  <text x="56" y="195" font-family="Inter, sans-serif" font-weight="500" font-size="14" fill="#9CA3AF">Students</text>
+  <!-- Attendance link (Active) -->
+  <rect x="12" y="217" width="216" height="38" rx="6" fill="#1E40AF" fill-opacity="0.15"/>
+  <rect x="0" y="217" width="4" height="38" fill="#1E40AF"/>
+  <text x="56" y="241" font-family="Inter, sans-serif" font-weight="bold" font-size="14" fill="#60A5FA">Attendance</text>
+  <!-- Finance link -->
+  <text x="56" y="287" font-family="Inter, sans-serif" font-weight="500" font-size="14" fill="#9CA3AF">Finance</text>
+  <!-- Academics link -->
+  <text x="56" y="327" font-family="Inter, sans-serif" font-weight="500" font-size="14" fill="#9CA3AF">Academics</text>
+  <!-- Communication link -->
+  <text x="56" y="367" font-family="Inter, sans-serif" font-weight="500" font-size="14" fill="#9CA3AF">Communication</text>
+  <!-- Reports link -->
+  <text x="56" y="407" font-family="Inter, sans-serif" font-weight="500" font-size="14" fill="#9CA3AF">Reports</text>
+  <!-- Settings link -->
+  <text x="56" y="447" font-family="Inter, sans-serif" font-weight="500" font-size="14" fill="#9CA3AF">Settings</text>
+  
+  <!-- Top Navigation Header -->
+  <rect x="240" y="0" width="960" height="70" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+  <text x="270" y="41" font-family="Inter, sans-serif" font-weight="bold" font-size="18" fill="#111827">Mark Attendance</text>
+  <!-- Breadcrumb -->
+  <text x="270" y="22" font-family="Inter, sans-serif" font-size="11" fill="#6B7280">Attendance / Mark Session / Class 4 West</text>
+  
+  <!-- School context indicator -->
+  <rect x="940" y="16" width="230" height="38" rx="19" fill="#F3F4F6"/>
+  <circle cx="959" cy="35" r="12" fill="#D1D5DB"/>
+  <text x="980" y="40" font-family="Inter, sans-serif" font-weight="600" font-size="12" fill="#374151">St. Joseph's Primary</text>
+  
+  <!-- Main Content Container -->
+  <!-- Context summary card -->
+  <rect x="270" y="94" width="900" height="96" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+  
+  <text x="300" y="132" font-family="Inter, sans-serif" font-weight="bold" font-size="14" fill="#6B7280">CLASS INSTANCE</text>
+  <text x="300" y="157" font-family="Inter, sans-serif" font-weight="700" font-size="18" fill="#111827">Class 4 West</text>
+  
+  <text x="480" y="132" font-family="Inter, sans-serif" font-weight="bold" font-size="14" fill="#6B7280">SESSION DATE</text>
+  <text x="480" y="157" font-family="Inter, sans-serif" font-weight="700" font-size="18" fill="#111827">Thu, 09 July 2026</text>
+  
+  <text x="690" y="132" font-family="Inter, sans-serif" font-weight="bold" font-size="14" fill="#6B7280">SESSION TYPE</text>
+  <text x="690" y="157" font-family="Inter, sans-serif" font-weight="700" font-size="18" fill="#1E40AF">Morning Session</text>
+  
+  <text x="900" y="132" font-family="Inter, sans-serif" font-weight="bold" font-size="14" fill="#6B7280">STATS SUMMARY</text>
+  <text x="900" y="157" font-family="Inter, sans-serif" font-weight="700" font-size="16" fill="#111827">Present: 38/40 (95%)</text>
+  
+  <!-- Filter & Action Bar -->
+  <rect x="270" y="210" width="300" height="38" rx="6" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="286" y="233" font-family="Inter, sans-serif" font-size="13" fill="#9CA3AF">Search student by name or admin number...</text>
+  
+  <rect x="1030" y="210" width="140" height="38" rx="6" fill="#10B981"/>
+  <text x="1100" y="233" font-family="Inter, sans-serif" font-weight="bold" font-size="13" fill="#FFFFFF" text-anchor="middle">Submit &amp; Lock</text>
+  
+  <!-- Attendance Table Grid -->
+  <rect x="270" y="268" width="900" height="580" rx="8" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
+  
+  <!-- Table Header -->
+  <rect x="270" y="268" width="900" height="46" fill="#F9FAFB" rx="8"/>
+  <line x1="270" y1="314" x2="1170" y2="314" stroke="#E5E7EB" stroke-width="1"/>
+  <text x="290" y="296" font-family="Inter, sans-serif" font-weight="600" font-size="13" fill="#374151">Admin #</text>
+  <text x="400" y="296" font-family="Inter, sans-serif" font-weight="600" font-size="13" fill="#374151">Student Name</text>
+  <text x="700" y="296" font-family="Inter, sans-serif" font-weight="600" font-size="13" fill="#374151">Gender</text>
+  <text x="850" y="296" font-family="Inter, sans-serif" font-weight="600" font-size="13" fill="#374151" text-anchor="middle">Status Selection (Present / Absent / Late / Excused)</text>
+  
+  <!-- Row 1 -->
+  <text x="290" y="348" font-family="Inter, sans-serif" font-weight="600" font-size="13" fill="#111827">ADM-2024-042</text>
+  <text x="400" y="348" font-family="Inter, sans-serif" font-weight="600" font-size="14" fill="#111827">Kamau Mutua John</text>
+  <text x="700" y="348" font-family="Inter, sans-serif" font-size="13" fill="#4B5563">Male</text>
+  
+  <!-- Status pill toggles row 1 (Present is active) -->
+  <rect x="850" y="328" width="55" height="28" rx="14" fill="#10B981"/>
+  <text x="877" y="346" font-family="Inter, sans-serif" font-weight="bold" font-size="12" fill="#FFFFFF" text-anchor="middle">P</text>
+  
+  <rect x="912" y="328" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="939" y="346" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">A</text>
+  
+  <rect x="974" y="328" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="1001" y="346" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">L</text>
+  
+  <rect x="1036" y="328" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="1063" y="346" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">E</text>
+  
+  <line x1="270" y1="375" x2="1170" y2="375" stroke="#F3F4F6" stroke-width="1"/>
+  
+  <!-- Row 2 -->
+  <text x="290" y="409" font-family="Inter, sans-serif" font-weight="600" font-size="13" fill="#111827">ADM-2024-118</text>
+  <text x="400" y="409" font-family="Inter, sans-serif" font-weight="600" font-size="14" fill="#111827">Faith Nduta Wambui</text>
+  <text x="700" y="409" font-family="Inter, sans-serif" font-size="13" fill="#4B5563">Female</text>
+  
+  <!-- Status pill toggles row 2 (Absent is active) -->
+  <rect x="850" y="389" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="877" y="407" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">P</text>
+  
+  <rect x="912" y="389" width="55" height="28" rx="14" fill="#EF4444"/>
+  <text x="939" y="407" font-family="Inter, sans-serif" font-weight="bold" font-size="12" fill="#FFFFFF" text-anchor="middle">A</text>
+  
+  <rect x="974" y="389" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="1001" y="407" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">L</text>
+  
+  <rect x="1036" y="389" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="1063" y="407" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">E</text>
+  
+  <line x1="270" y1="436" x2="1170" y2="436" stroke="#F3F4F6" stroke-width="1"/>
+  
+  <!-- Row 3 -->
+  <text x="290" y="470" font-family="Inter, sans-serif" font-weight="600" font-size="13" fill="#111827">ADM-2025-003</text>
+  <text x="400" y="470" font-family="Inter, sans-serif" font-weight="600" font-size="14" fill="#111827">Amina Mohamed Said</text>
+  <text x="700" y="470" font-family="Inter, sans-serif" font-size="13" fill="#4B5563">Female</text>
+  
+  <!-- Status pill toggles row 3 (Late is active) -->
+  <rect x="850" y="450" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="877" y="468" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">P</text>
+  
+  <rect x="912" y="450" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="939" y="468" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">A</text>
+  
+  <rect x="974" y="450" width="55" height="28" rx="14" fill="#F59E0B"/>
+  <text x="1001" y="468" font-family="Inter, sans-serif" font-weight="bold" font-size="12" fill="#FFFFFF" text-anchor="middle">L</text>
+  
+  <rect x="1036" y="450" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="1063" y="468" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">E</text>
+  
+  <line x1="270" y1="497" x2="1170" y2="497" stroke="#F3F4F6" stroke-width="1"/>
+  
+  <!-- Row 4 -->
+  <text x="290" y="531" font-family="Inter, sans-serif" font-weight="600" font-size="13" fill="#111827">ADM-2024-015</text>
+  <text x="400" y="531" font-family="Inter, sans-serif" font-weight="600" font-size="14" fill="#111827">Kevin Otieno Onyango</text>
+  <text x="700" y="531" font-family="Inter, sans-serif" font-size="13" fill="#4B5563">Male</text>
+  
+  <!-- Status pill toggles row 4 (Present is active) -->
+  <rect x="850" y="511" width="55" height="28" rx="14" fill="#10B981"/>
+  <text x="877" y="529" font-family="Inter, sans-serif" font-weight="bold" font-size="12" fill="#FFFFFF" text-anchor="middle">P</text>
+  
+  <rect x="912" y="511" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="939" y="529" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">A</text>
+  
+  <rect x="974" y="511" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="1001" y="529" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">L</text>
+  
+  <rect x="1036" y="511" width="55" height="28" rx="14" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="1063" y="529" font-family="Inter, sans-serif" font-weight="medium" font-size="12" fill="#4B5563" text-anchor="middle">E</text>
+  
+  <line x1="270" y1="558" x2="1170" y2="558" stroke="#F3F4F6" stroke-width="1"/>
+  
+  <!-- Row 5 (Skeleton load simulator for lower rows) -->
+  <rect x="290" y="585" width="90" height="14" rx="3" fill="#E5E7EB"/>
+  <rect x="400" y="585" width="180" height="14" rx="3" fill="#E5E7EB"/>
+  <rect x="700" y="585" width="40" height="14" rx="3" fill="#E5E7EB"/>
+  <rect x="850" y="580" width="241" height="24" rx="12" fill="#F3F4F6"/>
+  
+  <line x1="270" y1="619" x2="1170" y2="619" stroke="#F3F4F6" stroke-width="1"/>
+  
+  <!-- Pagination footer -->
+  <text x="290" y="820" font-family="Inter, sans-serif" font-size="13" fill="#6B7280">Showing 1 to 5 of 40 students</text>
+  <rect x="1000" y="802" width="150" height="28" rx="4" fill="#FFFFFF" stroke="#D1D5DB" stroke-width="1"/>
+  <text x="1075" y="820" font-family="Inter, sans-serif" font-size="12" fill="#374151" text-anchor="middle">Page 1 of 8 &gt;</text>
+</svg>
