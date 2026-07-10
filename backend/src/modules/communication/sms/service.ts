@@ -1,4 +1,4 @@
-import { sms } from "@/infrastructure/sms/sms.provider";
+import { sms } from "@/infrastructure/messaging/sms/sms.provider";
 
 export interface SmsOptions {
     recipients: string[];

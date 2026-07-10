@@ -477,3 +477,81 @@ prefer consistency over cleverness.
 Architecture over shortcuts.
 
 Long-term maintainability over temporary convenience.
+
+
+
+> extra notes for AI agents
+# AI Decision Framework
+
+Before making any modification, ask internally:
+
+1. Does this already exist?
+
+If yes:
+Reuse it.
+
+---
+
+2. Does this change Version 1.1.0 scope?
+
+If yes:
+Stop.
+Suggest documenting it for v1.2.0 instead.
+
+---
+
+3. Does this violate the frozen schema?
+
+If yes:
+Stop.
+
+---
+
+4. Does this duplicate an existing module?
+
+If yes:
+Extend the existing module.
+
+---
+
+5. Does this belong in Infrastructure?
+
+If yes:
+Move it there.
+
+---
+
+6. Does this belong in Common?
+
+If yes:
+Move it there.
+
+---
+
+7. Does this belong in Policies?
+
+If it is a business rule,
+move it into a Policy class.
+
+---
+
+8. Does this require an Event?
+
+If yes:
+Emit an EventOutbox event.
+
+---
+
+9. Does this require an Audit Log?
+
+If yes:
+Create one.
+
+---
+
+10. Is this documented?
+
+If not:
+
+Document first.
+Code second.

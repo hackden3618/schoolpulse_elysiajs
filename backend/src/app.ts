@@ -1,10 +1,10 @@
 import { Elysia } from "elysia";
 import { openapi } from "@elysia/openapi";
-import { userRoute } from "@/modules/users/routes";
-import { schoolRoute } from "@/modules/schools/routes";
-import { studentRoute } from "@/modules/students/routes";
-import { streamsRoute } from "@/modules/streams/routes";
-import { communicationRoute } from "@/modules/communication/routes";
+import { userRoute } from "@/modules/users/router";
+import { schoolRoute } from "@/modules/schools/router";
+import { studentRoute } from "@/modules/students/router";
+import { streamsRoute } from "@/modules/streams/router";
+import { communicationRoute } from "@/modules/communication/router";
 
 export const app = new Elysia();
 
