@@ -1,495 +1,479 @@
-# AGENTS.md
+# SchoolPulse Engineering Constitution
 
-## Purpose
+Version: 1.1.0
 
-This file is the operating contract for any AI agent, coding assistant, or contributor working in the SchoolPulse codebase.
+This document defines the engineering rules that every contributor
+(human or AI) MUST follow.
 
-The goal is deterministic collaboration. If two competent agents read this file and work on the same task, they should reach the same interpretation of product scope, architecture, documentation authority, coding standards, and implementation constraints.
+Violation of these rules results in inconsistent architecture,
+feature drift and technical debt.
 
-SchoolPulse is a serious commercial SaaS product for schools. Treat the repository as production-bound software, not an experiment.
+---
 
-## Product Identity
+# 1. Project Identity
 
-SchoolPulse is a cloud-based, multi-tenant school management platform built for Kenyan schools.
+SchoolPulse is a production-grade multi-tenant School Management SaaS.
 
-Its v1.1.0 product boundary includes:
+Target users include:
 
-1. School Management
-2. User Management
-3. Student Management
-4. Academic Structure
-5. Attendance
-6. Assessments
-7. Finance
-8. Communication
-9. Event System
-10. Reporting
+- Primary Schools
+- Junior Secondary Schools
+- Senior Secondary Schools
+- Mixed Schools
 
-Do not add modules outside this list unless the user explicitly changes the product version boundary in the engineering documents.
+This is NOT:
 
-## Canonical Documentation
+- a tutorial
+- a university project
+- a CRUD demo
+- an experimental codebase
 
-All agents must treat `ENGINEERING_DOCS` as the source of product and engineering truth.
+Every engineering decision must assume thousands of schools,
+millions of records and long-term maintainability.
 
-Read documents in this order before making architectural, database, API, or module-level decisions:
+---
 
-1. `ENGINEERING_DOCS/README.md`
-2. `ENGINEERING_DOCS/SCHOOLPULSE_PROJECT_CHARTER.MD`
-3. `ENGINEERING_DOCS/SchoolPulse_Engineering_Spec_v1.1.0.md`
-4. `ENGINEERING_DOCS/SchoolPulse_SRS_v1.1.0.md`
-5. `ENGINEERING_DOCS/MODEL_PLAN.md`
-6. `ENGINEERING_DOCS/POSTGRESQL_CODE_TO_BE_COMPLETED.sql`
-7. `ENGINEERING_DOCS/SchoolPulse_ProductDocument_v1.1.0.md`
+# 2. Current Development Phase
 
-Use `.docx` files only as print/share artifacts. Do not treat `.docx` files as the editable source of truth when a matching Markdown file exists.
+Current Version:
 
-## Documentation Authority Order
+v1.1.0
 
-When documents conflict, resolve in this order:
+This version is feature frozen.
 
-1. `SCHOOLPULSE_PROJECT_CHARTER.MD` controls product scope and governance.
-2. `SchoolPulse_Engineering_Spec_v1.1.0.md` controls engineering architecture, APIs, events, security, and coding standards.
-3. `SchoolPulse_SRS_v1.1.0.md` controls testable product behavior.
-4. `MODEL_PLAN.md` controls model planning intent, especially enum-first Prisma/database design.
-5. `POSTGRESQL_CODE_TO_BE_COMPLETED.sql` controls target database shape, unless it contradicts higher-level governance.
-6. `SchoolPulse_ProductDocument_v1.1.0.md` controls client-facing language and value proposition only.
+Only implement functionality already defined in:
 
-If a conflict affects implementation, update the relevant documentation first or in the same change as the code.
+- Engineering Documents
+- Database Schema
+- API Specification
 
-## Deterministic Agent Workflow
+Do NOT invent new product features.
 
-Every agent must follow this workflow for implementation tasks:
+If an improvement is discovered:
 
-1. Read the relevant canonical docs listed above.
-2. Inspect existing code before editing.
-3. Identify the module boundary.
-4. Preserve existing patterns unless they violate this file or canonical docs.
-5. Make the smallest change that fully satisfies the task.
-6. Keep product scope inside v1.1.0.
-7. Add or update tests when behavior changes.
-8. Run the most relevant validation commands available locally.
-9. Report exactly what changed, what was verified, and what remains unverified.
+DO NOT implement it.
 
-Do not skip directly to coding from memory.
+Instead document it under:
 
-## Strict Non-Negotiable Constraints
+Future Improvements (v1.2+)
 
-Agents must not:
+---
 
-- Add new product modules outside v1.1.0.
-- Invent features not present in the charter, engineering spec, SRS, model plan, or SQL target.
-- Bypass tenant isolation.
-- Query tenant-owned records without a school constraint or verified parent ownership path.
-- Use floating-point arithmetic for money.
-- Hard-delete student, finance, audit, or school records.
-- Put business logic in controllers or routes.
-- Put database calls in controllers.
-- Put authorization decisions in repositories.
-- Return raw database errors, stack traces, secrets, password hashes, OTPs, or tokens to API clients.
-- Edit generated files unless the task explicitly requires regeneration.
-- Rewrite unrelated code while completing a scoped request.
-- Revert user changes unless the user explicitly asks.
-- Treat client-facing product language as engineering requirements when engineering docs say otherwise.
+# 3. Source of Truth
 
-## Current Technology Stack
+The order of authority is:
 
-Backend:
+1.
+Engineering Documentation
 
-- Bun
-- TypeScript
-- Elysia
-- Prisma
-- PostgreSQL
-- Redis planned for queues/rate limiting/background work
-- JWT planned for authenticated API access
+↓
 
-Frontend:
+2.
+Prisma Schema
 
-- React
-- TypeScript
-- TailwindCSS
+↓
 
-Deployment target:
+3.
+API Documentation
 
-- Azure
-- Cloudflare
-- Managed PostgreSQL
-- Object storage
+↓
 
-## Repository Structure
+4.
+Backend Implementation
 
-Expected high-level structure:
+↓
 
-```text
-/
-  AGENTS.md
-  README.md
-  ENGINEERING_DOCS/
-  backend/
-  frontend/
-```
+5.
+Frontend
 
-Backend source currently lives in:
+Never allow implementation to redefine documentation.
 
-```text
-backend/src/
-```
+Documentation drives implementation.
 
-Prisma schema currently lives in:
+---
 
-```text
-backend/prisma/schema.prisma
-```
+# 4. Frozen Components
 
-Target SQL planning schema lives in:
+The following are frozen unless explicitly requested.
 
-```text
-ENGINEERING_DOCS/POSTGRESQL_CODE_TO_BE_COMPLETED.sql
-```
+✓ Database Schema
 
-## Backend Module Structure
+✓ Product Scope
 
-Every backend module must use this structure:
+✓ Core Business Rules
 
-```text
-backend/src/<module>/
-  schema.ts
-  repository.ts
-  service.ts
-  controller.ts
-  route.ts
-  README.md
-```
+✓ Entity Relationships
 
-If a module does not yet have all files, create only the files required for the task, but align with this structure.
+✓ API Design Principles
 
-## Backend Layer Responsibilities
+✓ Multi-tenancy Design
 
-`schema.ts`:
+✓ Version 1.1.0 Scope
 
-- Defines request schemas.
-- Defines response schemas where useful.
-- Defines DTO/input/output types.
-- Performs shape-level validation before data reaches business logic.
-- Must not import Prisma.
-- Must not perform database queries.
+---
 
-`repository.ts`:
+# 5. Architecture Style
 
-- Contains Prisma database access only.
-- Receives already-validated inputs.
-- Must not know HTTP details.
-- Must not decide business permissions.
-- Must not emit HTTP responses.
-- Must include tenant-aware filters for tenant-owned data.
+Backend follows Vertical Slice Architecture.
 
-`service.ts`:
+Every feature module contains:
 
-- Contains business logic.
-- Enforces domain rules.
-- Coordinates transactions.
-- Calls repositories.
-- Produces domain events where required.
-- Owns application-level decisions such as state transitions.
-- Must not return raw provider/database errors to controllers.
+controller
 
-`controller.ts`:
+service
 
-- Translates Elysia request context into service calls.
-- Maps service results into API response envelopes.
-- Maps known application errors into safe API errors.
-- Must not import Prisma.
-- Must not contain domain logic.
+repository
 
-`route.ts`:
+routes
 
-- Registers Elysia routes.
-- Attaches schemas, middleware, and OpenAPI metadata.
-- Must not contain domain logic.
+schema
 
-## API Standards
+mapper
 
-Production API routes must use:
+permissions
 
-```text
-/api/v1
-```
+events
 
-Current code may still have unversioned routes. When touching a route for production implementation, migrate it toward the `/api/v1` standard unless the user asks for a temporary compatibility change.
+README
 
-Collection endpoints must support pagination when returning lists.
+No exceptions.
 
-Standard error shape:
+---
 
-```json
-{
-  "error": {
-    "code": "VALIDATION_ERROR",
-    "message": "Human-safe message",
-    "details": [],
-    "requestId": "request-id"
-  }
-}
-```
+# 6. Separation of Responsibilities
 
-Do not expose internal stack traces to clients.
+Routes
 
-## Multi-Tenancy Rules
+↓
 
-School is the tenant boundary.
+Controllers
 
-For tenant-owned data:
+↓
 
-- Include `schoolId` in API route context where practical.
-- Validate the authenticated user has an active membership in that school.
-- Filter all repository queries by `schoolId` or through a parent relation proven to belong to the school.
-- Return `403 Forbidden` for known cross-school access attempts.
-- Return `404 Not Found` only when the record is absent within the valid tenant context.
+Services
 
-Never assume a UUID is safe because it came from the client.
+↓
 
-## Database and Prisma Rules
+Repositories
 
-Follow the enum-first model plan.
+↓
 
-Before implementing or changing Prisma models:
+Prisma
 
-1. Check `MODEL_PLAN.md`.
-2. Check `POSTGRESQL_CODE_TO_BE_COMPLETED.sql`.
-3. Define enums before dependent models.
-4. Use clean TypeScript-friendly Prisma field names.
-5. Map database snake_case columns with `@map`.
-6. Use `@@map` for table names.
+Controllers never contain business logic.
 
-Use:
+Repositories never contain business logic.
 
-- `Decimal` or database `numeric` for money.
-- UUID primary keys.
-- `createdAt`, `updatedAt`, and `deletedAt` fields for lifecycle tracking where applicable.
-- Soft delete for school, student, finance, communication, audit-sensitive, and operational records.
+Services orchestrate work.
 
-Do not use:
+Policies enforce business rules.
 
-- `Float` for money.
-- Hard deletes for financial records.
-- Free-form strings where a controlled enum exists.
+---
 
-## Academic Model Rule
+# 7. Business Rules
 
-Use the simpler v1.1.0 academic model:
+Business rules belong inside Policy classes.
 
-- `classes`
-- `class_instances`
-- `class_instances.stream_name`
+Example
 
-Do not reintroduce separate `class_templates` or `streams` aggregate tables unless the engineering documents are explicitly changed first.
+StudentPolicy
 
-## Finance Rules
+InvoicePolicy
 
-Finance is audit-sensitive.
+AttendancePolicy
 
-Agents must enforce:
+MembershipPolicy
 
-- Money uses Decimal/numeric.
-- Confirmed payments are immutable.
-- Corrections use reversal records.
-- Duplicate payment references are rejected per school/provider.
-- Invoice balances cannot become negative.
-- Overpayment becomes credit, not negative balance.
-- Receipts are generated for confirmed payments.
-- Financial actions produce audit logs.
+Never scatter business rules across services.
 
-Never implement financial calculations with JavaScript floating-point `number` arithmetic for production logic.
+---
 
-## Event Outbox Rules
+# 8. Infrastructure
 
-Use the transactional outbox pattern for workflows that produce asynchronous side effects.
+External systems belong under Infrastructure.
 
-Examples:
+Examples
 
-- Student admitted
-- Guardian added
-- Attendance marked
-- Attendance edited
-- Invoice generated
-- Payment received
-- Payment reversed
-- Fee reminder queued
-- Assessment published
-- Message sent
+Database
 
-Outbox events caused by a database write must be created in the same transaction as the state change.
+Queue
 
-Do not add extra outbox fields such as `workerId`, `correlationId`, or `causationId` for v1.1.0 unless the model plan is updated.
+SMS
 
-## Security Rules
+Email
 
-Agents must treat the system as handling sensitive data about minors and family finances.
+Storage
 
-Required behavior:
+Cache
 
-- Hash passwords before storage.
-- Never return password hashes.
-- Never log secrets, OTPs, raw tokens, or payment credentials.
-- Enforce RBAC server-side.
-- Enforce tenant isolation server-side.
-- Validate all inputs.
-- Rate-limit authentication and OTP endpoints when implemented.
-- Use safe user-facing errors.
+Events
 
-Parent access must be limited to students explicitly linked to that parent/guardian.
+Feature modules must never implement infrastructure directly.
 
-## Validation Rules
+---
 
-Validate input at the route/schema boundary before it reaches service or repository logic.
+# 9. Documentation First
 
-Validation must cover:
+Before implementing any major feature,
+documentation must exist.
 
-- Required fields.
-- UUID format where applicable.
-- Enum values.
-- String length constraints.
-- Numeric/money constraints.
-- Date validity.
-- Pagination limits.
+Required order:
 
-Business validation belongs in services, not schemas.
+Architecture
 
-## Testing Expectations
+↓
 
-When changing behavior, add or update tests appropriate to risk.
+Database
 
-Priority tests:
+↓
 
-- Tenant isolation.
-- Permission enforcement.
-- Input validation.
-- Student admission and guardian linking.
-- Enrollment uniqueness.
-- Attendance session uniqueness.
-- Finance decimal calculations.
-- Duplicate payment prevention.
-- Payment reversal behavior.
-- Outbox event creation.
+API
 
-If the project lacks a test harness for the touched area, document the gap and perform the closest available validation.
+↓
 
-## Documentation Update Rules
+UI
 
-Update documentation when code changes alter:
+↓
 
-- Product scope.
-- API paths or request/response shapes.
-- Database schema.
-- Domain events.
-- Security behavior.
-- Module responsibilities.
-- Business rules.
+Implementation
 
-Markdown files are source. Regenerate `.docx` only when the user needs print/share artifacts.
+Never reverse this process.
 
-## Client-Facing vs Internal Documentation
+---
 
-Do not mix audiences.
+# 10. UI Philosophy
 
-Client-facing:
+The UI should communicate trust.
 
-- `SchoolPulse_ProductDocument_v1.1.0.md`
-- Matching `.docx` print artifact
+Keywords:
 
-Internal engineering:
+Professional
 
-- `SchoolPulse_Engineering_Spec_v1.1.0.md`
-- `SchoolPulse_SRS_v1.1.0.md`
-- `MODEL_PLAN.md`
-- `POSTGRESQL_CODE_TO_BE_COMPLETED.sql`
+Calm
 
-Client-facing documents must not mention internal pitch strategy, implementation plans, coding standards, or speculative future modules.
+Fast
 
-Engineering documents must be precise, testable, and implementation-oriented.
+Minimal
 
-## Code Style
+Enterprise
 
-Use TypeScript with explicit types.
+Never imitate social media dashboards.
 
-Prefer:
+Avoid excessive gradients.
 
-- Clear function names.
-- Small module-level functions.
-- Typed DTOs.
-- Schema-derived types where possible.
-- Early validation.
-- Explicit error classes or typed error objects.
-- Prisma transactions for multi-write workflows.
+Avoid playful interfaces.
+
+Favor clarity over decoration.
+
+---
+
+# 11. Design Philosophy
+
+School administrators use this system for hours every day.
+
+Optimize for:
+
+low cognitive load
+
+speed
+
+predictability
+
+keyboard efficiency
+
+high information density
+
+large tables
+
+bulk operations
+
+minimal clicks
+
+---
+
+# 12. Performance Philosophy
 
 Avoid:
 
-- `any` unless bridging an untyped framework boundary.
-- Large controllers.
-- Hidden cross-module side effects.
-- Broad refactors unrelated to the task.
-- Magic strings for controlled states.
+N+1 queries
 
-## Error Handling
+large payloads
 
-Use consistent application errors.
+duplicate API calls
 
-Map errors to these HTTP categories:
+duplicate rendering
 
-- `400 VALIDATION_ERROR`
-- `401 UNAUTHENTICATED`
-- `403 FORBIDDEN`
-- `404 NOT_FOUND`
-- `409 CONFLICT`
-- `429 RATE_LIMITED`
-- `500 INTERNAL_ERROR`
-- `502 PROVIDER_ERROR`
+unnecessary loading
 
-Do not leak raw Prisma errors to clients.
+Pagination is preferred over loading everything.
 
-## Git and File Safety
+---
 
-The working tree may contain user changes.
+# 13. Security
 
-Agents must:
+Always assume:
 
-- Check relevant files before editing.
-- Avoid touching unrelated files.
-- Never run destructive git commands unless explicitly requested.
-- Never revert user changes unless explicitly requested.
-- Keep generated artifacts separate from source edits when possible.
+every endpoint is public until protected.
 
-## Deterministic Output Rules
+Every endpoint must consider:
 
-For the same task and same repository state, agents should produce the same output by following these rules:
+Authentication
 
-- Use canonical documents in the specified read order.
-- Use the documentation authority order for conflicts.
-- Use existing module patterns unless they violate this file.
-- Use the backend layer responsibilities exactly.
-- Use `/api/v1` for production API design.
-- Use enum-first database modeling.
-- Keep v1.1.0 scope fixed.
-- Prefer conservative implementation over speculative abstraction.
-- Do not add optional features.
-- Do not rename concepts unless docs require it.
+Authorization
 
-## Before Final Response
+School isolation
 
-Before reporting completion, an agent must check:
+Audit logging
 
-- Were canonical docs followed?
-- Were tenant boundaries preserved?
-- Were layer responsibilities preserved?
-- Were money and finance rules preserved?
-- Were relevant tests or validations run?
-- Were docs updated if contracts changed?
-- Are any limitations clearly stated?
+Validation
 
-Final responses must be concise and include:
+Never trust frontend input.
 
-- What changed.
-- Where it changed.
-- What validation was run.
-- Any remaining risk or follow-up needed.
+---
 
+# 14. Multi-Tenancy
+
+Every query MUST be scoped to school context unless explicitly global.
+
+Never expose records across schools.
+
+School isolation is mandatory.
+
+---
+
+# 15. Auditability
+
+Any action affecting:
+
+Students
+
+Finance
+
+Attendance
+
+Assessments
+
+Subscriptions
+
+Permissions
+
+should be capable of producing audit logs.
+
+---
+
+# 16. Event Driven Design
+
+Where applicable:
+
+emit events
+
+instead of tightly coupling modules.
+
+Examples
+
+StudentAdmitted
+
+PaymentReceived
+
+InvoiceGenerated
+
+AssessmentPublished
+
+AttendanceMarked
+
+---
+
+# 17. Code Quality
+
+Prefer:
+
+small files
+
+small functions
+
+descriptive names
+
+pure functions
+
+composition
+
+Avoid:
+
+god classes
+
+massive services
+
+deep nesting
+
+copy-paste
+
+magic numbers
+
+---
+
+# 18. AI Agent Rules
+
+AI agents must NOT:
+
+invent endpoints
+
+invent database tables
+
+change schema
+
+change version scope
+
+rename entities
+
+change business rules
+
+rewrite architecture
+
+AI agents SHOULD:
+
+follow documentation
+
+reuse components
+
+maintain consistency
+
+improve readability
+
+reduce duplication
+
+---
+
+# 19. Definition of Done
+
+A task is complete only when:
+
+✓ Documentation updated
+
+✓ API documented
+
+✓ Validation implemented
+
+✓ Authorization implemented
+
+✓ Errors handled
+
+✓ Audit considered
+
+✓ Events considered
+
+✓ Tests considered
+
+---
+
+# 20. Guiding Principle
+
+Every change should make the project feel like it was built by
+a disciplined engineering team over many years.
+
+When unsure:
+
+prefer consistency over cleverness.
+
+Architecture over shortcuts.
+
+Long-term maintainability over temporary convenience.
