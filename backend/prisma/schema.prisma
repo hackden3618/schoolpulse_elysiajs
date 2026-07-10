@@ -357,12 +357,17 @@ model Subscription {
 model JoinRequest {
     id          String            @id @default(uuid()) @db.Uuid
     schoolName  String            @map("school_name")
+    phone       String
+    email       String?
     requestedAt DateTime          @default(now()) @map("requested_at") @db.Timestamptz(6)
     requestedBy String            @map("requested_by")
     status      JoinRequestStatus @default(pending_review)
     processedBy String?           @map("processed_by")
     processedAt DateTime?         @map("processed_at") @db.Timestamptz(6)
     deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz(6)
+
+    @@unique([schoolName, phone])
+    @@map("join_requests")
 }
 
 /**
