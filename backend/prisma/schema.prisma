@@ -394,6 +394,7 @@ model User {
 
     memberships              SchoolMembership[]
     guardianLinks            StudentGuardian[]
+    passwordResetTokens      PasswordResetToken[]
     paymentsMade             Payment[]                 @relation("PaymentPayer")
     auditLogs                AuditLog[]                @relation("AuditActorUser")
     conversationParticipants ConversationParticipant[]
@@ -1170,6 +1171,27 @@ model MessageReceipt {
     recipientUser User?   @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
 
     @@map("message_receipts")
+}
+
+/**
+ * =========================
+ * AUTH DOMAIN
+ * =========================
+ */
+
+model PasswordResetToken {
+    id        String   @id @default(uuid()) @db.Uuid
+    userId    String   @map("user_id") @db.Uuid
+    tokenHash String   @map("token_hash")
+    expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+    usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+    user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@index([tokenHash], map: "idx_password_reset_token_hash")
+    @@index([userId], map: "idx_password_reset_user")
+    @@map("password_reset_tokens")
 }
 
 /**

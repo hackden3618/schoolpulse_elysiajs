@@ -1,0 +1,29 @@
+import { success } from "@/common/responses"
+import * as svc from "./service"
+
+export async function getConversationsController({ params: { schoolId }, authUser, set }: any) {
+  const result = await svc.listConversations(schoolId, authUser)
+  return success(result, schoolId)
+}
+
+export async function createConversationController({ params: { schoolId }, body, authUser, set }: any) {
+  set.status = 201
+  const result = await svc.createConversation(schoolId, authUser, body)
+  return success(result, schoolId)
+}
+
+export async function getConversationController({ params: { schoolId, conversationId }, set }: any) {
+  const result = await svc.getConversation(schoolId, conversationId)
+  return success(result, schoolId)
+}
+
+export async function getMessagesController({ params: { schoolId, conversationId }, set }: any) {
+  const result = await svc.listMessages(schoolId, conversationId)
+  return success(result, schoolId)
+}
+
+export async function sendMessageController({ params: { schoolId, conversationId }, body, authUser, set }: any) {
+  set.status = 201
+  const result = await svc.sendMessage(schoolId, conversationId, authUser, body)
+  return success(result, schoolId)
+}

@@ -1,43 +1,65 @@
-import { sms } from "@/infrastructure/messaging/sms/sms.provider";
+import { sendBulkSms, checkBalance as checkBalanceProvider } from "@/infrastructure/messaging/sms/sms.provider";
+import { calculateGsm7Segments } from "@/shared/utils";
+import type { Gsm7SegmentInfo } from "@/shared/utils";
 
 export interface SmsOptions {
-    recipients: string[];
-    message: string;
+  recipients: string[];
+  message: string;
 }
 
-export async function sendSms(options: SmsOptions) {
-    const smsOptions = {
-        to: options.recipients,
-        message: options.message,
-        // from: "SchoolPulse"
-    };
-
-    try {
-        const response = await sms.send(smsOptions);
-        const recipients = response.SMSMessageData.Recipients;
-        const recipientNo = recipients[0].number;
-        console.log("message sent successfully ", response.SMSMessageData, recipientNo);
-        return {
-            message: "message sent successfully",
-            body: response
-        };
-    } catch (error: any) {
-        console.log("message failed to send ", error);
-        const { phoneNumber, failureReason, id, status } = error;
-        return {
-            phoneNumber,
-            status,
-        };
-    }
+export interface RecipientResult {
+  mobile: string;
+  success: boolean;
+  messageId?: number;
+  error?: string;
 }
 
-export async function handleDeliveryReceipt(body: any) {
-    return {
-        status: "delivered",
-        message: "Message delivered successfully",
-        body
-    };
+export interface SmsSendResult {
+  totalRecipients: number;
+  successful: number;
+  failed: number;
+  segmentInfo: Gsm7SegmentInfo;
+  results: RecipientResult[];
 }
 
-// TODO: Implement inbox handler when needed
-// export async function handleIncomingMessage(body: any) { ... }
+export async function sendSms(options: SmsOptions): Promise<SmsSendResult> {
+  const segmentInfo = calculateGsm7Segments(options.message);
+
+  const payload = options.recipients.map((mobile) => {
+    let normalized = mobile.replace(/^\+/, "");
+    normalized = normalized.startsWith("0") ? `254${normalized.slice(1)}` : normalized;
+    return { mobile: normalized, message: options.message };
+  });
+
+  const providerResults = await sendBulkSms(payload);
+
+  const results: RecipientResult[] = providerResults.map((r) => ({
+    mobile: r.mobile,
+    success: r.success,
+    messageId: r.messageId,
+    ...(r.success ? {} : { error: r.description }),
+  }));
+
+  const successful = results.filter((r) => r.success).length;
+  const failed = results.length - successful;
+
+  return {
+    totalRecipients: results.length,
+    successful,
+    failed,
+    segmentInfo,
+    results,
+  };
+}
+
+export async function checkSmsBalance(): Promise<{ balance: string }> {
+  return checkBalanceProvider();
+}
+
+export async function handleDeliveryReceipt(body: unknown): Promise<{
+  status: string;
+  body: unknown;
+}> {
+  console.log("SMS delivery receipt:", body);
+  return { status: "received", body };
+}

@@ -1,0 +1,44 @@
+import { success } from "@/common/responses"
+import * as svc from "./service"
+
+export async function loginController({ body, set }: any) {
+  const result = await svc.login(body)
+  return success(result)
+}
+
+export async function registerController({ body, set }: any) {
+  set.status = 201
+  const result = await svc.register(body)
+  return success(result)
+}
+
+export async function forgotPasswordController({ body, set }: any) {
+  const result = await svc.forgotPassword(body)
+  return success(result)
+}
+
+export async function resetPasswordController({ body, set }: any) {
+  const result = await svc.resetPassword(body)
+  return success(result)
+}
+
+export async function refreshController({ body, set }: any) {
+  const result = await svc.refresh(body.refreshToken)
+  return success(result)
+}
+
+export async function logoutController({ set }: any) {
+  const result = await svc.logout()
+  return success(result)
+}
+
+export async function createJoinRequestController({ body, set }: any) {
+  set.status = 201
+  const result = await svc.createJoinRequest(body)
+  return success(result)
+}
+
+export async function listJoinRequestsController({ set }: any) {
+  const result = await svc.listJoinRequests()
+  return success(result)
+}
