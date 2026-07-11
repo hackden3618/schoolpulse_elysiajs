@@ -33,6 +33,15 @@ export const createJoinRequestSchema = t.Object({
   schoolName: t.String({ minLength: 2, maxLength: 200 }),
   phone: phoneString(true),
   email: emailString(false),
+  adminPhone: phoneString(true),
+  adminEmail: emailString(false),
+  county: t.Optional(t.String({ minLength: 2, maxLength: 100 })),
+  country: t.Optional(t.String({ minLength: 2, maxLength: 100 })),
+  town: t.Optional(t.String({ minLength: 2, maxLength: 100 })),
+})
+
+export const approveJoinRequestSchema = t.Object({
+  joinRequestId: t.String({ format: "uuid" }),
 })
 
 export type LoginInput = typeof loginSchema.static
@@ -41,3 +50,4 @@ export type ForgotPasswordInput = typeof forgotPasswordSchema.static
 export type ResetPasswordInput = typeof resetPasswordSchema.static
 export type RefreshInput = typeof refreshSchema.static
 export type CreateJoinRequestInput = typeof createJoinRequestSchema.static
+export type ApproveJoinRequestInput = typeof approveJoinRequestSchema.static

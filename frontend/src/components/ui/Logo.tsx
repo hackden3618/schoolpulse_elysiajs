@@ -1,5 +1,3 @@
-import React from "react"
-
 interface LogoProps {
   size?: number | string
   className?: string
@@ -12,41 +10,66 @@ export function Logo({ size = 24, className = "" }: LogoProps) {
     <svg
       width={s}
       height={s}
-      viewBox="0 0 24 24"
+      viewBox="0 0 100 100"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       className={className}
     >
-      {/* Outer Shield Body */}
+      {/* Shield Outer Path */}
       <path
-        d="M12 2C12 2 4 6 4 11V15C4 18.5 7 21 12 22C17 21 20 18.5 20 15V11C20 6 12 2 12 2Z"
+        d="M 23 24 Q 50 29 77 24 L 77 52 Q 77 74 50 86 Q 23 74 23 52 Z"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="5.5"
         strokeLinecap="round"
         strokeLinejoin="round"
       />
-      
-      {/* Inner Circuitry - Shield-shaped inner cutout */}
-      <path
-        d="M12 5L7 8V12C7 14.5 9 16.5 12 17C15 16.5 17 14.5 17 12V8L12 5Z"
+
+      {/* Circuit Middle Node and Line */}
+      <circle
+        cx="50"
+        cy="35"
+        r="4.5"
         stroke="currentColor"
-        strokeWidth="1.2"
+        strokeWidth="4.5"
+      />
+      <path
+        d="M 50 39.5 L 50 81"
+        stroke="currentColor"
+        strokeWidth="4.5"
+        strokeLinecap="round"
+      />
+
+      {/* Circuit Left Node and Line */}
+      <circle
+        cx="37"
+        cy="45"
+        r="4.5"
+        stroke="currentColor"
+        strokeWidth="4.5"
+      />
+      <path
+        d="M 37 49.5 L 37 57 L 43.5 64.5 L 43.5 81"
+        stroke="currentColor"
+        strokeWidth="4.5"
         strokeLinecap="round"
         strokeLinejoin="round"
-        opacity="0.7"
       />
-      
-      {/* Circuit Nodes & Lines */}
-      <path
-        d="M12 5V8M8 9H12M12 9H16M12 12V15"
+
+      {/* Circuit Right Node and Line */}
+      <circle
+        cx="63"
+        cy="45"
+        r="4.5"
         stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
+        strokeWidth="4.5"
       />
-      <circle cx="12" cy="5" r="0.8" fill="currentColor" />
-      <circle cx="8" cy="9" r="0.8" fill="currentColor" />
-      <circle cx="16" cy="9" r="0.8" fill="currentColor" />
-      <circle cx="12" cy="15" r="0.8" fill="currentColor" />
+      <path
+        d="M 63 49.5 L 63 57 L 56.5 64.5 L 56.5 81"
+        stroke="currentColor"
+        strokeWidth="4.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   )
 }

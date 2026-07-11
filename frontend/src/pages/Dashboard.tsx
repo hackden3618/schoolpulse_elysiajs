@@ -1,5 +1,6 @@
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Card, CardContent } from "../components/ui/Card"
+import { Skeleton } from "../components/ui/Skeleton"
 import {
   Users,
   DollarSign,
@@ -11,241 +12,253 @@ import {
   CheckSquare,
   FileText,
   Calendar,
-  Clock,
   ChevronRight,
   ChevronDown,
   UserPlus,
   MessageSquare,
   CheckCircle2,
   Receipt,
+  AlertCircle,
+  RefreshCw,
 } from "lucide-react"
+import { dashboardApi, usersApi } from "../lib/api"
+import { useAuth } from "../lib/auth-context"
+import type { DashboardSummary, RecentActivity, User } from "../types"
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return "just now"
+  if (mins < 60) return `${mins} min ago`
+  const hrs = Math.floor(mins / 60)
+  if (hrs < 24) return `${hrs} hour${hrs > 1 ? "s" : ""} ago`
+  const days = Math.floor(hrs / 24)
+  return `${days} day${days > 1 ? "s" : ""} ago`
+}
 
 export function Dashboard() {
-  const [selectedTerm, setSelectedTerm] = useState("Term 2")
+  const { school, user } = useAuth()
+  const [summary, setSummary] = useState<DashboardSummary | null>(null)
+  const [activity, setActivity] = useState<RecentActivity | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
+
+  const load = async () => {
+    if (!school) return
+    setLoading(true)
+    setError("")
+    try {
+      const [sumRes, actRes] = await Promise.all([
+        dashboardApi.summary(school.id),
+        dashboardApi.activity(school.id),
+      ])
+      setSummary(sumRes.data)
+      setActivity(actRes.data)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load dashboard")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => { load() }, [school?.id])
+
+  const displayName = user
+    ? `${user.firstName}${user.lastName ? " " + user.lastName : ""}`
+    : "there"
+  const schoolName = school?.schoolName || "your school"
+  const absent = summary ? Math.max(0, summary.students - summary.attendanceToday) : 0
+  const presentPct = summary && summary.students > 0
+    ? Math.round((summary.attendanceToday / summary.students) * 100)
+    : 0
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <Skeleton className="h-8 w-72" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-32" />)}
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-6">
+            <Skeleton className="h-80" />
+            <Skeleton className="h-80" />
+          </div>
+          <Skeleton className="h-96" />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20">
+        <AlertCircle size={40} className="text-danger-500 mb-4" />
+        <p className="text-lg font-semibold text-primary-900 mb-2">Failed to load dashboard</p>
+        <p className="text-sm text-primary-500 mb-4">{error}</p>
+        <button onClick={load} className="inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-semibold text-white hover:bg-accent-600">
+          <RefreshCw size={14} /> Retry
+        </button>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
       {/* Header Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-[24px] font-bold text-primary-900 tracking-tight leading-tight flex items-center gap-2">
-            Good morning, Dennis 👋
+          <h1 className="text-2xl font-bold text-surface-900 tracking-tight">
+            Good morning, {displayName}
           </h1>
-          <p className="mt-1 text-sm text-primary-500">
-            Here's what's happening at Greenfield Academy today.
+          <p className="mt-1 text-sm text-surface-500">
+            Here's what's happening at {schoolName} today.
           </p>
         </div>
 
-        {/* Date Selector */}
         <div className="flex items-center gap-3">
-          <button className="inline-flex items-center gap-2 rounded-lg border border-primary-100 bg-white px-3.5 py-2 text-sm font-semibold text-primary-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:border-primary-200/80 hover:bg-primary-50 transition-all">
+          <button className="inline-flex items-center gap-2 rounded-lg border border-primary-100/60 bg-white px-3.5 py-2 text-sm font-semibold text-primary-700 shadow-[0_1px_2px_rgba(15,23,42,0.03)] hover:border-primary-200/80 hover:bg-primary-50 transition-all">
             <Calendar size={16} className="text-primary-400 shrink-0" />
-            <span>May 20, 2026</span>
+            <span>{new Date().toLocaleDateString("en-US", { month: "long", day: "numeric", year: "numeric" })}</span>
             <ChevronDown size={14} className="text-primary-400 shrink-0" />
           </button>
         </div>
       </div>
 
-      {/* Main Stats Row 1: 4 Cards with Sparklines */}
+      {/* Main Stats Row 1: 4 Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Stat 1: Students Present */}
+        {/* Stat 1: Active Students */}
         <Card>
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="rounded-full bg-success-50 p-2.5 text-success-500">
                 <Users size={20} />
               </div>
-              <div className="flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-0.5 text-xs font-bold text-success-700">
-                <TrendingUp size={12} />
-                <span>94.8%</span>
-              </div>
+              {summary && summary.students > 0 && (
+                <div className="flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-0.5 text-xs font-bold text-success-700">
+                  <TrendingUp size={12} />
+                  <span>{presentPct}%</span>
+                </div>
+              )}
             </div>
             <div className="mt-4 flex items-end justify-between">
               <div>
-                <p className="text-3xl font-bold text-primary-900 tracking-tight">327</p>
-                <p className="text-xs text-primary-400 font-medium mt-0.5">of 345 enrolled</p>
-              </div>
-              <div className="w-20 h-10">
-                <svg className="w-full h-full" viewBox="0 0 100 40" fill="none">
-                  <path
-                    d="M0,35 Q15,30 30,28 T60,18 T90,8 L100,5"
-                    stroke="#10B981"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M0,35 Q15,30 30,28 T60,18 T90,8 L100,5 L100,40 L0,40 Z"
-                    fill="url(#green-glow)"
-                    opacity="0.1"
-                  />
-                  <defs>
-                    <linearGradient id="green-glow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#10B981" />
-                      <stop offset="100%" stopColor="#10B981" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+                <p className="text-3xl font-bold text-primary-900 tracking-tight">{summary?.attendanceToday ?? "—"}</p>
+                <p className="text-xs text-primary-400 font-medium mt-0.5">
+                  of {summary?.students ?? "—"} enrolled
+                </p>
               </div>
             </div>
-            <p className="text-xs text-primary-500 mt-2 font-medium">Students Present</p>
+            <p className="text-xs text-primary-500 mt-2 font-medium">Present Today</p>
           </CardContent>
         </Card>
 
-        {/* Stat 2: Absent Students */}
+        {/* Stat 2: Absent */}
         <Card>
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
               <div className="rounded-full bg-danger-50 p-2.5 text-danger-500">
                 <Users size={20} />
               </div>
-              <div className="flex items-center gap-1.5 rounded-full bg-danger-50 px-2.5 py-0.5 text-xs font-bold text-danger-700">
-                <TrendingDown size={12} />
-                <span>5.2%</span>
-              </div>
+              {summary && summary.students > 0 && (
+                <div className="flex items-center gap-1.5 rounded-full bg-danger-50 px-2.5 py-0.5 text-xs font-bold text-danger-700">
+                  <TrendingDown size={12} />
+                  <span>{100 - presentPct}%</span>
+                </div>
+              )}
             </div>
             <div className="mt-4 flex items-end justify-between">
               <div>
-                <p className="text-3xl font-bold text-primary-900 tracking-tight">18</p>
-                <p className="text-xs text-primary-400 font-medium mt-0.5">of 345 enrolled</p>
-              </div>
-              <div className="w-20 h-10">
-                <svg className="w-full h-full" viewBox="0 0 100 40" fill="none">
-                  <path
-                    d="M0,8 Q20,12 40,22 T80,32 L100,35"
-                    stroke="#EF4444"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                  <path
-                    d="M0,8 Q20,12 40,22 T80,32 L100,35 L100,40 L0,40 Z"
-                    fill="url(#red-glow)"
-                    opacity="0.1"
-                  />
-                  <defs>
-                    <linearGradient id="red-glow" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#EF4444" />
-                      <stop offset="100%" stopColor="#EF4444" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                </svg>
+                <p className="text-3xl font-bold text-primary-900 tracking-tight">{absent}</p>
+                <p className="text-xs text-primary-400 font-medium mt-0.5">
+                  of {summary?.students ?? "—"} enrolled
+                </p>
               </div>
             </div>
-            <p className="text-xs text-primary-500 mt-2 font-medium">Absent Students</p>
+            <p className="text-xs text-primary-500 mt-2 font-medium">Absent Today</p>
           </CardContent>
         </Card>
 
-        {/* Stat 3: Revenue Today */}
+        {/* Stat 3: Active Staff */}
         <Card>
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
-              <div className="rounded-full bg-success-50 p-2.5 text-success-500">
-                <DollarSign size={20} />
-              </div>
-              <div className="flex items-center gap-1.5 rounded-full bg-success-50 px-2.5 py-0.5 text-xs font-bold text-success-700">
-                <TrendingUp size={12} />
-                <span>12%</span>
+              <div className="rounded-full bg-info-50 p-2.5 text-info-500">
+                <Users size={20} />
               </div>
             </div>
             <div className="mt-4 flex items-end justify-between">
               <div>
-                <p className="text-3xl font-bold text-primary-900 tracking-tight">KES 185k</p>
-                <p className="text-xs text-primary-400 font-medium mt-0.5">12% vs yesterday</p>
-              </div>
-              <div className="w-20 h-10">
-                <svg className="w-full h-full" viewBox="0 0 100 40" fill="none">
-                  <path
-                    d="M0,38 Q25,32 50,22 T85,10 L100,2"
-                    stroke="#10B981"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <p className="text-3xl font-bold text-primary-900 tracking-tight">{summary?.staff ?? "—"}</p>
+                <p className="text-xs text-primary-400 font-medium mt-0.5">active staff</p>
               </div>
             </div>
-            <p className="text-xs text-primary-500 mt-2 font-medium">Revenue Today</p>
+            <p className="text-xs text-primary-500 mt-2 font-medium">Staff</p>
           </CardContent>
         </Card>
 
-        {/* Stat 4: Outstanding Fees */}
+        {/* Stat 4: Active Classes */}
         <Card>
           <CardContent className="p-5">
             <div className="flex items-start justify-between">
-              <div className="rounded-full bg-warning-50 p-2.5 text-warning-500">
-                <DollarSign size={20} />
-              </div>
-              <div className="flex items-center gap-1.5 rounded-full bg-warning-50 px-2.5 py-0.5 text-xs font-bold text-warning-700">
-                <TrendingUp size={12} />
-                <span>4%</span>
+              <div className="rounded-full bg-accent-50 p-2.5 text-accent-500">
+                <BookOpen size={20} />
               </div>
             </div>
             <div className="mt-4 flex items-end justify-between">
               <div>
-                <p className="text-3xl font-bold text-primary-900 tracking-tight">KES 2.45M</p>
-                <p className="text-xs text-primary-400 font-medium mt-0.5">10% vs last week</p>
-              </div>
-              <div className="w-20 h-10">
-                <svg className="w-full h-full" viewBox="0 0 100 40" fill="none">
-                  <path
-                    d="M0,15 Q30,12 60,18 T90,25 L100,28"
-                    stroke="#F59E0B"
-                    strokeWidth="2.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <p className="text-3xl font-bold text-primary-900 tracking-tight">{summary?.activeClasses ?? "—"}</p>
+                <p className="text-xs text-primary-400 font-medium mt-0.5">active classes</p>
               </div>
             </div>
-            <p className="text-xs text-primary-500 mt-2 font-medium">Outstanding Fees</p>
+            <p className="text-xs text-primary-500 mt-2 font-medium">Active Classes</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Row 2 Indicators (Actionable items) */}
+      {/* Row 2 Indicators */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
-        {/* Indicator 1 */}
         <Card className="cursor-pointer">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-primary-900 leading-tight">14</p>
-              <p className="text-xs text-primary-500 font-medium mt-0.5">Fee Collections Today</p>
+              <p className="text-2xl font-bold text-primary-900 leading-tight">{summary?.attendanceToday ?? "—"}</p>
+              <p className="text-xs text-primary-500 font-medium mt-0.5">Attendance Records Today</p>
             </div>
             <div className="rounded-lg bg-success-50 p-2.5 text-success-500 shrink-0">
+              <CalendarCheck size={20} />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="cursor-pointer">
+          <CardContent className="p-4 flex items-center justify-between">
+            <div>
+              <p className="text-2xl font-bold text-primary-900 leading-tight">{summary?.openInvoices ?? "—"}</p>
+              <p className="text-xs text-primary-500 font-medium mt-0.5">Open Invoices</p>
+            </div>
+            <div className="rounded-lg bg-warning-50 p-2.5 text-warning-500 shrink-0">
               <Receipt size={20} />
             </div>
           </CardContent>
         </Card>
 
-        {/* Indicator 2 */}
         <Card className="cursor-pointer">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-primary-900 leading-tight">2</p>
-              <p className="text-xs text-primary-500 font-medium mt-0.5">Pending Approvals</p>
-            </div>
-            <div className="rounded-lg bg-warning-50 p-2.5 text-warning-500 shrink-0">
-              <CheckSquare size={20} />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Indicator 3 */}
-        <Card className="cursor-pointer">
-          <CardContent className="p-4 flex items-center justify-between">
-            <div>
-              <p className="text-2xl font-bold text-primary-900 leading-tight">7</p>
-              <p className="text-xs text-primary-500 font-medium mt-0.5">Unread Messages</p>
+              <p className="text-2xl font-bold text-primary-900 leading-tight">{summary?.pendingPayments ?? "—"}</p>
+              <p className="text-xs text-primary-500 font-medium mt-0.5">Pending Payments</p>
             </div>
             <div className="rounded-lg bg-info-50 p-2.5 text-info-500 shrink-0">
-              <Mail size={20} />
+              <DollarSign size={20} />
             </div>
           </CardContent>
         </Card>
 
-        {/* Indicator 4 */}
         <Card className="cursor-pointer">
           <CardContent className="p-4 flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold text-primary-900 leading-tight">3</p>
-              <p className="text-xs text-primary-500 font-medium mt-0.5">Exams This Week</p>
+              <p className="text-2xl font-bold text-primary-900 leading-tight">{summary?.activeClasses ?? "—"}</p>
+              <p className="text-xs text-primary-500 font-medium mt-0.5">Active Classes</p>
             </div>
             <div className="rounded-lg bg-accent-50 p-2.5 text-accent-500 shrink-0">
               <BookOpen size={20} />
@@ -265,115 +278,73 @@ export function Dashboard() {
             
             {/* 1. Recent Activity Card */}
             <Card className="flex flex-col h-[340px]">
-              <div className="px-4.5 py-3 border-b border-primary-50 flex items-center justify-between shrink-0">
-                <h3 className="font-semibold text-primary-900 text-xs">Recent Activity</h3>
-                <button className="text-[10px] font-semibold text-accent-600 hover:text-accent-700 inline-flex items-center">
-                  View all <ChevronRight size={12} />
-                </button>
+              <div className="px-4 py-3 border-b border-primary-50 flex items-center justify-between shrink-0">
+                <h3 className="font-semibold text-primary-900 text-xs">Recent Payments</h3>
               </div>
               <div className="p-4 overflow-y-auto flex-1">
-                <div className="relative pl-5 space-y-4 before:absolute before:left-[9px] before:top-2 before:bottom-2 before:w-[2px] before:bg-primary-50">
-                  {/* Item 1 */}
-                  <div className="relative">
-                    <div className="absolute -left-[19px] top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-success-500" />
-                    <div>
-                      <p className="text-xs font-semibold text-primary-900 leading-tight">Payment received from James Karanja</p>
-                      <p className="text-[10px] text-primary-400 mt-0.5">KES 25,000</p>
-                      <span className="text-[9px] text-primary-400 block mt-1">12 mins ago</span>
-                    </div>
+                {!activity || activity.recentPayments.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <DollarSign size={24} className="text-primary-300 mb-2" />
+                    <p className="text-xs text-primary-400">No recent payments</p>
                   </div>
-                  {/* Item 2 */}
-                  <div className="relative">
-                    <div className="absolute -left-[19px] top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-accent" />
-                    <div>
-                      <p className="text-xs font-semibold text-primary-900 leading-tight">New student admission completed</p>
-                      <p className="text-[10px] text-primary-400 mt-0.5">Mary Wanjiku - Grade 8</p>
-                      <span className="text-[9px] text-primary-400 block mt-1">45 mins ago</span>
-                    </div>
+                ) : (
+                  <div className="relative pl-5 space-y-4 before:absolute before:left-[9px] before:top-2 before:bottom-2 before:w-[2px] before:bg-primary-50">
+                    {activity.recentPayments.map((p) => (
+                      <div key={p.id} className="relative">
+                        <div className="absolute -left-[19px] top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-success-500" />
+                        <div>
+                          <p className="text-xs font-semibold text-primary-900 leading-tight">
+                            Payment from {p.student.firstName} {p.student.lastName}
+                          </p>
+                          <p className="text-[10px] text-primary-400 mt-0.5">
+                            KES {p.amount.toLocaleString()} — {p.method.replace("_", " ")}
+                          </p>
+                          <span className="text-[9px] text-primary-400 block mt-1">{timeAgo(p.createdAt)}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  {/* Item 3 */}
-                  <div className="relative">
-                    <div className="absolute -left-[19px] top-1 h-2.5 w-2.5 rounded-full border-2 border-white bg-info-500" />
-                    <div>
-                      <p className="text-xs font-semibold text-primary-900 leading-tight">Attendance marked for Grade 10A</p>
-                      <p className="text-[10px] text-primary-400 mt-0.5">97% present</p>
-                      <span className="text-[9px] text-primary-400 block mt-1">1 hour ago</span>
-                    </div>
-                  </div>
-                </div>
+                )}
               </div>
             </Card>
 
-            {/* 2. Outstanding Fees by Class */}
+            {/* 2. Academic Period */}
             <Card className="flex flex-col h-[340px]">
-              <div className="px-4.5 py-3 border-b border-primary-50 flex items-center justify-between shrink-0">
-                <h3 className="font-semibold text-primary-900 text-xs">Outstanding Fees by Class</h3>
-                <span className="text-[9px] font-semibold text-primary-400 bg-primary-50 px-1.5 py-0.5 rounded uppercase">
-                  This Term
-                </span>
+              <div className="px-4 py-3 border-b border-primary-50 shrink-0">
+                <h3 className="font-semibold text-primary-900 text-xs">Current Academic Period</h3>
               </div>
-              <div className="p-4 space-y-3.5 flex-1 overflow-y-auto">
-                {/* Class Row */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-semibold">
-                    <span className="text-primary-600">Grade 8</span>
-                    <span className="text-primary-900">KES 620,000</span>
+              <div className="p-4 space-y-4 flex-1">
+                {summary?.activeAcademicYear ? (
+                  <div className="space-y-3">
+                    <div className="rounded-lg bg-primary-50 p-3">
+                      <p className="text-[10px] font-bold text-primary-400 uppercase tracking-wider">Academic Year</p>
+                      <p className="text-sm font-bold text-primary-900 mt-1">{summary.activeAcademicYear.name}</p>
+                      <p className="text-[10px] text-primary-500 mt-0.5">
+                        {new Date(summary.activeAcademicYear.startDate).toLocaleDateString()} — {new Date(summary.activeAcademicYear.endDate).toLocaleDateString()}
+                      </p>
+                    </div>
+                    {summary.activeTerm && (
+                      <div className="rounded-lg bg-accent-50 p-3">
+                        <p className="text-[10px] font-bold text-accent-600 uppercase tracking-wider">Current Term</p>
+                        <p className="text-sm font-bold text-primary-900 mt-1">{summary.activeTerm.name}</p>
+                        <p className="text-[10px] text-primary-500 mt-0.5">
+                          {new Date(summary.activeTerm.startDate).toLocaleDateString()} — {new Date(summary.activeTerm.endDate).toLocaleDateString()}
+                        </p>
+                      </div>
+                    )}
                   </div>
-                  <div className="h-1.5 w-full bg-primary-50 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary-800 rounded-full" style={{ width: "85%" }} />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-center">
+                    <Calendar size={24} className="text-primary-300 mb-2" />
+                    <p className="text-xs text-primary-400">No active academic year set</p>
                   </div>
-                </div>
-                {/* Class Row */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-semibold">
-                    <span className="text-primary-600">Grade 9</span>
-                    <span className="text-primary-900">KES 540,000</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-primary-50 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary-800 rounded-full" style={{ width: "70%" }} />
-                  </div>
-                </div>
-                {/* Class Row */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-semibold">
-                    <span className="text-primary-600">Grade 10</span>
-                    <span className="text-primary-900">KES 720,000</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-primary-50 rounded-full overflow-hidden">
-                    <div className="h-full bg-accent rounded-full" style={{ width: "95%" }} />
-                  </div>
-                </div>
-                {/* Class Row */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-semibold">
-                    <span className="text-primary-600">Grade 11</span>
-                    <span className="text-primary-900">KES 350,000</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-primary-50 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary-800 rounded-full" style={{ width: "45%" }} />
-                  </div>
-                </div>
-                {/* Class Row */}
-                <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-semibold">
-                    <span className="text-primary-600">Grade 12</span>
-                    <span className="text-primary-900">KES 220,000</span>
-                  </div>
-                  <div className="h-1.5 w-full bg-primary-50 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary-800 rounded-full" style={{ width: "30%" }} />
-                  </div>
-                </div>
-              </div>
-              <div className="px-4 py-2.5 border-t border-primary-50 shrink-0 text-center bg-primary-50/20">
-                <button className="text-[11px] font-bold text-accent hover:underline flex items-center justify-center gap-0.5 mx-auto">
-                  View full report <ChevronRight size={12} />
-                </button>
+                )}
               </div>
             </Card>
 
             {/* 3. Quick Actions */}
             <Card className="flex flex-col h-[340px]">
-              <div className="px-4.5 py-3 border-b border-primary-50 shrink-0">
+              <div className="px-4 py-3 border-b border-primary-50 shrink-0">
                 <h3 className="font-semibold text-primary-900 text-xs">Quick Actions</h3>
               </div>
               <div className="p-3 grid grid-cols-3 gap-1.5 flex-1 overflow-y-auto">
@@ -441,243 +412,127 @@ export function Dashboard() {
                 </button>
               </div>
             </Card>
-
           </div>
 
-          {/* School Overview & Analytics (Bottom Charts) */}
+          {/* School Overview */}
           <Card>
             <div className="px-5 py-4 border-b border-primary-50 flex items-center justify-between">
               <h3 className="font-semibold text-primary-900 text-sm">School Overview</h3>
-              <div className="flex items-center gap-1.5">
-                <button
-                  className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-colors ${
-                    selectedTerm === "Term 2" ? "bg-primary-900 text-white" : "text-primary-600 hover:bg-primary-50"
-                  }`}
-                  onClick={() => setSelectedTerm("Term 2")}
-                >
-                  Term 2
-                </button>
-                <button
-                  className={`text-xs px-2.5 py-1 rounded-md font-semibold transition-colors ${
-                    selectedTerm === "Full Year" ? "bg-primary-900 text-white" : "text-primary-600 hover:bg-primary-50"
-                  }`}
-                  onClick={() => setSelectedTerm("Full Year")}
-                >
-                  Full Year
-                </button>
+              <div className="flex items-center gap-3 text-xs text-primary-500">
+                <span>{summary?.students ?? 0} Students</span>
+                <span className="w-1 h-1 rounded-full bg-primary-300" />
+                <span>{summary?.staff ?? 0} Staff</span>
+                <span className="w-1 h-1 rounded-full bg-primary-300" />
+                <span>{summary?.activeClasses ?? 0} Classes</span>
               </div>
             </div>
             <CardContent className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                
-                {/* Chart 1: Enrollment Trend */}
-                <div className="md:col-span-1 space-y-3">
-                  <h4 className="text-xs font-bold text-primary-400 uppercase tracking-wider">Enrollment Trend</h4>
-                  <div className="h-40 border-b border-l border-primary-100/60 relative">
-                    <svg className="w-full h-full" viewBox="0 0 100 80" preserveAspectRatio="none">
-                      <path
-                        d="M 5,60 L 25,50 L 50,45 L 75,32 L 95,15"
-                        fill="none"
-                        stroke="#1E293B"
-                        strokeWidth="3"
-                        strokeLinecap="round"
-                      />
-                      <circle cx="95" cy="15" r="4" fill="#E89D47" stroke="#1E293B" strokeWidth="2" />
-                    </svg>
-                    <div className="absolute left-1 top-1 text-[10px] font-bold text-primary-400">400</div>
-                    <div className="absolute left-1 bottom-1 text-[10px] font-bold text-primary-400">0</div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Total Students */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-primary-400 uppercase tracking-wider">Student Body</h4>
+                  <div className="flex items-end gap-4">
+                    <div>
+                      <p className="text-3xl font-bold text-primary-900">{summary?.students ?? 0}</p>
+                      <p className="text-xs text-primary-500">Total enrolled</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-success-600">{summary?.activeStudents ?? 0}</p>
+                      <p className="text-xs text-primary-500">Active</p>
+                    </div>
                   </div>
-                  <div className="flex justify-between text-[10px] font-semibold text-primary-400 px-1">
-                    <span>Jan</span>
-                    <span>Mar</span>
-                    <span>May</span>
+                  <div className="h-2 w-full bg-primary-50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-success-500 rounded-full"
+                      style={{ width: summary && summary.students > 0 ? `${(summary.activeStudents / summary.students) * 100}%` : "0%" }}
+                    />
                   </div>
                 </div>
 
-                {/* Chart 2: Attendance Overview Ring */}
-                <div className="space-y-3 flex flex-col justify-between">
-                  <h4 className="text-xs font-bold text-primary-400 uppercase tracking-wider">Attendance Overview</h4>
-                  <div className="flex items-center justify-center relative py-2">
-                    <svg className="w-32 h-32 transform -rotate-90">
-                      <circle cx="64" cy="64" r="48" stroke="#E2E8F0" strokeWidth="12" fill="transparent" />
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="48"
-                        stroke="#10B981"
-                        strokeWidth="12"
-                        fill="transparent"
-                        strokeDasharray={2 * Math.PI * 48}
-                        strokeDashoffset={2 * Math.PI * 48 * (1 - 0.948)}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute flex flex-col items-center justify-center">
-                      <span className="text-xl font-bold text-primary-900">94.8%</span>
-                      <span className="text-[9px] font-semibold text-primary-400 uppercase">Present</span>
+                {/* Finance Snapshot */}
+                <div className="space-y-2">
+                  <h4 className="text-xs font-bold text-primary-400 uppercase tracking-wider">Finance Snapshot</h4>
+                  <div className="flex items-end gap-4">
+                    <div>
+                      <p className="text-3xl font-bold text-primary-900">{summary?.openInvoices ?? 0}</p>
+                      <p className="text-xs text-primary-500">Open invoices</p>
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-warning-600">{summary?.pendingPayments ?? 0}</p>
+                      <p className="text-xs text-primary-500">Pending payments</p>
                     </div>
                   </div>
-                  <div className="grid grid-cols-3 gap-1 text-center text-[10px] font-semibold">
-                    <div>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-success-500 mr-1" />
-                      <span className="text-primary-700">Present</span>
-                    </div>
-                    <div>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-danger-500 mr-1" />
-                      <span className="text-primary-700">Absent</span>
-                    </div>
-                    <div>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-warning-500 mr-1" />
-                      <span className="text-primary-700">Late</span>
-                    </div>
+                  <div className="h-2 w-full bg-primary-50 rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-warning-500 rounded-full"
+                      style={{ width: summary && summary.openInvoices > 0 ? `${Math.min(100, (summary.pendingPayments / Math.max(1, summary.openInvoices)) * 100)}%` : "0%" }}
+                    />
                   </div>
                 </div>
-
-                {/* Chart 3: Fee Collection Ring */}
-                <div className="space-y-3 flex flex-col justify-between">
-                  <h4 className="text-xs font-bold text-primary-400 uppercase tracking-wider">Fee Collection</h4>
-                  <div className="flex items-center justify-center relative py-2">
-                    <svg className="w-32 h-32 transform -rotate-90">
-                      <circle cx="64" cy="64" r="48" stroke="#E2E8F0" strokeWidth="12" fill="transparent" />
-                      <circle
-                        cx="64"
-                        cy="64"
-                        r="48"
-                        stroke="#3B82F6"
-                        strokeWidth="12"
-                        fill="transparent"
-                        strokeDasharray={2 * Math.PI * 48}
-                        strokeDashoffset={2 * Math.PI * 48 * (1 - 0.692)}
-                        strokeLinecap="round"
-                      />
-                    </svg>
-                    <div className="absolute flex flex-col items-center justify-center">
-                      <span className="text-lg font-bold text-primary-900 leading-none">KES 12.4M</span>
-                      <span className="text-[9px] font-semibold text-primary-400 uppercase mt-0.5">Collected</span>
-                    </div>
-                  </div>
-                  <div className="grid grid-cols-2 gap-1 text-center text-[10px] font-semibold">
-                    <div>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-info-500 mr-1" />
-                      <span className="text-primary-700">Collected</span>
-                    </div>
-                    <div>
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-warning-500 mr-1" />
-                      <span className="text-primary-700">Outstanding</span>
-                    </div>
-                  </div>
-                </div>
-
               </div>
             </CardContent>
           </Card>
-
         </div>
 
-        {/* Right Side Columns (Dashboard Sidebar Panel) */}
+        {/* Right Side Column */}
         <div className="space-y-6">
-          
-          {/* Upcoming Events Box */}
+          {/* Current Term Info */}
           <Card>
-            <div className="px-5 py-4 border-b border-primary-50 flex items-center justify-between">
-              <h3 className="font-semibold text-primary-900 text-sm">Upcoming Events</h3>
-              <button className="text-xs font-semibold text-primary-500 hover:text-primary-700">
-                View calendar
-              </button>
+            <div className="px-5 py-4 border-b border-primary-50">
+              <h3 className="font-semibold text-primary-900 text-sm">Current Period</h3>
+            </div>
+            <CardContent className="p-5 space-y-3">
+              {summary?.activeTerm ? (
+                <>
+                  <div className="flex items-center gap-3">
+                    <div className="rounded-lg bg-accent-50 p-2 text-accent-600">
+                      <Calendar size={18} />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold text-primary-900">{summary.activeTerm.name}</p>
+                      <p className="text-xs text-primary-400">{summary.activeAcademicYear?.name}</p>
+                    </div>
+                  </div>
+                  <div className="text-xs text-primary-500">
+                    {new Date(summary.activeTerm.startDate).toLocaleDateString()} — {new Date(summary.activeTerm.endDate).toLocaleDateString()}
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm text-primary-400">No active term</p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Notifications placeholder */}
+          <Card>
+            <div className="px-5 py-4 border-b border-primary-50">
+              <h3 className="font-semibold text-primary-900 text-sm">Quick Stats</h3>
             </div>
             <CardContent className="p-5 space-y-4">
-              
-              {/* Event 1 */}
-              <div className="flex gap-3">
-                <div className="h-10 w-10 shrink-0 rounded-lg bg-primary-50/50 border border-primary-100/50 flex flex-col items-center justify-center text-primary-700">
-                  <span className="text-[10px] font-bold uppercase leading-none">May</span>
-                  <span className="text-base font-bold leading-tight mt-0.5">21</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-primary-900 truncate">Staff Meeting</p>
-                  <p className="text-xs text-primary-400 mt-0.5">Tomorrow • 9:00 AM - 10:00 AM</p>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-primary-600">Staff</span>
+                <span className="text-sm font-bold text-primary-900">{summary?.staff ?? 0}</span>
               </div>
-
-              {/* Event 2 */}
-              <div className="flex gap-3">
-                <div className="h-10 w-10 shrink-0 rounded-lg bg-accent-50/50 border border-accent-100/50 flex flex-col items-center justify-center text-accent-700">
-                  <span className="text-[10px] font-bold uppercase leading-none">May</span>
-                  <span className="text-base font-bold leading-tight mt-0.5">24</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-primary-900 truncate">Parents Meeting</p>
-                  <p className="text-xs text-primary-400 mt-0.5">May 24, 2026 • 2:00 PM</p>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-primary-600">Active Classes</span>
+                <span className="text-sm font-bold text-primary-900">{summary?.activeClasses ?? 0}</span>
               </div>
-
-              {/* Event 3 */}
-              <div className="flex gap-3">
-                <div className="h-10 w-10 shrink-0 rounded-lg bg-danger-50/50 border border-danger-100/50 flex flex-col items-center justify-center text-danger-700">
-                  <span className="text-[10px] font-bold uppercase leading-none">May</span>
-                  <span className="text-base font-bold leading-tight mt-0.5">30</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-semibold text-primary-900 truncate">Mid-Term Break Begins</p>
-                  <p className="text-xs text-primary-400 mt-0.5">May 30 - June 6, 2026</p>
-                </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-primary-600">Total Students</span>
+                <span className="text-sm font-bold text-primary-900">{summary?.students ?? 0}</span>
               </div>
-
-            </CardContent>
-          </Card>
-
-          {/* Notifications Center */}
-          <Card>
-            <div className="px-5 py-4 border-b border-primary-50 flex items-center justify-between">
-              <h3 className="font-semibold text-primary-900 text-sm">Notifications</h3>
-              <button className="text-[10px] font-bold text-primary-400 hover:text-primary-600 uppercase tracking-wider">
-                Mark read
-              </button>
-            </div>
-            <CardContent className="p-0">
-              <div className="divide-y divide-primary-50/60">
-                
-                {/* Notif 1 */}
-                <div className="p-4 flex gap-3 hover:bg-primary-50/40 transition-colors cursor-pointer">
-                  <div className="h-2 w-2 rounded-full bg-success-500 mt-1.5 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-primary-900">Payment received</p>
-                    <p className="text-xs text-primary-500 mt-0.5 leading-relaxed">
-                      James Karanja paid KES 25,000 for tuition fees.
-                    </p>
-                    <span className="text-[10px] text-primary-400 font-medium mt-1 block">12 mins ago</span>
-                  </div>
-                </div>
-
-                {/* Notif 2 */}
-                <div className="p-4 flex gap-3 hover:bg-primary-50/40 transition-colors cursor-pointer">
-                  <div className="h-2 w-2 rounded-full bg-danger-500 mt-1.5 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-primary-900">Attendance alert</p>
-                    <p className="text-xs text-primary-500 mt-0.5 leading-relaxed">
-                      18 students were marked absent today.
-                    </p>
-                    <span className="text-[10px] text-primary-400 font-medium mt-1 block">45 mins ago</span>
-                  </div>
-                </div>
-
-                {/* Notif 3 */}
-                <div className="p-4 flex gap-3 hover:bg-primary-50/40 transition-colors cursor-pointer">
-                  <div className="h-2 w-2 rounded-full bg-info-500 mt-1.5 shrink-0" />
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-primary-900">New admission</p>
-                    <p className="text-xs text-primary-500 mt-0.5 leading-relaxed">
-                      Mary Wanjiku has been admitted to Grade 8.
-                    </p>
-                    <span className="text-[10px] text-primary-400 font-medium mt-1 block">1 hour ago</span>
-                  </div>
-                </div>
-
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-primary-600">Open Invoices</span>
+                <span className="text-sm font-bold text-primary-900">{summary?.openInvoices ?? 0}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-primary-600">Pending Payments</span>
+                <span className="text-sm font-bold text-primary-900">{summary?.pendingPayments ?? 0}</span>
               </div>
             </CardContent>
           </Card>
 
-          {/* System Status Panel */}
+          {/* System Status */}
           <Card className="border-success-100/30 bg-success-50/10">
             <CardContent className="p-4 flex items-center gap-3">
               <div className="rounded-full bg-success-50 p-1.5 text-success-500 shrink-0">
@@ -685,24 +540,12 @@ export function Dashboard() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-xs font-semibold text-success-700">All Systems Operational</p>
-                <p className="text-[10px] text-success-600 mt-0.5 font-medium">Last checked: 2 mins ago</p>
+                <p className="text-[10px] text-success-600 mt-0.5 font-medium">Data loaded from live API</p>
               </div>
             </CardContent>
           </Card>
-
         </div>
-
       </div>
-
-      {/* TODO: BACKEND INTEGRATION
-       *
-       * [ ] GET /api/v1/schools/:schoolId/dashboard/stats      – Returns Stats Row 1 & 2
-       * [ ] GET /api/v1/schools/:schoolId/dashboard/activity   – Returns Recent Activity Feed
-       * [ ] GET /api/v1/schools/:schoolId/dashboard/fees       – Returns Outstanding Fees by Class
-       * [ ] GET /api/v1/schools/:schoolId/dashboard/overview   – Returns sparkline and donut chart metrics
-       * [ ] GET /api/v1/schools/:schoolId/dashboard/events     – Returns Upcoming Events
-       * [ ] GET /api/v1/schools/:schoolId/dashboard/notifs     – Returns active notification alerts
-       */}
     </div>
   )
 }

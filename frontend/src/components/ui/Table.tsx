@@ -14,7 +14,7 @@ interface TableProps<T> {
   className?: string
 }
 
-export function Table<T extends Record<string, unknown>>({
+export function Table<T extends object>({
   columns,
   data,
   onRowClick,
@@ -38,7 +38,7 @@ export function Table<T extends Record<string, unknown>>({
         <tbody className="divide-y divide-surface-100">
           {data.map((item, i) => (
             <tr
-              key={(item.id as string) || i}
+              key={(item as any).id || i}
               className={`transition-colors ${onRowClick ? "cursor-pointer hover:bg-surface-50" : ""}`}
               onClick={() => onRowClick?.(item)}
             >

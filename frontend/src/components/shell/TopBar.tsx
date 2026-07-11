@@ -51,7 +51,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
       </button>
 
       <nav className="flex items-center gap-2 text-xs font-semibold">
-        <span className="text-primary-400">{school?.schoolName || "Greenfield Academy"}</span>
+        <span className="text-primary-400">{school?.schoolName || "School"}</span>
         {breadcrumbs.length > 0 && <span className="text-primary-300 text-xs">/</span>}
         {breadcrumbs.map((crumb, i) => (
           <span key={crumb.href} className="flex items-center gap-2">
@@ -87,16 +87,10 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
       <div className="flex items-center gap-5">
         <button className="relative rounded-full p-2 text-primary-500 hover:bg-primary-50 hover:text-primary-800 transition-all">
           <Bell size={18} />
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger-500 text-[8px] font-bold text-white ring-2 ring-white">
-            4
-          </span>
         </button>
 
         <button className="relative rounded-full p-2 text-primary-500 hover:bg-primary-50 hover:text-primary-800 transition-all">
           <Mail size={18} />
-          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-danger-500 text-[8px] font-bold text-white ring-2 ring-white">
-            7
-          </span>
         </button>
 
         <div className="h-6 w-px bg-primary-200" />
@@ -111,11 +105,11 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
             </div>
             <div className="hidden sm:block text-left">
               <p className="text-xs font-semibold text-primary-900 leading-tight">
-                {user ? `${user.firstName} ${user.lastName || ""}` : "Dennis Okello"}
+                {user ? `${user.firstName} ${user.lastName || ""}` : ""}
               </p>
               <p className="text-[10px] text-primary-400 font-semibold uppercase mt-0.5">
                 {/* Show first role if available */}
-                {user?.status || "Principal"}
+                {user?.status || ""}
               </p>
             </div>
             <ChevronDown size={12} className="text-primary-400" />
@@ -125,9 +119,9 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
             <div className="absolute right-0 mt-2 w-56 rounded-lg border border-primary-100 bg-white shadow-lg py-1 z-50">
               <div className="px-4 py-2.5 border-b border-primary-50">
                 <p className="text-sm font-semibold text-primary-900">
-                  {user ? `${user.firstName} ${user.lastName || ""}` : "Dennis Okello"}
+                  {user ? `${user.firstName} ${user.lastName || ""}` : ""}
                 </p>
-                <p className="text-xs text-primary-400">{user?.phone || "+254 712 345 678"}</p>
+                <p className="text-xs text-primary-400">{user?.phone || ""}</p>
               </div>
               <button
                 onClick={() => { setDropdownOpen(false); navigate("/settings") }}

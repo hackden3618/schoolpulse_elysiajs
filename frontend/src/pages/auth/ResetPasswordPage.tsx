@@ -1,9 +1,10 @@
 import { useState, type FormEvent } from "react"
 import { useNavigate, useSearchParams, Link } from "react-router-dom"
-import { Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react"
+import { AlertCircle, CheckCircle } from "lucide-react"
 import { authApi } from "../../lib/api"
 import { Logo } from "../../components/ui/Logo"
 import { Button } from "../../components/ui/Button"
+import { Input } from "../../components/ui/Input"
 
 export function ResetPasswordPage() {
   const navigate = useNavigate()
@@ -12,7 +13,6 @@ export function ResetPasswordPage() {
 
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
@@ -86,42 +86,21 @@ export function ResetPasswordPage() {
             </div>
           )}
 
-          <div className="space-y-1">
-            <label htmlFor="password" className="block text-sm font-medium text-surface-700">
-              New Password
-            </label>
-            <div className="relative">
-              <input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Min. 6 characters"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2 pr-10 text-sm text-surface-900 placeholder-surface-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600"
-              >
-                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
+          <Input
+            label="New Password"
+            type="password"
+            placeholder="Min. 6 characters"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
 
-          <div className="space-y-1">
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-surface-700">
-              Confirm Password
-            </label>
-            <input
-              id="confirmPassword"
-              type={showPassword ? "text" : "password"}
-              placeholder="Repeat your password"
-              value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
-              className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm text-surface-900 placeholder-surface-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-            />
-          </div>
+          <Input
+            label="Confirm Password"
+            type="password"
+            placeholder="Repeat your password"
+            value={confirmPassword}
+            onChange={(e) => setConfirmPassword(e.target.value)}
+          />
 
           <Button type="submit" className="w-full" disabled={loading}>
             {loading ? (

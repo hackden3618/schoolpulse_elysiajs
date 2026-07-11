@@ -301,6 +301,8 @@ enum AggregateType {
     payment
     conversation
     subscription
+    join_request
+    platform_admin
 
     @@map("aggregate_type")
 }
@@ -329,6 +331,13 @@ enum EventType {
     ConversationCreated
     MessageSent
     SubscriptionExpired
+    JoinRequestSubmitted
+    JoinRequestApproved
+    JoinRequestRejected
+    PlatformAdminInvited
+    PlatformAdminCreated
+    SchoolDeleted
+    SchoolClaimed
 
     @@map("event_type")
 }
@@ -355,19 +364,60 @@ model Subscription {
 }
 
 model JoinRequest {
-    id          String            @id @default(uuid()) @db.Uuid
-    schoolName  String            @map("school_name")
-    phone       String
-    email       String?
-    requestedAt DateTime          @default(now()) @map("requested_at") @db.Timestamptz(6)
-    requestedBy String            @map("requested_by")
-    status      JoinRequestStatus @default(pending_review)
-    processedBy String?           @map("processed_by")
-    processedAt DateTime?         @map("processed_at") @db.Timestamptz(6)
-    deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz(6)
+    id            String            @id @default(uuid()) @db.Uuid
+    schoolName    String            @map("school_name")
+    phone         String
+    email         String?
+    adminPhone    String            @map("admin_phone")
+    adminEmail    String?           @map("admin_email")
+    county        String?
+    country       String?           @default("Kenya")
+    town          String?
+    requestedAt   DateTime          @default(now()) @map("requested_at") @db.Timestamptz(6)
+    requestedBy   String            @map("requested_by")
+    status        JoinRequestStatus @default(pending_review)
+    processedBy   String?           @map("processed_by")
+    processedAt   DateTime?         @map("processed_at") @db.Timestamptz(6)
+    oneTimeCode   String?           @map("one_time_code")
+    deletedAt     DateTime?         @map("deleted_at") @db.Timestamptz(6)
 
     @@unique([schoolName, phone])
     @@map("join_requests")
+}
+
+enum PlatformAdminRole {
+    super_admin
+    admin
+    staff
+    support
+
+    @@map("platform_admin_role")
+}
+
+enum PlatformAdminStatus {
+    active
+    invited
+    suspended
+
+    @@map("platform_admin_status")
+}
+
+model PlatformAdmin {
+    id             String              @id @default(uuid()) @db.Uuid
+    firstName      String              @map("first_name")
+    lastName       String              @map("last_name")
+    email          String              @unique
+    phone          String              @unique
+    role           PlatformAdminRole   @default(staff)
+    hashedPassword String?             @map("hashed_password")
+    status         PlatformAdminStatus @default(invited)
+    createdBy      String?             @map("created_by") @db.Uuid
+    lastLogin      DateTime?           @map("last_login") @db.Timestamptz(6)
+    createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt      DateTime            @updatedAt @map("updated_at") @db.Timestamptz(6)
+    deletedAt      DateTime?           @map("deleted_at") @db.Timestamptz(6)
+
+    @@map("platform_admins")
 }
 
 /**
@@ -476,8 +526,21 @@ model School {
     eventOutbox              EventOutbox[]
     messageTokens            MessageToken[]
     subscriptions            Subscription[]
+    smsWallet                SmsWallet?
 
     @@map("schools")
+}
+
+model SmsWallet {
+    id        String   @id @default(uuid()) @db.Uuid
+    schoolId  String   @unique @map("school_id") @db.Uuid
+    balance   Int      @default(0)
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+    @@map("sms_wallets")
 }
 
 model SchoolMembership {

@@ -7,7 +7,7 @@ import { PageHeader } from "../../components/shell/PageHeader"
 import { Card, CardContent, CardHeader } from "../../components/ui/Card"
 import { Badge } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
-import { Skeleton } from "../../components/ui/Skeleton"
+import { CardSkeleton, Skeleton } from "../../components/ui/Skeleton"
 import type { Student } from "../../types"
 
 export function StudentDetail() {
@@ -33,16 +33,10 @@ export function StudentDetail() {
       <div className="space-y-6">
         <PageHeader title="Loading..." description="" />
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <Card><CardContent className="p-6 space-y-4">
-            <Skeleton className="h-16 w-16 rounded-full mx-auto" />
-            <Skeleton className="h-5 w-32 mx-auto" />
-            <Skeleton className="h-4 w-20 mx-auto" />
-          </CardContent></Card>
-          <Card className="lg:col-span-2"><CardContent className="p-6 space-y-3">
-            <Skeleton className="h-5 w-48" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </CardContent></Card>
+          <CardSkeleton />
+          <div className="lg:col-span-2">
+            <CardSkeleton />
+          </div>
         </div>
       </div>
     )

@@ -1,21 +1,25 @@
 import { Navigate, Route, Routes } from "react-router-dom"
-import { AuthProvider } from "./lib/auth-context"
+import { AuthProvider, useAuth } from "./lib/auth-context"
 import { AppShell } from "./components/shell/AppShell"
 import { LoginPage } from "./pages/auth/LoginPage"
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage"
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage"
 import { SchoolRegistrationPage } from "./pages/onboarding/SchoolRegistrationPage"
+import { SchoolSetupPage } from "./pages/onboarding/SchoolSetupPage"
 import { Dashboard } from "./pages/Dashboard"
 import { StudentList } from "./pages/students/StudentList"
 import { StudentDetail } from "./pages/students/StudentDetail"
 import { AttendancePage } from "./pages/attendance/AttendancePage"
 import { FinancePage } from "./pages/finance/FinancePage"
 import { AcademicsPage } from "./pages/academics/AcademicsPage"
+import { ExamsPage } from "./pages/exams/ExamsPage"
 import { CommunicationPage } from "./pages/communication/CommunicationPage"
 import { ReportsPage } from "./pages/reports/ReportsPage"
 import { SettingsPage } from "./pages/settings/SettingsPage"
 import { UserListPage } from "./pages/users/UserListPage"
 import { CreateUserPage } from "./pages/users/CreateUserPage"
+import { PlatformLoginPage } from "./pages/platform/PlatformLoginPage"
+import { PlatformDashboard } from "./pages/platform/PlatformDashboard"
 
 export function App() {
   return (
@@ -26,6 +30,12 @@ export function App() {
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route path="/auth/register" element={<SchoolRegistrationPage />} />
+        <Route path="/onboarding/register" element={<SchoolRegistrationPage />} />
+        <Route path="/onboarding/setup" element={<SchoolSetupPage />} />
+
+        {/* Platform Admin routes (outside AppShell) */}
+        <Route path="/platform/login" element={<PlatformLoginPage />} />
+        <Route path="/platform/dashboard" element={<PlatformDashboard />} />
 
         {/* App routes (inside AppShell) */}
         <Route path="/*" element={
@@ -41,7 +51,8 @@ export function App() {
                 <Route path="/attendance" element={<AttendancePage />} />
                 <Route path="/finance" element={<FinancePage />} />
                 <Route path="/academics" element={<AcademicsPage />} />
-                <Route path="/assessments" element={<AcademicsPage />} />
+                <Route path="/exams" element={<ExamsPage />} />
+                <Route path="/assessments" element={<ExamsPage />} />
                 <Route path="/communication" element={<CommunicationPage />} />
                 <Route path="/reports" element={<ReportsPage />} />
                 <Route path="/settings" element={<SettingsPage />} />

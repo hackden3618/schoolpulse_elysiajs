@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia"
 import { API_PREFIX } from "@/shared/constants"
-import { errorHandler } from "@/common/middleware"
+import { errorHandler, authGuard } from "@/common/middleware"
 import {
   loginController,
   registerController,
@@ -10,6 +10,7 @@ import {
   logoutController,
   createJoinRequestController,
   listJoinRequestsController,
+  approveJoinRequestController,
 } from "./controller"
 import {
   loginSchema,
@@ -54,4 +55,12 @@ export const joinRequestRoute = new Elysia({ prefix: `${API_PREFIX}/join-request
   })
   .get("/", listJoinRequestsController, {
     detail: { summary: "List join requests (admin)", tags: ["Onboarding"] },
+  })
+
+export const joinRequestApproveRoute = new Elysia({ prefix: `${API_PREFIX}/join-requests` })
+  .use(errorHandler)
+  .use(authGuard)
+  .post("/:id/approve", approveJoinRequestController, {
+    params: t.Object({ id: t.String({ format: "uuid" }) }),
+    detail: { summary: "Approve a join request", tags: ["Onboarding"] },
   })

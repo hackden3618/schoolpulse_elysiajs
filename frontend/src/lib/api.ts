@@ -94,16 +94,25 @@ export const authApi = {
 }
 
 /* =========================================================================
- * JOIN REQUESTS (not yet in backend - placeholder)
+ * JOIN REQUESTS
  * ========================================================================= */
 
 export const joinRequestsApi = {
-  create: (data: { schoolName: string; phone: string; email?: string }) =>
+  create: (data: { schoolName: string; phone: string; email?: string; adminPhone: string; adminEmail?: string; county?: string; country?: string; town?: string }) =>
     request<ApiResponse<JoinRequest>>("/join-requests", {
       method: "POST",
       body: JSON.stringify(data),
     }),
-  list: () => request<ApiResponse<JoinRequest[]>>("/join-requests"),
+  list: () => platformRequest<ApiResponse<JoinRequest[]>>("/join-requests"),
+  approve: (id: string) =>
+    platformRequest<ApiResponse<{ school: any; oneTimeCode: string }>>(`/platform/join-requests/${id}/approve`, {
+      method: "POST",
+    }),
+  reject: (id: string, reason?: string) =>
+    platformRequest<ApiResponse<{ rejected: boolean }>>(`/platform/join-requests/${id}/reject`, {
+      method: "POST",
+      body: JSON.stringify(reason ? { reason } : {}),
+    }),
 }
 
 /* =========================================================================
@@ -128,6 +137,11 @@ export const schoolsApi = {
   updateSubscription: (id: string, data: Record<string, unknown>) =>
     request<ApiResponse<School>>(`/schools/${id}/subscription`, {
       method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  claim: (data: { schoolCode: string; oneTimeCode: string; firstName: string; lastName: string; phone: string; email?: string; password: string }) =>
+    request<ApiResponse<{ message: string; user: { id: string; firstName: string; lastName: string; phone: string } }>>("/schools/claim", {
+      method: "POST",
       body: JSON.stringify(data),
     }),
 }
@@ -457,4 +471,97 @@ export const dashboardApi = {
     request<ApiResponse<{ students: number; activeStudents: number; staff: number; activeClasses: number; activeAcademicYear: any; activeTerm: any; attendanceToday: number; openInvoices: number; pendingPayments: number }>>(`/schools/${schoolId}/dashboard/summary`),
   activity: (schoolId: string) =>
     request<ApiResponse<{ recentPayments: any[] }>>(`/schools/${schoolId}/dashboard/activity`),
+}
+
+/* =========================================================================
+ * REPORTS
+ * ========================================================================= */
+
+export const reportsApi = {
+  summary: (schoolId: string) =>
+    request<ApiResponse<Array<{ type: string; label: string; count: number }>>>(`/schools/${schoolId}/reports`),
+  attendance: (schoolId: string) =>
+    request<ApiResponse<{
+      totalSessions: number; totalRecords: number; present: number; absent: number; late: number; excused: number; averageRate: number
+    }>>(`/schools/${schoolId}/reports/attendance`),
+  finance: (schoolId: string) =>
+    request<ApiResponse<{
+      totalInvoiced: number; totalCollected: number; totalOutstanding: number; invoicesByStatus: Array<{ status: string; count: number; totalAmount: number; outstanding: number }>
+    }>>(`/schools/${schoolId}/reports/finance`),
+  academic: (schoolId: string) =>
+    request<ApiResponse<{
+      totalExams: number; completedExams: number; totalAssessments: number; totalResults: number; publishedResults: number
+    }>>(`/schools/${schoolId}/reports/academic`),
+  students: (schoolId: string) =>
+    request<ApiResponse<{
+      total: number; active: number; byGender: Array<{ gender: string; count: number }>; byClass: Array<{ classId: string; className: string; count: number }>
+    }>>(`/schools/${schoolId}/reports/students`),
+}
+
+/* =========================================================================
+ * PLATFORM ADMIN (SchoolPulse Internal)
+ * ========================================================================= */
+
+let platformToken: string | null = null
+
+export function setPlatformToken(token: string | null) {
+  platformToken = token
+}
+
+export function getPlatformToken(): string | null {
+  return platformToken
+}
+
+function getPlatformHeaders(): Record<string, string> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (platformToken) {
+    headers["Authorization"] = `Bearer ${platformToken}`
+  }
+  return headers
+}
+
+async function platformRequest<T>(path: string, options?: RequestInit): Promise<T> {
+  const url = `${API_BASE}${path}`
+  const res = await fetch(url, {
+    ...options,
+    headers: { ...getPlatformHeaders(), ...options?.headers },
+  })
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    const message = body?.error?.message || `API error: ${res.status}`
+    throw new Error(message)
+  }
+
+  return res.json() as Promise<T>
+}
+
+export const platformAdminApi = {
+  login: (data: { email: string; password: string }) =>
+    platformRequest<ApiResponse<{ accessToken: string; admin: any }>>("/platform/auth/login", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  listAdmins: () =>
+    platformRequest<ApiResponse<any[]>>("/platform/admins"),
+  createAdmin: (data: { firstName: string; lastName: string; email: string; phone: string; role?: string }) =>
+    platformRequest<ApiResponse<any>>("/platform/admins", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+  updateAdmin: (id: string, data: Record<string, unknown>) =>
+    platformRequest<ApiResponse<any>>(`/platform/admins/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(data),
+    }),
+  resetPassword: (id: string) =>
+    platformRequest<ApiResponse<{ temporaryPassword: string }>>(`/platform/admins/${id}/reset-password`, {
+      method: "POST",
+    }),
+  listSchools: () =>
+    platformRequest<ApiResponse<any[]>>("/platform/schools"),
+  deleteSchool: (id: string) =>
+    platformRequest<ApiResponse<{ deleted: boolean }>>(`/platform/schools/${id}`, {
+      method: "DELETE",
+    }),
 }

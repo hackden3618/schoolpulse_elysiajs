@@ -92,7 +92,17 @@ export async function markResetTokenUsed(id: string) {
   return prisma.passwordResetToken.update({ where: { id }, data: { usedAt: new Date() } })
 }
 
-export async function createJoinRequest(data: { schoolName: string; phone: string; email?: string; requestedBy: string }) {
+export async function createJoinRequest(data: {
+  schoolName: string
+  phone: string
+  email?: string
+  adminPhone: string
+  adminEmail?: string
+  county?: string
+  country?: string
+  town?: string
+  requestedBy: string
+}) {
   return prisma.joinRequest.create({ data: { ...data, status: "submitted" } })
 }
 
@@ -100,5 +110,36 @@ export async function findAllJoinRequests() {
   return prisma.joinRequest.findMany({
     where: { deletedAt: null },
     orderBy: { requestedAt: "desc" },
+    select: {
+      id: true,
+      schoolName: true,
+      phone: true,
+      email: true,
+      county: true,
+      country: true,
+      town: true,
+      requestedAt: true,
+      requestedBy: true,
+      status: true,
+      processedBy: true,
+      processedAt: true,
+      deletedAt: true,
+    },
+  })
+}
+
+export async function findJoinRequestById(id: string) {
+  return prisma.joinRequest.findFirst({ where: { id, deletedAt: null } })
+}
+
+export async function updateJoinRequest(id: string, data: Prisma.JoinRequestUpdateInput) {
+  return prisma.joinRequest.update({ where: { id }, data })
+}
+
+export async function findLatestSchoolCode(prefix: string) {
+  return prisma.school.findFirst({
+    where: { schoolCode: { startsWith: prefix } },
+    orderBy: { schoolCode: "desc" },
+    select: { schoolCode: true },
   })
 }

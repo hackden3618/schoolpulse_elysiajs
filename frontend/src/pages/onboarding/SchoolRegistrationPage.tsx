@@ -12,6 +12,11 @@ export function SchoolRegistrationPage() {
   const [schoolName, setSchoolName] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
+  const [adminPhone, setAdminPhone] = useState("")
+  const [adminEmail, setAdminEmail] = useState("")
+  const [county, setCounty] = useState("")
+  const [town, setTown] = useState("")
+  const [country, setCountry] = useState("Kenya")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
@@ -29,6 +34,11 @@ export function SchoolRegistrationPage() {
         schoolName,
         phone,
         email: email || undefined,
+        adminPhone,
+        adminEmail: adminEmail || undefined,
+        county: county || undefined,
+        country: country || undefined,
+        town: town || undefined,
       })
       setSubmitted(true)
     } catch (err) {
@@ -97,7 +107,17 @@ export function SchoolRegistrationPage() {
               <Input label="School Name *" placeholder="e.g. St Mary's High School" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} />
               <Input label="Phone Number *" type="tel" placeholder="e.g. +254712345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
               <Input label="Email Address" type="email" placeholder="admin@school.sch.ke" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <Button className="w-full" onClick={() => setStep(2)} disabled={!schoolName || !phone}>
+              <div className="border-t border-primary-100 pt-4">
+                <p className="text-xs font-semibold text-primary-500 uppercase tracking-wider mb-3">Admin Contact</p>
+                <Input label="Admin Phone *" type="tel" placeholder="e.g. +254712345678" value={adminPhone} onChange={(e) => setAdminPhone(e.target.value)} />
+                <Input label="Admin Email" type="email" placeholder="admin@school.sch.ke" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <Input label="County *" placeholder="e.g. Nairobi" value={county} onChange={(e) => setCounty(e.target.value)} />
+                <Input label="Town / City" placeholder="e.g. Westlands" value={town} onChange={(e) => setTown(e.target.value)} />
+              </div>
+              <Input label="Country" placeholder="Kenya" value={country} onChange={(e) => setCountry(e.target.value)} />
+              <Button className="w-full" onClick={() => setStep(2)} disabled={!schoolName || !phone || !adminPhone}>
                 Continue
               </Button>
             </div>
@@ -116,8 +136,11 @@ export function SchoolRegistrationPage() {
                 <h3 className="text-sm font-semibold text-primary-800">Review your details</h3>
                 <div className="text-sm text-primary-600 space-y-1">
                   <p><span className="font-medium">School:</span> {schoolName}</p>
-                  <p><span className="font-medium">Phone:</span> {phone}</p>
-                  {email && <p><span className="font-medium">Email:</span> {email}</p>}
+                  <p><span className="font-medium">School Phone:</span> {phone}</p>
+                  {email && <p><span className="font-medium">School Email:</span> {email}</p>}
+                  <p><span className="font-medium">Admin Phone:</span> {adminPhone}</p>
+                  {adminEmail && <p><span className="font-medium">Admin Email:</span> {adminEmail}</p>}
+                  {county && <p><span className="font-medium">Location:</span> {county}{town ? `, ${town}` : ""}, {country}</p>}
                 </div>
               </div>
 

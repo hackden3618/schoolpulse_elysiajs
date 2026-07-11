@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../lib/auth-context"
-import { Plus, Search, AlertCircle, Loader2 } from "lucide-react"
+import { Plus, Search, AlertCircle, Loader2, RefreshCw } from "lucide-react"
 import { studentsApi } from "../../lib/api"
 import { PageHeader } from "../../components/shell/PageHeader"
 import { Card, CardContent } from "../../components/ui/Card"
@@ -96,18 +96,21 @@ export function StudentList() {
 
       <Card>
         <CardContent className="p-0">
-          <div className="flex items-center gap-3 p-4 border-b border-surface-100">
-            <div className="relative flex-1 max-w-sm">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
-              <input
-                type="text"
-                placeholder="Search by name or admission number..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full rounded-lg border border-surface-200 bg-surface-50 pl-9 pr-3 py-2 text-sm text-surface-900 placeholder-surface-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-              />
+            <div className="flex items-center gap-3 p-4 border-b border-surface-100">
+              <div className="relative flex-1 max-w-sm">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-surface-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name or admission number..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full rounded-lg border border-surface-200 bg-surface-50 pl-9 pr-3 py-2 text-sm text-surface-900 placeholder-surface-400 focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                />
+              </div>
+              <Button size="sm" variant="secondary" onClick={load}>
+                <RefreshCw size={14} />
+              </Button>
             </div>
-          </div>
 
           {loading ? (
             <div className="p-4 space-y-3">
@@ -128,9 +131,10 @@ export function StudentList() {
               <Button size="sm" variant="secondary" className="mt-3" onClick={load}>Retry</Button>
             </div>
           ) : hasNoResults ? (
-            <div className="p-6 text-center">
-              <p className="text-sm text-primary-400">No students match your search.</p>
-            </div>
+            <EmptyState
+              title="No results"
+              description="No students match your search. Try a different name or admission number."
+            />
           ) : (
             <Table
               columns={[

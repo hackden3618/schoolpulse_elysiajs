@@ -1,14 +1,21 @@
 import { useState, useEffect, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
 import { ArrowLeft, AlertCircle, Shield, Plus, X, Check } from "lucide-react"
-import { usersApi, membershipsApi } from "../../lib/api"
+import { usersApi, membershipsApi, rolesApi } from "../../lib/api"
 import { useAuth } from "../../lib/auth-context"
 import { PageHeader } from "../../components/shell/PageHeader"
 import { Card, CardContent } from "../../components/ui/Card"
 import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
 import { Skeleton } from "../../components/ui/Skeleton"
+import { ErrorBanner } from "../../components/ui/ErrorBanner"
 import type { Role } from "../../types"
+
+const MIN_LOAD_MS = 500
+
+function delay(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
 
 export function CreateUserPage() {
   const navigate = useNavigate()
@@ -22,7 +29,30 @@ export function CreateUserPage() {
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
   const [success, setSuccess] = useState(false)
+
+  const [roles, setRoles] = useState<Role[]>([])
+  const [rolesLoading, setRolesLoading] = useState(true)
+  const [rolesError, setRolesError] = useState("")
+
   const { school } = useAuth()
+
+  useEffect(() => {
+    let cancelled = false
+    const load = async () => {
+      setRolesLoading(true)
+      setRolesError("")
+      try {
+        const res = await rolesApi.list()
+        if (!cancelled) setRoles(res.data)
+      } catch (e) {
+        if (!cancelled) setRolesError(e instanceof Error ? e.message : "Failed to load roles")
+      } finally {
+        if (!cancelled) setRolesLoading(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [])
 
   const toggleRole = (roleId: string) => {
     setSelectedRoleIds((prev) =>
@@ -45,17 +75,18 @@ export function CreateUserPage() {
 
     setLoading(true)
     try {
-      // Step 1: Create the user
-      const userRes = await usersApi.create(school!.id, {
-        firstName,
-        secondName: secondName || undefined,
-        lastName,
-        phone,
-        email: email || undefined,
-        password: password || undefined,
-      })
+      const [userRes] = await Promise.all([
+        usersApi.create(school!.id, {
+          firstName,
+          secondName: secondName || undefined,
+          lastName,
+          phone,
+          email: email || undefined,
+          password: password || undefined,
+        }),
+        delay(MIN_LOAD_MS),
+      ])
 
-      // Step 2: Create membership with role assignments
       await membershipsApi.create(school!.id, {
         userId: userRes.data.id,
         roleIds: selectedRoleIds,
@@ -141,36 +172,53 @@ export function CreateUserPage() {
                 <p className="text-xs text-primary-500 mb-4">
                   Assign one or more roles to define what this staff member can access.
                 </p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                  {ROLES.map((role) => {
-                    const selected = selectedRoleIds.includes(role.id)
-                    return (
-                      <button
-                        key={role.id}
-                        type="button"
-                        onClick={() => toggleRole(role.id)}
-                        className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
-                          selected
-                            ? "border-accent bg-accent-50 ring-1 ring-accent"
-                            : "border-surface-200 bg-white hover:border-surface-300"
-                        }`}
-                      >
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                          selected ? "bg-accent text-white" : "bg-surface-100 text-surface-500"
-                        }`}>
-                          <Shield size={14} />
+
+                {rolesLoading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {Array.from({ length: 6 }).map((_, i) => (
+                      <div key={i} className="flex items-center gap-3 rounded-lg border border-surface-200 bg-white p-3">
+                        <Skeleton className="h-8 w-8 rounded-full" />
+                        <div className="flex-1 space-y-1.5">
+                          <Skeleton className="h-4 w-24" />
+                          <Skeleton className="h-3 w-32" />
                         </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-sm font-semibold ${selected ? "text-accent-700" : "text-primary-900"}`}>
-                            {role.name}
-                          </p>
-                          <p className="text-xs text-primary-400 truncate">{role.description}</p>
-                        </div>
-                        {selected ? <X size={14} className="text-accent shrink-0" /> : <Plus size={14} className="text-surface-300 shrink-0" />}
-                      </button>
-                    )
-                  })}
-                </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : rolesError ? (
+                  <ErrorBanner message={rolesError} />
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {roles.map((role) => {
+                      const selected = selectedRoleIds.includes(role.id)
+                      return (
+                        <button
+                          key={role.id}
+                          type="button"
+                          onClick={() => toggleRole(role.id)}
+                          className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
+                            selected
+                              ? "border-accent bg-accent-50 ring-1 ring-accent"
+                              : "border-surface-200 bg-white hover:border-surface-300"
+                          }`}
+                        >
+                          <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
+                            selected ? "bg-accent text-white" : "bg-surface-100 text-surface-500"
+                          }`}>
+                            <Shield size={14} />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-semibold ${selected ? "text-accent-700" : "text-primary-900"}`}>
+                              {role.name}
+                            </p>
+                            <p className="text-xs text-primary-400 truncate">{role.description}</p>
+                          </div>
+                          {selected ? <X size={14} className="text-accent shrink-0" /> : <Plus size={14} className="text-surface-300 shrink-0" />}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -195,7 +243,7 @@ export function CreateUserPage() {
                         <span className="text-primary-400">None selected</span>
                       ) : (
                         selectedRoleIds.map((id) => {
-                          const role = ROLES.find((r) => r.id === id)
+                          const role = roles.find((r) => r.id === id)
                           return role ? (
                             <span key={id} className="inline-flex items-center gap-1 rounded-full bg-accent-50 text-accent-700 px-2 py-0.5 text-[11px] font-semibold">
                               {role.name}
@@ -218,14 +266,3 @@ export function CreateUserPage() {
     </div>
   )
 }
-
-const ROLES: { id: string; name: string; description: string }[] = [
-  { id: "role-admin", name: "Platform Admin", description: "Full system access" },
-  { id: "role-principal", name: "Principal", description: "School-wide management" },
-  { id: "role-deputy", name: "Deputy Principal", description: "Assist principal" },
-  { id: "role-academic", name: "Academic Master", description: "Academic oversight" },
-  { id: "role-bursar", name: "Bursar", description: "Finance management" },
-  { id: "role-teacher", name: "Teacher", description: "Classroom management" },
-  { id: "role-admissions", name: "Admissions", description: "Student admissions" },
-  { id: "role-reception", name: "Reception", description: "Front desk" },
-]

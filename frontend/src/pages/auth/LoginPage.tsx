@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react"
 import { useNavigate, Link } from "react-router-dom"
-import { LogIn, Eye, EyeOff, AlertCircle } from "lucide-react"
+import { LogIn, AlertCircle } from "lucide-react"
 import { useAuth } from "../../lib/auth-context"
 import { Logo } from "../../components/ui/Logo"
 import { Button } from "../../components/ui/Button"
@@ -11,7 +11,6 @@ export function LoginPage() {
   const { login, isAuthenticated } = useAuth()
   const [loginStr, setLoginStr] = useState("")
   const [password, setPassword] = useState("")
-  const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
 
@@ -73,29 +72,14 @@ export function LoginPage() {
               autoFocus
             />
 
-            <div className="space-y-1">
-              <label htmlFor="password" className="block text-sm font-medium text-surface-700">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  autoComplete="current-password"
-                  className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2 pr-10 text-sm text-surface-900 placeholder-surface-400 transition-colors focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-primary-400 hover:text-primary-600"
-                >
-                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                </button>
-              </div>
-            </div>
+            <Input
+              label="Password"
+              type="password"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="current-password"
+            />
 
             <div className="flex items-center justify-between">
               <label className="flex items-center gap-2">
@@ -149,7 +133,7 @@ export function LoginPage() {
               <span className="text-accent">Simplified</span>
             </h3>
             <p className="mt-4 text-primary-300 leading-relaxed">
-              Manage students, staff, attendance, fees, and academics — all from one unified platform.
+              Manage students, staff, attendance, fees, and academics. All from one unified platform.
             </p>
             <div className="mt-10 grid grid-cols-3 gap-4 text-center">
               <div className="rounded-xl bg-white/5 border border-white/10 p-4">

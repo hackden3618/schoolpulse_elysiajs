@@ -42,3 +42,8 @@ export async function listJoinRequestsController({ set }: any) {
   const result = await svc.listJoinRequests()
   return success(result)
 }
+
+export async function approveJoinRequestController({ params, authUser, set }: any) {
+  const result = await svc.approveJoinRequest(params.id, authUser.userId)
+  return success(result)
+}

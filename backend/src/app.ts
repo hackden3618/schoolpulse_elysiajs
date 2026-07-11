@@ -3,6 +3,7 @@ import { openapi } from "@elysia/openapi"
 import { errorHandler, authGuard } from "@/common/middleware"
 
 import { authRoute, joinRequestRoute } from "@/modules/auth/route"
+import { platformAdminAuthRoute, platformAdminRoute, platformAdminJoinRequestRoute, platformAdminSchoolRoute, platformSchoolClaimRoute } from "@/modules/platform-admin/routes"
 import { schoolRoute } from "@/modules/schools/route"
 import { userRoute, membershipRoute } from "@/modules/users/route"
 import { studentRoute } from "@/modules/students/route"
@@ -18,13 +19,17 @@ import { attendanceRoute } from "@/modules/attendance/route"
 import { examRoute, assessmentRoute } from "@/modules/exams/route"
 import { financeRoute } from "@/modules/finance/route"
 import { dashboardRoute } from "@/modules/dashboard/route"
+import { reportsRoute } from "@/modules/reports/route"
 import { notificationsRoute } from "@/modules/notifications/route"
+import { rolesRoute } from "@/modules/roles/route"
 
 export const app = new Elysia()
   .use(openapi())
   .use(errorHandler)
   .use(authRoute)
   .use(joinRequestRoute)
+  .use(platformAdminAuthRoute)
+  .use(platformSchoolClaimRoute)
   .get("/api/v1/health", { status: "ok", timestamp: new Date().toISOString() }, {
     detail: { summary: "Health check", tags: ["System"] },
   })
@@ -32,7 +37,11 @@ export const app = new Elysia()
     detail: { summary: "Readiness check", tags: ["System"] },
   })
   .use(authGuard)
+  .use(rolesRoute)
   .use(schoolRoute)
+  .use(platformAdminRoute)
+  .use(platformAdminJoinRequestRoute)
+  .use(platformAdminSchoolRoute)
   .use(userRoute)
   .use(membershipRoute)
   .use(studentRoute)
@@ -47,4 +56,5 @@ export const app = new Elysia()
   .use(assessmentRoute)
   .use(financeRoute)
   .use(dashboardRoute)
+  .use(reportsRoute)
   .use(notificationsRoute)

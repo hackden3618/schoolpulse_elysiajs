@@ -3,9 +3,16 @@ import { hashPassword, verifyPasswordOrThrow } from "@/common/auth"
 import { AppError } from "@/common/errors"
 import { prisma } from "@/infrastructure/database/prisma"
 import { writeEventOutbox } from "@/infrastructure/events"
+import { sendSingleSms } from "@/infrastructure/messaging/sms/sms.provider"
 import { signToken } from "@/shared/jwt"
 import * as repo from "./repository"
-import type { LoginInput, RegisterInput, ForgotPasswordInput, ResetPasswordInput, CreateJoinRequestInput } from "./schema"
+import type {
+  LoginInput,
+  RegisterInput,
+  ForgotPasswordInput,
+  ResetPasswordInput,
+  CreateJoinRequestInput,
+} from "./schema"
 
 export async function login(data: LoginInput) {
   const user = await repo.findUserByPhone(data.login) ?? await repo.findUserByEmail(data.login)
@@ -179,14 +186,141 @@ export async function createJoinRequest(data: CreateJoinRequestInput) {
     throw AppError.conflict("A join request with this school name and phone already exists")
   }
 
-  return repo.createJoinRequest({
+  const joinRequest = await repo.createJoinRequest({
     schoolName: data.schoolName,
     phone: data.phone,
     email: data.email,
+    adminPhone: data.adminPhone,
+    adminEmail: data.adminEmail,
+    county: data.county,
+    country: data.country,
+    town: data.town,
     requestedBy: data.phone,
   })
+
+  await writeEventOutbox({
+    aggregateId: joinRequest.id,
+    aggregateType: "join_request",
+    eventType: "JoinRequestSubmitted",
+    payload: {
+      joinRequestId: joinRequest.id,
+      schoolName: data.schoolName,
+      phone: data.phone,
+      county: data.county ?? null,
+      country: data.country ?? null,
+      town: data.town ?? null,
+      requestedAt: joinRequest.requestedAt,
+    },
+  })
+
+  const smsMessage = `Your request to join ${data.schoolName} has been submitted. We will review it and get back to you.`
+  await sendSingleSms(data.phone, smsMessage).catch(() => {})
+
+  return joinRequest
 }
 
 export async function listJoinRequests() {
   return repo.findAllJoinRequests()
+}
+
+export async function approveJoinRequest(id: string, processedBy: string) {
+  const joinRequest = await repo.findJoinRequestById(id)
+  if (!joinRequest) {
+    throw AppError.notFound("Join request not found")
+  }
+
+  if (!["pending_review", "submitted"].includes(joinRequest.status)) {
+    throw AppError.validation("Join request is not in a pending state")
+  }
+
+  const county = joinRequest.county || "Unknown"
+  const prefix = county.slice(0, 3).toUpperCase()
+
+  const latestSchool = await repo.findLatestSchoolCode(prefix)
+  let nextNumber = 1
+  if (latestSchool) {
+    const numPart = parseInt(latestSchool.schoolCode.slice(3), 10)
+    if (!isNaN(numPart)) nextNumber = numPart + 1
+  }
+  const schoolCode = `${prefix}${String(nextNumber).padStart(3, "0")}`
+
+  const otp = Math.floor(100000 + Math.random() * 900000).toString()
+  const hashedOtp = await hashPassword(otp)
+
+  const result = await prisma.$transaction(async (tx: any) => {
+    const school = await tx.school.create({
+      data: {
+        schoolCode,
+        schoolName: joinRequest.schoolName,
+        schoolPhone: joinRequest.phone,
+        schoolEmail: joinRequest.email,
+        county: joinRequest.county || "Unknown",
+        town: joinRequest.town || "Unknown",
+        country: joinRequest.country || "Kenya",
+      },
+    })
+
+    await tx.smsWallet.create({
+      data: {
+        schoolId: school.id,
+        balance: 5,
+      },
+    })
+
+    const user = await tx.user.create({
+      data: {
+        firstName: "Admin",
+        lastName: joinRequest.schoolName,
+        phone: joinRequest.phone,
+        email: joinRequest.email,
+        hashedPassword: hashedOtp,
+      },
+    })
+
+    const membership = await tx.schoolMembership.create({
+      data: { schoolId: school.id, userId: user.id, status: "active" },
+    })
+
+    const superAdminRole = await repo.findRoleByName("Super Admin")
+    if (superAdminRole) {
+      await tx.schoolMembershipRole.create({
+        data: { membershipId: membership.id, roleId: superAdminRole.id },
+      })
+    }
+
+    await tx.joinRequest.update({
+      where: { id },
+      data: {
+        status: "approved",
+        processedBy,
+        processedAt: new Date(),
+        oneTimeCode: otp,
+      },
+    })
+
+    return { school, user }
+  })
+
+  await writeEventOutbox({
+    schoolId: result.school.id,
+    aggregateId: id,
+    aggregateType: "join_request",
+    eventType: "JoinRequestApproved",
+    payload: {
+      joinRequestId: id,
+      schoolId: result.school.id,
+      schoolName: joinRequest.schoolName,
+      phone: joinRequest.phone,
+      userId: result.user.id,
+    },
+  })
+
+  const smsMessage = `Your school ${joinRequest.schoolName} has been approved! Login with phone ${joinRequest.phone} and code ${otp}. Change your password on first login.`
+  await sendSingleSms(joinRequest.phone, smsMessage).catch(() => {})
+
+  return {
+    school: result.school,
+    user: { id: result.user.id, phone: result.user.phone },
+    oneTimeCode: otp,
+  }
 }

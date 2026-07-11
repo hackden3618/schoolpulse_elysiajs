@@ -42,7 +42,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   const initials = user
     ? `${user.firstName[0]}${(user.lastName || "")[0] || ""}`
-    : "DO"
+    : "?"
 
   return (
     <aside
@@ -140,9 +140,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           {!collapsed && (
             <div className="flex-1 text-left min-w-0">
               <p className="font-semibold text-white truncate text-xs">
-                {school?.schoolName || "Greenfield Academy"}
+                {school?.schoolName || "School"}
               </p>
-              <p className="text-[10px] text-primary-500 font-semibold mt-0.5">2025/2026 Term 2</p>
+              <p className="text-[10px] text-primary-500 font-semibold mt-0.5">&nbsp;</p>
             </div>
           )}
           {!collapsed && <ChevronDown size={12} className="shrink-0 text-primary-500" />}
@@ -158,9 +158,9 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
           {!collapsed && (
             <div className="flex-1 min-w-0">
               <p className="text-xs font-semibold text-white truncate leading-tight">
-                {user ? `${user.firstName} ${user.lastName || ""}` : "Dennis Okello"}
+                {user ? `${user.firstName} ${user.lastName || ""}` : ""}
               </p>
-              <p className="text-[10px] text-primary-400 font-medium mt-0.5">Principal</p>
+              <p className="text-[10px] text-primary-400 font-medium mt-0.5">&nbsp;</p>
             </div>
           )}
           {!collapsed && (

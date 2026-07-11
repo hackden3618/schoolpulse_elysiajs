@@ -168,7 +168,7 @@ export function SettingsPage() {
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {section.fields.map((field) => {
-                    const value = field.value ?? (school as any)[field.key] ?? ""
+                    const value = "value" in field ? (field as any).value : (school as any)[field.key] ?? ""
                     return (
                       <Input
                         key={field.key}

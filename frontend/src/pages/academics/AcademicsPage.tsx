@@ -1,13 +1,14 @@
 import { useState, useEffect, type FormEvent } from "react"
-import { Plus, Search, Check, X, AlertCircle, Loader2, BookOpen, CalendarDays, Layers, GraduationCap } from "lucide-react"
+import { Plus, Check, X, BookOpen, CalendarDays, Layers, GraduationCap } from "lucide-react"
 import { academicApi } from "../../lib/api"
 import { useAuth } from "../../lib/auth-context"
 import { PageHeader } from "../../components/shell/PageHeader"
-import { Card, CardContent, CardHeader } from "../../components/ui/Card"
+import { Card, CardContent } from "../../components/ui/Card"
 import { Badge } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
-import { Skeleton } from "../../components/ui/Skeleton"
+import { TableSkeleton } from "../../components/ui/Skeleton"
+import { ErrorBanner } from "../../components/ui/ErrorBanner"
 import { EmptyState } from "../../components/ui/EmptyState"
 import type { AcademicYear, Term, Class, ClassInstance, Subject } from "../../types"
 
@@ -18,22 +19,7 @@ interface ModalState<T> {
   data: T | null
 }
 
-/* ───────────────────────────────────────────────
-   Common Loading Row
-   ─────────────────────────────────────────────── */
-function TableSkeleton({ rows = 4, cols = 3 }: { rows?: number; cols?: number }) {
-  return (
-    <div className="space-y-3 p-4">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex gap-4">
-          {Array.from({ length: cols }).map((_, j) => (
-            <Skeleton key={j} className="h-5 flex-1" />
-          ))}
-        </div>
-      ))}
-    </div>
-  )
-}
+const MIN_LOAD_MS = 500
 
 /* ───────────────────────────────────────────────
    Academic Years Tab
@@ -49,6 +35,7 @@ function AcademicYearsSection({ schoolId, activeYearId: _ }: { schoolId: string;
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
+    const start = Date.now()
     setLoading(true)
     setError("")
     try {
@@ -57,6 +44,9 @@ function AcademicYearsSection({ schoolId, activeYearId: _ }: { schoolId: string;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load academic years")
     } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -66,6 +56,7 @@ function AcademicYearsSection({ schoolId, activeYearId: _ }: { schoolId: string;
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!name || !startDate || !endDate) return
+    const start = Date.now()
     setSaving(true)
     try {
       await academicApi.years.create(schoolId, { name, startDate, endDate })
@@ -75,16 +66,26 @@ function AcademicYearsSection({ schoolId, activeYearId: _ }: { schoolId: string;
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create")
     } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
 
   const handleActivate = async (id: string) => {
+    const start = Date.now()
+    setLoading(true)
     try {
       await academicApi.years.activate(schoolId, id)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to activate")
+    } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
+      setLoading(false)
     }
   }
 
@@ -164,6 +165,7 @@ function TermsSection({ schoolId }: { schoolId: string }) {
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
+    const start = Date.now()
     setLoading(true)
     setError("")
     try {
@@ -176,6 +178,9 @@ function TermsSection({ schoolId }: { schoolId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load terms")
     } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -185,6 +190,7 @@ function TermsSection({ schoolId }: { schoolId: string }) {
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!name || !academicYearId || !startDate || !endDate) return
+    const start = Date.now()
     setSaving(true)
     try {
       await academicApi.terms.create(schoolId, { name, academicYearId, startDate, endDate })
@@ -194,16 +200,26 @@ function TermsSection({ schoolId }: { schoolId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create")
     } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
 
   const handleActivate = async (id: string) => {
+    const start = Date.now()
+    setLoading(true)
     try {
       await academicApi.terms.activate(schoolId, id)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to activate")
+    } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
+      setLoading(false)
     }
   }
 
@@ -290,6 +306,7 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
+    const start = Date.now()
     setLoading(true)
     setError("")
     try {
@@ -304,6 +321,9 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load classes")
     } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -313,6 +333,7 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
   const handleCreateClass = async (e: FormEvent) => {
     e.preventDefault()
     if (!className) return
+    const start = Date.now()
     setSaving(true)
     try {
       await academicApi.classes.create(schoolId, { name: className, level: classLevel })
@@ -322,6 +343,9 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create class")
     } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
@@ -329,6 +353,7 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
   const handleCreateStream = async (e: FormEvent) => {
     e.preventDefault()
     if (!streamClassId || !streamName || !streamYearId) return
+    const start = Date.now()
     setSaving(true)
     try {
       await academicApi.classInstances.create(schoolId, { classId: streamClassId, streamName, academicYearId: streamYearId })
@@ -338,6 +363,9 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create stream")
     } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
@@ -359,11 +387,7 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
             <CardContent className="p-4">
               <form onSubmit={handleCreateClass} className="flex items-end gap-3">
                 <Input label="Class Name" value={className} onChange={(e) => setClassName(e.target.value)} placeholder="e.g. Grade 8" />
-                <div className="space-y-1">
-                  <label className="block text-sm font-medium text-surface-700">Level</label>
-                  <input type="number" value={classLevel} onChange={(e) => setClassLevel(Number(e.target.value))} min={1} max={16}
-                    className="block w-24 rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm" />
-                </div>
+                <Input label="Level" type="number" value={classLevel} onChange={(e) => setClassLevel(Number(e.target.value))} min={1} max={16} className="w-24" />
                 <div className="flex gap-2 pb-1">
                   <Button size="sm" type="submit" disabled={saving}>{saving ? "Saving..." : "Save"}</Button>
                   <Button size="sm" variant="secondary" type="button" onClick={() => setShowClassForm(false)}><X size={14} /></Button>
@@ -467,6 +491,7 @@ function SubjectsSection({ schoolId }: { schoolId: string }) {
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
+    const start = Date.now()
     setLoading(true)
     setError("")
     try {
@@ -475,6 +500,9 @@ function SubjectsSection({ schoolId }: { schoolId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load subjects")
     } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -484,6 +512,7 @@ function SubjectsSection({ schoolId }: { schoolId: string }) {
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!name || !code) return
+    const start = Date.now()
     setSaving(true)
     try {
       await academicApi.subjects.create(schoolId, { name, code, isCompulsory: compulsory })
@@ -493,6 +522,9 @@ function SubjectsSection({ schoolId }: { schoolId: string }) {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create")
     } finally {
+      const elapsed = Date.now() - start
+      const remaining = MIN_LOAD_MS - elapsed
+      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
@@ -545,21 +577,6 @@ function SubjectsSection({ schoolId }: { schoolId: string }) {
         </div>
       )}
     </div>
-  )
-}
-
-/* ───────────────────────────────────────────────
-   Error Banner
-   ─────────────────────────────────────────────── */
-function ErrorBanner({ message, onRetry }: { message: string; onRetry: () => void }) {
-  return (
-    <Card>
-      <CardContent className="p-6 text-center">
-        <AlertCircle size={32} className="mx-auto text-danger-500 mb-3" />
-        <p className="text-sm text-danger-700 font-medium mb-2">{message}</p>
-        <Button size="sm" variant="secondary" onClick={onRetry}>Retry</Button>
-      </CardContent>
-    </Card>
   )
 }
 

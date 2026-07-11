@@ -203,108 +203,192 @@ export interface Subject {
 
 export interface AttendanceSession {
   id: string
+  schoolId: string
   classInstanceId: string
+  markerMembershipId: string | null
   sessionDate: string
   sessionType: "morning" | "afternoon" | "lesson"
   status: "open" | "locked"
+  lockedAt: string | null
+  createdAt: string
+  updatedAt: string
+  classInstance: ClassInstance
+  marker?: { id: string; user: { id: string; firstName: string; lastName: string } } | null
   records: AttendanceRecord[]
 }
 
 export interface AttendanceRecord {
   id: string
+  schoolId: string
+  sessionId: string
   studentId: string
+  editedByMembershipId: string | null
   status: "present" | "absent" | "late" | "excused"
-  reason?: string
+  checkInTime: string | null
+  editReason: string | null
+  editedAt: string | null
+  createdAt: string
+  updatedAt: string
+  student?: { id: string; admissionNumber: string; firstName: string; lastName: string }
 }
 
 export interface Exam {
   id: string
-  name: string
+  schoolId: string
   termId: string
-  type: string
+  name: string
+  type: "cat" | "midterm" | "endterm" | "mock" | "opener" | "continuous_assessment" | "practical" | "project" | "oral" | "national" | "custom"
   startDate: string
   endDate: string
   completed: boolean
   published: boolean
+  publishedAt: string | null
+  createdAt: string
+  updatedAt: string
+  term: Term
   assessments: Assessment[]
 }
 
 export interface Assessment {
   id: string
+  schoolId: string
   examId: string
   subjectId: string
   classInstanceId: string
   totalMarks: number
+  accountedInFinal: boolean
+  createdAt: string
+  updatedAt: string
+  exam: Exam
+  subject: Subject
+  classInstance: ClassInstance
   results: AssessmentResult[]
 }
 
 export interface AssessmentResult {
   id: string
+  schoolId: string
   studentId: string
+  enrollmentId: string | null
+  assessmentId: string
   attainedMarks: number
-  performance?: string
-  remarks?: string
+  performance: "excellent" | "good" | "average" | "below_average" | "poor" | null
+  remarks: string | null
   published: boolean
+  createdAt: string
+  updatedAt: string
+  student: { id: string; admissionNumber: string; firstName: string; lastName: string }
 }
 
 export interface FeeStructure {
   id: string
-  name: string
-  termId: string
+  schoolId: string
   academicYearId: string
-  classId?: string
+  termId: string
+  classId: string | null
   isGlobal: boolean
-  items: FeeItem[]
+  isLatest: boolean
+  createdAt: string
+  updatedAt: string
+  academicYear: AcademicYear
+  term: Term
+  class: { id: string; name: string; level: number } | null
+  feeItems: FeeItem[]
 }
 
 export interface FeeItem {
   id: string
+  schoolId: string
+  feeStructureId: string
   name: string
   amount: number
   optional: boolean
-  description?: string
+  description: string | null
+  createdAt: string
+  updatedAt: string
 }
 
 export interface Invoice {
   id: string
+  schoolId: string
   studentId: string
+  enrollmentId: string | null
   termId: string
+  feeStructureId: string | null
   totalAmount: number
   paidAmount: number
   balance: number
   status: "draft" | "issued" | "partially_paid" | "paid" | "overdue" | "cancelled" | "written_off"
+  isCurrent: boolean
   dueDate: string
+  createdAt: string
+  updatedAt: string
+  student: { id: string; admissionNumber: string; firstName: string; lastName: string }
+  term: Term
+  feeStructure: FeeStructure | null
+  payments: Payment[]
 }
 
 export interface Payment {
   id: string
-  invoiceId?: string
+  schoolId: string
   studentId: string
-  amount: number
+  payerId: string | null
+  invoiceId: string | null
+  reversedPaymentId: string | null
+  createdByMembershipId: string | null
   method: "mpesa_stk" | "mpesa_c2b" | "bank_transfer" | "bursary" | "cash" | "adjustment" | "credit"
-  reference: string
+  type: "subscription" | "fee" | "extra_curricular"
   status: "pending" | "confirmed" | "failed" | "reversed"
-  paidAt: string
+  provider: string | null
+  transactionRef: string
+  amount: number
+  receivedAt: string
+  createdAt: string
+  student: { id: string; admissionNumber: string; firstName: string; lastName: string }
+  invoice: Invoice | null
 }
 
 export interface Conversation {
   id: string
+  schoolId: string
   type: "direct" | "group" | "announcement"
-  subject?: string
-  participants: User[]
-  lastMessage?: Message
+  subject: string | null
+  createdAt: string
+  updatedAt: string
+  participants: {
+    id: string
+    userId: string | null
+    membershipId: string | null
+    participantType: string
+    user: { id: string; firstName: string; lastName: string; phone: string } | null
+    membership: { id: string; userId: string; user: { id: string; firstName: string; lastName: string } } | null
+  }[]
+  messages: Message[]
 }
 
 export interface Message {
   id: string
-  conversationId?: string
-  senderId: string
+  schoolId: string
+  conversationId: string | null
+  senderMembershipId: string | null
+  recipientUserId: string | null
+  channel: "in_app" | "sms" | "whatsapp" | "email"
+  messageType: "text" | "announcement" | "invoice" | "payment" | "attendance" | "assessment" | "system"
+  priority: "low" | "normal" | "high" | "urgent"
+  subject: string | null
   content: string
-  channel?: string
-  messageType?: string
-  priority?: string
+  payload: Record<string, unknown>
+  isLatest: boolean
   createdAt: string
-  readAt?: string
+  updatedAt: string
+  sender: { id: string; userId: string; user: { id: string; firstName: string; lastName: string } } | null
+  receipts: {
+    id: string
+    recipientUserId: string | null
+    status: "pending" | "sent" | "delivered" | "failed" | "read"
+    channel: string
+  }[]
 }
 
 export interface Notification {
@@ -322,7 +406,15 @@ export interface JoinRequest {
   schoolName: string
   phone: string
   email?: string
+  adminPhone: string
+  adminEmail?: string
+  county?: string
+  country?: string
+  town?: string
   status: string
+  requestedBy: string
+  processedBy?: string
+  processedAt?: string
   requestedAt: string
 }
 
@@ -334,6 +426,29 @@ export interface LoginResponse {
   school: School
 }
 
+export interface DashboardSummary {
+  students: number
+  activeStudents: number
+  staff: number
+  activeClasses: number
+  activeAcademicYear: { id: string; name: string; startDate: string; endDate: string; active: boolean } | null
+  activeTerm: { id: string; academicYearId: string; name: string; startDate: string; endDate: string; active: boolean } | null
+  attendanceToday: number
+  openInvoices: number
+  pendingPayments: number
+}
+
+export interface RecentActivity {
+  recentPayments: {
+    id: string
+    amount: number
+    method: string
+    transactionRef: string
+    createdAt: string
+    student: { firstName: string; lastName: string }
+  }[]
+}
+
 export interface AuthState {
   user: User | null
   membership: Membership | null
@@ -341,4 +456,42 @@ export interface AuthState {
   accessToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
+}
+
+export interface ReportSummaryItem {
+  type: string
+  label: string
+  count: number
+}
+
+export interface AttendanceReport {
+  totalSessions: number
+  totalRecords: number
+  present: number
+  absent: number
+  late: number
+  excused: number
+  averageRate: number
+}
+
+export interface FinanceReport {
+  totalInvoiced: number
+  totalCollected: number
+  totalOutstanding: number
+  invoicesByStatus: { status: string; count: number; totalAmount: number; outstanding: number }[]
+}
+
+export interface AcademicReport {
+  totalExams: number
+  completedExams: number
+  totalAssessments: number
+  totalResults: number
+  publishedResults: number
+}
+
+export interface StudentReport {
+  total: number
+  active: number
+  byGender: { gender: string | null; count: number }[]
+  byClass: { classId: string; className: string; count: number }[]
 }
