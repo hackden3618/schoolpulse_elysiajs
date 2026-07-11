@@ -22,6 +22,11 @@ export async function resetPasswordController({ body, set }: any) {
   return success(result)
 }
 
+export async function changePasswordController({ body, authUser, set }: any) {
+  const result = await svc.changePassword(authUser.userId, body)
+  return success(result)
+}
+
 export async function refreshController({ body, set }: any) {
   const result = await svc.refresh(body.refreshToken)
   return success(result)

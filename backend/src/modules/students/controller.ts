@@ -43,3 +43,14 @@ export async function enrollStudentController({ params: { schoolId, studentId },
   set.status = 201;
   return success(enrollment, schoolId);
 }
+
+export async function updateEnrollmentController({ params: { schoolId, studentId, enrollmentId }, body, set }: any) {
+  const enrollment = await svc.updateEnrollment(schoolId, studentId, enrollmentId, body);
+  return success(enrollment, schoolId);
+}
+
+export async function addGuardianByDetailsController({ params: { schoolId, studentId }, body, set }: any) {
+  const guardian = await svc.addGuardianByDetails(schoolId, studentId, body);
+  set.status = 201;
+  return success(guardian, schoolId);
+}

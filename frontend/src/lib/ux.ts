@@ -13,3 +13,14 @@ export async function withMinDelay<T>(
   }
   return result
 }
+
+/**
+ * Normalise a Kenyan phone number to the international format required
+ * by the Safaricom Daraja API (e.g. "0712345678" → "254712345678").
+ */
+export function normalizePhone(phone: string): string {
+  return phone
+    .trim()
+    .replace(/^\+/, "")   // strip leading +
+    .replace(/^0/, "254") // replace leading 0 with country code
+}

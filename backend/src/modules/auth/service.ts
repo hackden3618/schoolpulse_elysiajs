@@ -12,6 +12,7 @@ import type {
     RegisterInput,
     ForgotPasswordInput,
     ResetPasswordInput,
+    ChangePasswordInput,
     CreateJoinRequestInput,
 } from "./schema"
 import { HOST } from "@/config"
@@ -28,18 +29,49 @@ export async function login(data: LoginInput) {
     await verifyPasswordOrThrow(data.password, user.hashedPassword)
 
     const memberships = await repo.findActiveMemberships(user.id)
-    if (memberships.length === 0) {
+    const guardianLinks = await prisma.studentGuardian.findMany({
+        where: { guardianId: user.id },
+        include: { student: { select: { schoolId: true } } }
+    })
+
+    if (memberships.length === 0 && guardianLinks.length === 0) {
         throw AppError.forbidden("No active school membership found")
     }
 
-    const membership = memberships[0]!
+    let schoolId: string;
+    let baseMembership: any = null;
+    let isGuardianInSchool = false;
+
+    if (memberships.length > 0) {
+        baseMembership = memberships[0];
+        schoolId = baseMembership.schoolId;
+        isGuardianInSchool = guardianLinks.some((g: any) => g.student.schoolId === schoolId);
+    } else {
+        schoolId = guardianLinks[0]!.student.schoolId;
+        isGuardianInSchool = true;
+    }
+
     const school = await prisma.school.findUnique({
-        where: { id: membership.schoolId },
+        where: { id: schoolId },
         select: { id: true, schoolName: true, schoolCode: true, schoolPhone: true, schoolEmail: true, schoolLogo: true, county: true, town: true, country: true, schoolLevel: true, schoolTier: true, subscriptionPlan: true, subscriptionStatus: true, currency: true, timezone: true, settings: true },
     })
 
-    const roleNames = membership.roles.map((r: any) => r.role.name)
-    const accessToken = signToken({ sub: user.id, schoolId: membership.schoolId, roles: roleNames })
+    const roles = baseMembership ? baseMembership.roles.map((r: any) => ({
+        id: r.role.id,
+        name: r.role.name,
+        description: r.role.description
+    })) : [];
+
+    if (isGuardianInSchool) {
+        roles.push({
+            id: "guardian-virtual-role",
+            name: "guardian",
+            description: "Parent / Guardian"
+        });
+    }
+
+    const roleNames = roles.map((r: any) => r.name)
+    const accessToken = signToken({ sub: user.id, schoolId, roles: roleNames })
 
     const { hashedPassword: _, ...safeUser } = user
 
@@ -48,12 +80,12 @@ export async function login(data: LoginInput) {
         refreshToken: accessToken,
         user: safeUser,
         membership: {
-            id: membership.id,
-            schoolId: membership.schoolId,
-            userId: membership.userId,
-            status: membership.status,
-            joinedAt: membership.joinedAt,
-            roles: membership.roles.map((r: any) => ({ id: r.role.id, name: r.role.name, description: r.role.description })),
+            id: baseMembership ? baseMembership.id : `virtual-${schoolId}`,
+            schoolId,
+            userId: user.id,
+            status: baseMembership ? baseMembership.status : "active",
+            joinedAt: baseMembership ? baseMembership.joinedAt : new Date(),
+            roles,
         },
         school,
     }
@@ -159,6 +191,20 @@ export async function resetPassword(data: ResetPasswordInput) {
     })
 
     return { message: "Password successfully reset" }
+}
+
+export async function changePassword(userId: string, data: ChangePasswordInput) {
+    const user = await repo.findUserById(userId)
+    if (!user || !user.hashedPassword) {
+        throw AppError.unauthenticated("User not found or cannot change password")
+    }
+
+    await verifyPasswordOrThrow(data.currentPassword, user.hashedPassword)
+    const newHashed = await hashPassword(data.newPassword)
+    
+    await repo.updateUser(userId, { hashedPassword: newHashed })
+    
+    return { message: "Password successfully updated" }
 }
 
 export async function refresh(token: string) {

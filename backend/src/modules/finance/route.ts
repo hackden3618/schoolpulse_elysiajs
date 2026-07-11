@@ -10,6 +10,7 @@ import {
   recordPaymentController,
   getPaymentsController,
   initiateMpesaPaymentController,
+  initiateBulkMpesaPaymentController,
   mpesaCallbackController,
 } from "./controller"
 import {
@@ -17,6 +18,7 @@ import {
   generateInvoiceSchema,
   recordPaymentSchema,
   initiateMpesaPaymentSchema,
+  initiateBulkMpesaPaymentSchema,
   mpesaCallbackSchema,
 } from "./schema"
 
@@ -67,5 +69,10 @@ export const financeRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolI
   .post("/mpesa/stk-push", initiateMpesaPaymentController, {
     params: t.Object({ schoolId: t.String() }),
     body: initiateMpesaPaymentSchema,
-    detail: { summary: "Initiate M-Pesa STK Push", tags: ["Finance"] },
+    detail: { summary: "Initiate STK Push (Single Invoice)", tags: ["Finance", "Daraja"] },
+  })
+  .post("/mpesa/bulk-stk-push", initiateBulkMpesaPaymentController, {
+    params: t.Object({ schoolId: t.String() }),
+    body: initiateBulkMpesaPaymentSchema,
+    detail: { summary: "Initiate STK Push (Bulk Invoices)", tags: ["Finance", "Daraja"] },
   })

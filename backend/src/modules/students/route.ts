@@ -10,6 +10,8 @@ import {
   linkGuardianController,
   unlinkGuardianController,
   enrollStudentController,
+  updateEnrollmentController,
+  addGuardianByDetailsController,
 } from "./controller";
 import {
   createStudentSchema,
@@ -17,6 +19,8 @@ import {
   linkGuardianSchema,
   archiveStudentSchema,
   enrollStudentSchema,
+  updateEnrollmentSchema,
+  addGuardianByDetailsSchema,
 } from "./schema";
 
 export const studentRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/students` })
@@ -61,4 +65,14 @@ export const studentRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolI
     params: t.Object({ schoolId: t.String(), studentId: t.String() }),
     body: enrollStudentSchema,
     detail: { summary: "Enroll student in class", tags: ["Students"] },
+  })
+  .patch("/:studentId/enrollments/:enrollmentId", updateEnrollmentController, {
+    params: t.Object({ schoolId: t.String(), studentId: t.String(), enrollmentId: t.String() }),
+    body: updateEnrollmentSchema,
+    detail: { summary: "Update student enrollment", tags: ["Students"] },
+  })
+  .post("/:studentId/guardians/by-details", addGuardianByDetailsController, {
+    params: t.Object({ schoolId: t.String(), studentId: t.String() }),
+    body: addGuardianByDetailsSchema,
+    detail: { summary: "Add guardian by contact details (creates user if needed)", tags: ["Students"] },
   });

@@ -20,6 +20,12 @@ export const createTermSchema = t.Object({
   endDate: dateString(true),
 });
 
+export const updateTermSchema = t.Object({
+  name: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
+  startDate: dateString(false),
+  endDate: dateString(false),
+});
+
 export const createClassSchema = t.Object({
   name: nameString(1, 100),
   level: t.Number({ minimum: 1, maximum: 20 }),
@@ -49,6 +55,7 @@ export const assignSubjectsSchema = t.Object({
 export type CreateAcademicYearInput = typeof createAcademicYearSchema.static;
 export type UpdateAcademicYearInput = typeof updateAcademicYearSchema.static;
 export type CreateTermInput = typeof createTermSchema.static;
+export type UpdateTermInput = typeof updateTermSchema.static;
 export type CreateClassInput = typeof createClassSchema.static;
 export type CreateClassInstanceInput = typeof createClassInstanceSchema.static;
 export type CreateSubjectInput = typeof createSubjectSchema.static;

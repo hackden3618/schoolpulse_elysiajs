@@ -131,7 +131,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
                 Settings
               </button>
               <button
-                onClick={() => { setDropdownOpen(false); navigate("/users") }}
+                onClick={() => { setDropdownOpen(false); if (user) navigate(`/users/${user.id}`) }}
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-primary-700 hover:bg-primary-50 transition-colors"
               >
                 <User size={16} className="text-primary-400" />

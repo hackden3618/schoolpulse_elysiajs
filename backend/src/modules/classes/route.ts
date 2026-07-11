@@ -5,9 +5,11 @@ import {
   getAcademicYearsController,
   getAcademicYearController,
   createAcademicYearController,
+  updateAcademicYearController,
   activateAcademicYearController,
   getTermsController,
   createTermController,
+  updateTermController,
   activateTermController,
   getClassesController,
   createClassController,
@@ -21,6 +23,7 @@ import {
   createAcademicYearSchema,
   updateAcademicYearSchema,
   createTermSchema,
+  updateTermSchema,
   createClassSchema,
   createClassInstanceSchema,
   createSubjectSchema,
@@ -38,7 +41,7 @@ const academicYearRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/
     body: createAcademicYearSchema,
     detail: { summary: "Create academic year", tags: ["Academic"] },
   })
-  .patch("/:academicYearId", getAcademicYearController, {
+  .patch("/:academicYearId", updateAcademicYearController, {
     params: t.Object({ schoolId: t.String(), academicYearId: t.String() }),
     body: updateAcademicYearSchema,
     detail: { summary: "Update academic year", tags: ["Academic"] },
@@ -52,12 +55,18 @@ const termRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/terms` }
   .use(errorHandler)
   .get("/", getTermsController, {
     params: t.Object({ schoolId: t.String() }),
+    query: t.Optional(t.Object({ academicYearId: t.Optional(t.String()) })),
     detail: { summary: "List terms", tags: ["Academic"] },
   })
   .post("/", createTermController, {
     params: t.Object({ schoolId: t.String() }),
     body: createTermSchema,
     detail: { summary: "Create term", tags: ["Academic"] },
+  })
+  .patch("/:termId", updateTermController, {
+    params: t.Object({ schoolId: t.String(), termId: t.String() }),
+    body: updateTermSchema,
+    detail: { summary: "Update term", tags: ["Academic"] },
   })
   .post("/:termId/activate", activateTermController, {
     params: t.Object({ schoolId: t.String(), termId: t.String() }),

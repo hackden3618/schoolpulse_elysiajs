@@ -6,6 +6,7 @@ import type {
   CreateAcademicYearInput,
   UpdateAcademicYearInput,
   CreateTermInput,
+  UpdateTermInput,
   CreateClassInput,
   CreateClassInstanceInput,
   CreateSubjectInput,
@@ -35,13 +36,26 @@ export async function createAcademicYear(schoolId: string, data: CreateAcademicY
   return year;
 }
 
+export async function updateAcademicYear(schoolId: string, academicYearId: string, data: UpdateAcademicYearInput) {
+  const year = await repo.findAcademicYearById(schoolId, academicYearId);
+  if (!year) throw AppError.notFound("Academic year not found");
+
+  const updated = await repo.updateAcademicYear(academicYearId, {
+    name: data.name,
+    startDate: data.startDate ? new Date(data.startDate) : undefined,
+    endDate: data.endDate ? new Date(data.endDate) : undefined,
+  });
+
+  return updated;
+}
+
 export async function activateAcademicYear(schoolId: string, academicYearId: string) {
   const year = await repo.findAcademicYearById(schoolId, academicYearId);
   if (!year) throw AppError.notFound("Academic year not found");
 
   await prisma.$transaction(async (tx: any) => {
     await repo.deactivateAllAcademicYears(schoolId, tx);
-    await repo.updateAcademicYear(academicYearId, { active: true });
+    await tx.academicYear.update({ where: { id: academicYearId }, data: { active: true } });
   });
 
   await writeEventOutbox({
@@ -55,22 +69,57 @@ export async function activateAcademicYear(schoolId: string, academicYearId: str
   return repo.findAcademicYearById(schoolId, academicYearId);
 }
 
-export async function listTerms(schoolId: string) {
-  return repo.findAllTerms(schoolId);
+export async function listTerms(schoolId: string, academicYearId?: string) {
+  return repo.findAllTerms(schoolId, academicYearId);
 }
 
 export async function createTerm(schoolId: string, data: CreateTermInput) {
   const year = await repo.findAcademicYearById(schoolId, data.academicYearId);
   if (!year) throw AppError.notFound("Academic year not found");
 
+  // Policy: Term dates must fall within the Academic Year bounds
+  const termStart = new Date(data.startDate);
+  const termEnd = new Date(data.endDate);
+  const yearStart = new Date(year.startDate);
+  const yearEnd = new Date(year.endDate);
+  if (termStart < yearStart || termEnd > yearEnd) {
+    throw AppError.validation(
+      `Term dates must fall within the Academic Year (${year.name}: ${year.startDate.toDateString()} – ${year.endDate.toDateString()})`
+    );
+  }
+
   return prisma.term.create({
     data: {
       school: { connect: { id: schoolId } },
       academicYear: { connect: { id: data.academicYearId } },
       name: data.name,
-      startDate: new Date(data.startDate),
-      endDate: new Date(data.endDate),
+      startDate: termStart,
+      endDate: termEnd,
     },
+  });
+}
+
+export async function updateTerm(schoolId: string, termId: string, data: UpdateTermInput) {
+  const term = await repo.findTermById(schoolId, termId);
+  if (!term) throw AppError.notFound("Term not found");
+
+  const year = await repo.findAcademicYearById(schoolId, term.academicYearId);
+  if (!year) throw AppError.notFound("Academic year not found");
+
+  const termStart = data.startDate ? new Date(data.startDate) : new Date(term.startDate);
+  const termEnd = data.endDate ? new Date(data.endDate) : new Date(term.endDate);
+  const yearStart = new Date(year.startDate);
+  const yearEnd = new Date(year.endDate);
+
+  if (termStart < yearStart || termEnd > yearEnd) {
+    throw AppError.validation(
+      `Term dates must fall within the Academic Year (${year.name}: ${year.startDate.toDateString()} – ${year.endDate.toDateString()})`
+    );
+  }
+
+  return prisma.term.update({
+    where: { id: termId },
+    data: { name: data.name, startDate: termStart, endDate: termEnd },
   });
 }
 
@@ -80,7 +129,7 @@ export async function activateTerm(schoolId: string, termId: string) {
 
   await prisma.$transaction(async (tx: any) => {
     await repo.deactivateAllTermsInYear(term.academicYearId, tx);
-    await prisma.term.update({ where: { id: termId }, data: { active: true } });
+    await tx.term.update({ where: { id: termId }, data: { active: true } });
   });
 
   await writeEventOutbox({

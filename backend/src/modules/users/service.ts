@@ -21,18 +21,36 @@ export async function getUserById(schoolId: string, userId: string) {
     throw AppError.notFound("User not found");
   }
   const membership = await repo.findMembership(schoolId, userId);
-  if (!membership) {
+  const guardianLinks = await prisma.studentGuardian.findMany({
+    where: { guardianId: userId, student: { schoolId, status: "active" } }
+  });
+
+  if (!membership && guardianLinks.length === 0) {
     throw AppError.forbidden("User does not belong to this school");
   }
+
   const { hashedPassword, ...safeUser } = user;
-  return safeUser;
+  return {
+    ...safeUser,
+    isGuardian: guardianLinks.length > 0
+  };
 }
 
 export async function createUser(data: CreateUserInput) {
-  if (data.phone) {
-    const existing = await repo.findUserByPhone(data.phone);
-    if (existing) {
-      throw AppError.conflict("Phone number is already registered", [
+  const existing = await prisma.user.findFirst({
+    where: {
+      OR: [
+        ...(data.phone ? [{ phone: data.phone }] : []),
+        ...(data.email ? [{ email: data.email }] : [])
+      ]
+    }
+  });
+
+  if (existing) {
+    if (existing.deletedAt !== null) {
+      await prisma.user.delete({ where: { id: existing.id } });
+    } else {
+      throw AppError.conflict("Phone number or email is already registered", [
         { field: "phone", issue: "duplicate" },
       ]);
     }

@@ -11,6 +11,7 @@ import { OnboardingCompletePage } from "./pages/onboarding/OnboardingCompletePag
 import { Dashboard } from "./pages/Dashboard"
 import { StudentList } from "./pages/students/StudentList"
 import { StudentDetail } from "./pages/students/StudentDetail"
+import { CreateStudent } from "./pages/students/CreateStudent"
 import { AttendancePage } from "./pages/attendance/AttendancePage"
 import { FinancePage } from "./pages/finance/FinancePage"
 import { AcademicsPage } from "./pages/academics/AcademicsPage"
@@ -50,6 +51,7 @@ export function App() {
                 <Route path="/" element={<Navigate to="/dashboard" replace />} />
                 <Route path="/dashboard" element={<Dashboard />} />
                 <Route path="/students" element={<StudentList />} />
+                <Route path="/students/create" element={<CreateStudent />} />
                 <Route path="/students/:id" element={<StudentDetail />} />
                 <Route path="/users" element={<UserListPage />} />
                 <Route path="/users/create" element={<CreateUserPage />} />

@@ -22,14 +22,24 @@ export async function activateAcademicYearController({ params: { schoolId, acade
   return success(year, schoolId);
 }
 
-export async function getTermsController({ params: { schoolId }, set }: any) {
-  const terms = await svc.listTerms(schoolId);
+export async function updateAcademicYearController({ params: { schoolId, academicYearId }, body, set }: any) {
+  const year = await svc.updateAcademicYear(schoolId, academicYearId, body);
+  return success(year, schoolId);
+}
+
+export async function getTermsController({ params: { schoolId }, query, set }: any) {
+  const terms = await svc.listTerms(schoolId, query?.academicYearId);
   return success(terms, schoolId);
 }
 
 export async function createTermController({ params: { schoolId }, body, set }: any) {
   const term = await svc.createTerm(schoolId, body);
   set.status = 201;
+  return success(term, schoolId);
+}
+
+export async function updateTermController({ params: { schoolId, termId }, body, set }: any) {
+  const term = await svc.updateTerm(schoolId, termId, body);
   return success(term, schoolId);
 }
 

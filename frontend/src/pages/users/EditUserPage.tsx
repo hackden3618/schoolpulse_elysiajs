@@ -10,12 +10,15 @@ import { Input } from "../../components/ui/Input"
 import { Skeleton } from "../../components/ui/Skeleton"
 import { ErrorBanner } from "../../components/ui/ErrorBanner"
 import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
+import { ChangePasswordModal } from "./ChangePasswordModal"
+import { RoleSwitcherModal } from "../../components/shell/RoleSwitcherModal"
 import type { Role, User, Membership } from "../../types"
 
 export function EditUserPage() {
   const navigate = useNavigate()
   const { userId } = useParams<{ userId: string }>()
-  const { school } = useAuth()
+  const { school, user: authUser, roles: authRoles } = useAuth()
+  const isOwnProfile = authUser?.id === userId
 
   const [firstName, setFirstName] = useState("")
   const [secondName, setSecondName] = useState("")
@@ -33,6 +36,10 @@ export function EditUserPage() {
   const [roles, setRoles] = useState<Role[]>([])
   const [rolesLoading, setRolesLoading] = useState(true)
   const [rolesError, setRolesError] = useState("")
+
+  const [showChangePasswordModal, setShowChangePasswordModal] = useState(false)
+  const [showRoleSwitcherModal, setShowRoleSwitcherModal] = useState(false)
+  const [isGuardian, setIsGuardian] = useState(false)
 
   useEffect(() => {
     if (!school || !userId) return
@@ -54,12 +61,23 @@ export function EditUserPage() {
         setPhone(user.phone || "")
         setEmail(user.email || "")
         setStatus(user.status || "active")
+        setIsGuardian(user.isGuardian || false)
         setRoles(rolesRes.data)
+        
+        let initialRoleIds: string[] = []
         const membership = membershipsRes.data.find((m: Membership) => m.userId === userId)
         if (membership) {
           setMembershipId(membership.id)
-          setSelectedRoleIds((membership.roles || []).map((r: any) => r.role?.id).filter(Boolean))
+          initialRoleIds = (membership.roles || []).map((r: any) => r.role?.id).filter(Boolean)
         }
+        
+        if (user.isGuardian) {
+          const guardianRole = rolesRes.data.find((r: Role) => r.name === "guardian")
+          if (guardianRole && !initialRoleIds.includes(guardianRole.id)) {
+            initialRoleIds.push(guardianRole.id)
+          }
+        }
+        setSelectedRoleIds(initialRoleIds)
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load user data")
       } finally {
@@ -74,6 +92,9 @@ export function EditUserPage() {
   }, [school, userId])
 
   const toggleRole = (roleId: string) => {
+    const role = roles.find(r => r.id === roleId)
+    if (role?.name === "guardian" && isGuardian) return // Guardian role is immutable if user is a guardian
+    
     setSelectedRoleIds((prev) =>
       prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
     )
@@ -159,13 +180,21 @@ export function EditUserPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Edit Staff User"
+        title={isOwnProfile ? "Edit My Profile" : "Edit Staff User"}
         description="Update user profile, status, and role assignments."
         actions={
-          <Button variant="secondary" onClick={() => navigate("/users")}>
-            <ArrowLeft size={16} />
-            Back to Staff
-          </Button>
+          <div className="flex items-center gap-3">
+            {isOwnProfile && authRoles.length > 1 && (
+              <Button variant="secondary" onClick={() => setShowRoleSwitcherModal(true)}>
+                <Shield size={16} />
+                Switch Role
+              </Button>
+            )}
+            <Button variant="secondary" onClick={() => navigate("/users")}>
+              <ArrowLeft size={16} />
+              Back to Staff
+            </Button>
+          </div>
         }
       />
 
@@ -237,16 +266,18 @@ export function EditUserPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {roles.map((role) => {
                       const selected = selectedRoleIds.includes(role.id)
+                      const isImmutable = role.name === "guardian" && isGuardian
                       return (
                         <button
                           key={role.id}
                           type="button"
                           onClick={() => toggleRole(role.id)}
+                          disabled={isImmutable}
                           className={`flex items-center gap-3 rounded-lg border p-3 text-left transition-all ${
                             selected
                               ? "border-accent bg-accent-50 ring-1 ring-accent"
                               : "border-surface-200 bg-white hover:border-surface-300"
-                          }`}
+                          } ${isImmutable ? "opacity-75 cursor-not-allowed" : ""}`}
                         >
                           <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
                             selected ? "bg-accent text-white" : "bg-surface-100 text-surface-500"
@@ -255,11 +286,11 @@ export function EditUserPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm font-semibold ${selected ? "text-accent-700" : "text-primary-900"}`}>
-                              {role.name}
+                              {role.name === "guardian" ? "Parent / Guardian" : role.name}
                             </p>
                             <p className="text-xs text-primary-400 truncate">{role.description}</p>
                           </div>
-                          {selected ? <X size={14} className="text-accent shrink-0" /> : <Plus size={14} className="text-surface-300 shrink-0" />}
+                          {selected ? <X size={14} className={`shrink-0 ${isImmutable ? "text-accent-300" : "text-accent"}`} /> : <Plus size={14} className="text-surface-300 shrink-0" />}
                         </button>
                       )
                     })}
@@ -267,6 +298,22 @@ export function EditUserPage() {
                 )}
               </CardContent>
             </Card>
+
+            {isOwnProfile && (
+              <Card>
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-sm font-semibold text-primary-900">Security</h3>
+                      <p className="text-xs text-primary-500">Manage your password</p>
+                    </div>
+                    <Button type="button" variant="secondary" size="sm" onClick={() => setShowChangePasswordModal(true)}>
+                      Change Password
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <div className="space-y-4">
@@ -313,6 +360,19 @@ export function EditUserPage() {
           </div>
         </div>
       </form>
+
+      {showChangePasswordModal && (
+        <ChangePasswordModal
+          onClose={() => setShowChangePasswordModal(false)}
+          onSaved={() => {
+            setShowChangePasswordModal(false)
+          }}
+        />
+      )}
+
+      {showRoleSwitcherModal && (
+        <RoleSwitcherModal onClose={() => setShowRoleSwitcherModal(false)} />
+      )}
     </div>
   )
 }

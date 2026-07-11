@@ -8,6 +8,7 @@ import {
   resetPasswordController,
   refreshController,
   logoutController,
+  changePasswordController,
   createJoinRequestController,
   listJoinRequestsController,
   approveJoinRequestController,
@@ -17,6 +18,7 @@ import {
   registerSchema,
   forgotPasswordSchema,
   resetPasswordSchema,
+  changePasswordSchema,
   refreshSchema,
   createJoinRequestSchema,
 } from "./schema"
@@ -45,6 +47,11 @@ export const authRoute = new Elysia({ prefix: `${API_PREFIX}/auth` })
   })
   .post("/logout", logoutController, {
     detail: { summary: "Logout", tags: ["Auth"] },
+  })
+  .use(authGuard)
+  .post("/change-password", changePasswordController, {
+    body: changePasswordSchema,
+    detail: { summary: "Change password for logged-in user", tags: ["Auth"] },
   })
 
 export const joinRequestRoute = new Elysia({ prefix: `${API_PREFIX}/join-requests` })

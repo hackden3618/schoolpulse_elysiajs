@@ -78,6 +78,7 @@ export interface User {
   email?: string
   profilePic?: string
   status: UserStatus
+  isGuardian?: boolean
   lastLogin?: string
   createdAt: string
   updatedAt: string
@@ -455,6 +456,8 @@ export interface AuthState {
   accessToken: string | null
   isAuthenticated: boolean
   isLoading: boolean
+  activeRole: Role | null
+  roles: Role[]
 }
 
 export interface ReportSummaryItem {

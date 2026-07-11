@@ -25,6 +25,11 @@ export const resetPasswordSchema = t.Object({
   password: t.String({ minLength: 6, maxLength: 128 }),
 })
 
+export const changePasswordSchema = t.Object({
+  currentPassword: t.String({ minLength: 1 }),
+  newPassword: t.String({ minLength: 6, maxLength: 128 }),
+})
+
 export const refreshSchema = t.Object({
   refreshToken: t.String({ minLength: 1 }),
 })
@@ -47,6 +52,7 @@ export type LoginInput = typeof loginSchema.static
 export type RegisterInput = typeof registerSchema.static
 export type ForgotPasswordInput = typeof forgotPasswordSchema.static
 export type ResetPasswordInput = typeof resetPasswordSchema.static
+export type ChangePasswordInput = typeof changePasswordSchema.static
 export type RefreshInput = typeof refreshSchema.static
 export type CreateJoinRequestInput = typeof createJoinRequestSchema.static
 export type ApproveJoinRequestInput = typeof approveJoinRequestSchema.static

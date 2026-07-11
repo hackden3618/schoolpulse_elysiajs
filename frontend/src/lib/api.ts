@@ -91,6 +91,11 @@ export const authApi = {
             method: "POST",
             body: JSON.stringify(data),
         }),
+    changePassword: (data: { currentPassword: string; newPassword: string }) =>
+        request<ApiResponse<void>>("/auth/change-password", {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
 }
 
 /* =========================================================================
@@ -232,12 +237,28 @@ export const studentsApi = {
         classInstanceId?: string
         academicYearId?: string
         termId?: string
+        specialNeeds?: Record<string, string>
+        guardians?: Array<{
+            firstName: string
+            lastName: string
+            phone: string
+            email?: string
+            relationship?: string
+        }>
     }) =>
         request<ApiResponse<Student>>(`/schools/${schoolId}/students`, {
             method: "POST",
             body: JSON.stringify(data),
         }),
-    update: (schoolId: string, studentId: string, data: Partial<Student>) =>
+    update: (schoolId: string, studentId: string, data: {
+        firstName?: string
+        secondName?: string
+        lastName?: string
+        gender?: "male" | "female"
+        dateOfBirth?: string
+        performanceExpectation?: "below_expectation" | "average" | "good" | "excellent" | "exceptional"
+        specialNeeds?: Record<string, string>
+    }) =>
         request<ApiResponse<Student>>(`/schools/${schoolId}/students/${studentId}`, {
             method: "PATCH",
             body: JSON.stringify(data),
@@ -261,6 +282,18 @@ export const studentsApi = {
         }),
     removeGuardian: (schoolId: string, studentId: string, guardianId: string) =>
         request<ApiResponse<void>>(`/schools/${schoolId}/students/${studentId}/guardians/${guardianId}`, { method: "DELETE" }),
+    addGuardianByDetails: (schoolId: string, studentId: string, data: {
+        firstName: string
+        lastName: string
+        phone: string
+        email?: string
+        relationship?: string
+        isPrimary?: boolean
+    }) =>
+        request<ApiResponse<void>>(`/schools/${schoolId}/students/${studentId}/guardians/by-details`, {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
     enroll: (schoolId: string, studentId: string, data: {
         classInstanceId: string
         academicYearId: string
@@ -268,6 +301,16 @@ export const studentsApi = {
     }) =>
         request<ApiResponse<void>>(`/schools/${schoolId}/students/${studentId}/enrollments`, {
             method: "POST",
+            body: JSON.stringify(data),
+        }),
+    updateEnrollment: (schoolId: string, studentId: string, enrollmentId: string, data: {
+        classInstanceId?: string
+        academicYearId?: string
+        termId?: string
+        status?: "active" | "suspended" | "transferred" | "expelled" | "on_leave" | "medical_leave" | "truant" | "dropped_out" | "graduated"
+    }) =>
+        request<ApiResponse<void>>(`/schools/${schoolId}/students/${studentId}/enrollments/${enrollmentId}`, {
+            method: "PATCH",
             body: JSON.stringify(data),
         }),
 }
@@ -295,8 +338,10 @@ export const academicApi = {
             request<ApiResponse<AcademicYear>>(`/schools/${schoolId}/academic-years/${id}/activate`, { method: "POST" }),
     },
     terms: {
-        list: (schoolId: string) =>
-            request<ApiResponse<Term[]>>(`/schools/${schoolId}/terms`),
+        list: (schoolId: string, academicYearId?: string) => {
+            const qs = academicYearId ? `?academicYearId=${academicYearId}` : ""
+            return request<ApiResponse<Term[]>>(`/schools/${schoolId}/terms${qs}`)
+        },
         create: (schoolId: string, data: { name: string; academicYearId: string; startDate: string; endDate: string }) =>
             request<ApiResponse<Term>>(`/schools/${schoolId}/terms`, {
                 method: "POST",
@@ -440,6 +485,16 @@ export const financeApi = {
         },
         record: (schoolId: string, data: { studentId: string; invoiceId: string; amount: number; method: string; transactionRef: string }) =>
             request<ApiResponse<Payment>>(`/schools/${schoolId}/finance/payments`, {
+                method: "POST",
+                body: JSON.stringify(data),
+            }),
+        initiateMpesa: (schoolId: string, data: { invoiceId: string; phoneNumber: string; amount: number }) =>
+            request<ApiResponse<{ checkoutRequestId: string; paymentId: string }>>(`/schools/${schoolId}/finance/mpesa/stk-push`, {
+                method: "POST",
+                body: JSON.stringify(data),
+            }),
+        initiateBulkMpesa: (schoolId: string, data: { studentId: string; allocations: { invoiceId: string; amount: number }[]; phoneNumber: string; totalAmount: number }) =>
+            request<ApiResponse<{ checkoutRequestId: string; paymentId: string }>>(`/schools/${schoolId}/finance/mpesa/bulk-stk-push`, {
                 method: "POST",
                 body: JSON.stringify(data),
             }),

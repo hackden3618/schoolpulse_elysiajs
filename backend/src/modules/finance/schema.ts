@@ -40,6 +40,16 @@ export const initiateMpesaPaymentSchema = t.Object({
   amount: t.Number({ minimum: 1 }),
 })
 
+export const initiateBulkMpesaPaymentSchema = t.Object({
+  studentId: uuidString(true),
+  allocations: t.Array(t.Object({
+    invoiceId: uuidString(true),
+    amount: t.Number({ minimum: 1 }),
+  }), { minItems: 1 }),
+  phoneNumber: t.String({ minLength: 9, maxLength: 15 }),
+  totalAmount: t.Number({ minimum: 1 }),
+})
+
 export const mpesaCallbackSchema = t.Object({
   Body: t.Object({
     stkCallback: t.Object({
@@ -66,4 +76,5 @@ export type GenerateInvoiceInput = typeof generateInvoiceSchema.static
 export type RecordPaymentInput = typeof recordPaymentSchema.static
 export type ReversePaymentInput = typeof reversePaymentSchema.static
 export type InitiateMpesaPaymentInput = typeof initiateMpesaPaymentSchema.static
+export type InitiateBulkMpesaPaymentInput = typeof initiateBulkMpesaPaymentSchema.static
 export type MpesaCallbackInput = typeof mpesaCallbackSchema.static

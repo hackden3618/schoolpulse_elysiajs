@@ -45,6 +45,12 @@ export async function initiateMpesaPaymentController({ params: { schoolId }, bod
   return success(result, schoolId)
 }
 
+export async function initiateBulkMpesaPaymentController({ params: { schoolId }, body, set }: any) {
+  set.status = 201
+  const result = await svc.initiateBulkMpesaPayment(schoolId, body)
+  return success(result, schoolId)
+}
+
 export async function mpesaCallbackController({ body, set }: any) {
   // Webhook from Safaricom. Always return 200 OK to acknowledge receipt.
   try {

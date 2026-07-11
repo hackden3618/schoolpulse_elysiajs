@@ -30,7 +30,7 @@ export function LoginPage() {
     setLoading(true)
     try {
       await login(loginStr, password)
-      navigate("/dashboard", { replace: true })
+      navigate("/dashboard", { replace: true, state: { promptRoleSwitch: true } })
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.")
     } finally {

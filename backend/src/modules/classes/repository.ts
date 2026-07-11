@@ -68,9 +68,9 @@ export async function deactivateAllAcademicYears(schoolId: string, tx?: any) {
   });
 }
 
-export async function findAllTerms(schoolId: string) {
+export async function findAllTerms(schoolId: string, academicYearId?: string) {
   return prisma.term.findMany({
-    where: { schoolId, deletedAt: null },
+    where: { schoolId, deletedAt: null, ...(academicYearId ? { academicYearId } : {}) },
     include: {
       academicYear: { select: { id: true, name: true } },
       _count: { select: { exams: true, invoices: true } },

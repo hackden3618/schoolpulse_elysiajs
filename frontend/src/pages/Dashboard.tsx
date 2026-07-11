@@ -24,6 +24,8 @@ import {
 import { dashboardApi, usersApi } from "../lib/api"
 import { useAuth } from "../lib/auth-context"
 import { UX_MIN_DELAY, withMinDelay } from "../lib/ux"
+import { RoleSwitcherModal } from "../components/shell/RoleSwitcherModal"
+import { useLocation } from "react-router-dom"
 import type { DashboardSummary, RecentActivity, User } from "../types"
 
 function timeAgo(dateStr: string): string {
@@ -38,14 +40,18 @@ function timeAgo(dateStr: string): string {
 }
 
 export function Dashboard() {
-  const { school, user } = useAuth()
+  const { school, user, activeRole, roles } = useAuth()
+  const location = useLocation()
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [activity, setActivity] = useState<RecentActivity | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(activeRole?.name !== "guardian")
   const [error, setError] = useState("")
+  const [showRoleSwitcher, setShowRoleSwitcher] = useState(() => {
+    return (location.state as any)?.promptRoleSwitch && roles.length > 1
+  })
 
   const load = async () => {
-    if (!school) return
+    if (!school || activeRole?.name === "guardian") return
     setLoading(true)
     setError("")
     try {
@@ -62,7 +68,7 @@ export function Dashboard() {
     }
   }
 
-  useEffect(() => { load() }, [school?.id])
+  useEffect(() => { load() }, [school?.id, activeRole])
 
   const displayName = user
     ? `${user.firstName}${user.lastName ? " " + user.lastName : ""}`
@@ -72,6 +78,27 @@ export function Dashboard() {
   const presentPct = summary && summary.students > 0
     ? Math.round((summary.attendanceToday / summary.students) * 100)
     : 0
+
+  if (activeRole?.name === "guardian") {
+    return (
+      <div className="space-y-6">
+        <div className="flex flex-col gap-2">
+          <h1 className="text-2xl font-bold text-primary-900 tracking-tight">
+            Welcome, {displayName}
+          </h1>
+          <p className="text-sm text-primary-500">
+            Here's what's happening with your students.
+          </p>
+        </div>
+        <Card>
+          <CardContent className="p-10 text-center text-primary-500">
+            Guardian Dashboard is currently under construction.
+          </CardContent>
+        </Card>
+        {showRoleSwitcher && <RoleSwitcherModal onClose={() => setShowRoleSwitcher(false)} />}
+      </div>
+    )
+  }
 
   if (loading) {
     return (
@@ -547,6 +574,8 @@ export function Dashboard() {
           </Card>
         </div>
       </div>
+
+      {showRoleSwitcher && <RoleSwitcherModal onClose={() => setShowRoleSwitcher(false)} />}
     </div>
   )
 }

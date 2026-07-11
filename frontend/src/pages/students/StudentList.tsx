@@ -63,7 +63,7 @@ export function StudentList() {
           title="Students"
           description="Manage admissions, enrollment and student records."
           actions={
-            <Button>
+            <Button onClick={() => navigate("/students/create")}>
               <Plus size={16} />
               Admit Student
             </Button>
@@ -74,7 +74,7 @@ export function StudentList() {
             <EmptyState
               title="No students yet"
               description="Start by admitting your first learner."
-              action={{ label: "Admit First Student", onClick: () => {} }}
+              action={{ label: "Admit First Student", onClick: () => navigate("/students/create") }}
             />
           </CardContent>
         </Card>
@@ -88,7 +88,7 @@ export function StudentList() {
         title="Students"
         description="Manage admissions, enrollment and student records."
         actions={
-          <Button>
+          <Button onClick={() => navigate("/students/create")}>
             <Plus size={16} />
             Admit Student
           </Button>
