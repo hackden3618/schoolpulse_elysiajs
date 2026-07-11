@@ -35,9 +35,10 @@ enum SchoolTier {
 enum SchoolLevel {
     pre_primary
     primary
+    hybrid_pri_jsecondary
     junior_secondary
     senior_secondary
-    mixed
+    tertiary
 
     @@map("school_level")
 }
@@ -334,6 +335,7 @@ enum EventType {
     JoinRequestSubmitted
     JoinRequestApproved
     JoinRequestRejected
+    JoinRequestUnderReview
     PlatformAdminInvited
     PlatformAdminCreated
     SchoolDeleted
@@ -368,8 +370,7 @@ model JoinRequest {
     schoolName    String            @map("school_name")
     phone         String
     email         String?
-    adminPhone    String            @map("admin_phone")
-    adminEmail    String?           @map("admin_email")
+    schoolLevel   SchoolLevel?      @map("school_level")
     county        String?
     country       String?           @default("Kenya")
     town          String?
@@ -490,7 +491,7 @@ model School {
     subscriptionPlan   SubscriptionPlan   @default(free) @map("subscription_plan")
     subscriptionStatus SubscriptionStatus @default(trial) @map("subscription_status")
     schoolTier         SchoolTier         @default(medium) @map("school_tier")
-    schoolLevel        SchoolLevel        @default(mixed) @map("school_level")
+    schoolLevel        SchoolLevel        @default(hybrid_pri_jsecondary) @map("school_level")
     settings           Json               @default("{}")
 
     createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)

@@ -116,7 +116,7 @@ export async function createMembership(
       }
     }
 
-    return repo.findMembershipById(m.id);
+    return m;
   });
 
   await writeEventOutbox({

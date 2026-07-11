@@ -5,6 +5,7 @@ import { useAuth } from "../../lib/auth-context"
 import { Logo } from "../../components/ui/Logo"
 import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
+import { BrandedHero } from "../../components/ui/BrandedHero"
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -39,7 +40,7 @@ export function LoginPage() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
+      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:w-1/2 lg:flex-none lg:min-h-screen lg:justify-center lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm">
           <div className="flex items-center gap-3 mb-10">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-white shadow-inner">
@@ -121,37 +122,17 @@ export function LoginPage() {
         </div>
       </div>
 
-      <div className="relative hidden flex-1 lg:block">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-950" />
-        <div className="absolute inset-0 flex items-center justify-center p-12">
-          <div className="max-w-md text-center">
-            <div className="mb-8 inline-flex h-20 w-20 items-center justify-center rounded-2xl bg-accent/20 border border-accent/30">
-              <Logo size={40} className="text-accent" />
-            </div>
-            <h3 className="text-3xl font-bold text-white tracking-tight">
-              School Management,{" "}
-              <span className="text-accent">Simplified</span>
-            </h3>
-            <p className="mt-4 text-primary-300 leading-relaxed">
-              Manage students, staff, attendance, fees, and academics. All from one unified platform.
-            </p>
-            <div className="mt-10 grid grid-cols-3 gap-4 text-center">
-              <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-                <p className="text-2xl font-bold text-accent">98+</p>
-                <p className="text-xs text-primary-400 mt-1">Schools Active</p>
-              </div>
-              <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-                <p className="text-2xl font-bold text-accent">15k+</p>
-                <p className="text-xs text-primary-400 mt-1">Students Managed</p>
-              </div>
-              <div className="rounded-xl bg-white/5 border border-white/10 p-4">
-                <p className="text-2xl font-bold text-accent">99.9%</p>
-                <p className="text-xs text-primary-400 mt-1">Uptime</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <BrandedHero
+        title={<>School Management, <span className="text-accent">Simplified</span></>}
+        subtitle="Manage students, staff, attendance, fees, and academics — all from one unified platform designed for Kenyan schools."
+        features={[
+          "Multi-tenant with full school data isolation",
+          "Comprehensive academic & finance management",
+          "Built-in SMS, email, and in-app communication",
+          "Role-based access control for staff & parents",
+          "99.9% uptime with enterprise-grade security",
+        ]}
+      />
     </div>
   )
 }

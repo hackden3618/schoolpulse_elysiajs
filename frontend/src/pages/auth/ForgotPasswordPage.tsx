@@ -10,7 +10,7 @@ export function ForgotPasswordPage() {
   const [login, setLogin] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
-  const [sent, setSent] = useState(false)
+  const [result, setResult] = useState<{ found: boolean; message: string } | null>(null)
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -21,8 +21,8 @@ export function ForgotPasswordPage() {
     }
     setLoading(true)
     try {
-      await authApi.forgotPassword({ login })
-      setSent(true)
+      const res = await authApi.forgotPassword({ login })
+      setResult(res.data)
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to send reset link.")
     } finally {
@@ -30,17 +30,27 @@ export function ForgotPasswordPage() {
     }
   }
 
-  if (sent) {
+  if (result) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background px-4">
         <div className="w-full max-w-sm text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-50 text-success-500 mb-6">
-            <CheckCircle size={32} />
-          </div>
-          <h2 className="text-2xl font-bold text-primary-900">Check your inbox</h2>
-          <p className="mt-2 text-sm text-primary-500">
-            If an account with that email or phone exists, we've sent password reset instructions.
-          </p>
+          {result.found ? (
+            <>
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-50 text-success-500 mb-6">
+                <CheckCircle size={32} />
+              </div>
+              <h2 className="text-2xl font-bold text-primary-900">Check your phone</h2>
+              <p className="mt-2 text-sm text-primary-500">{result.message}</p>
+            </>
+          ) : (
+            <>
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-danger-50 text-danger-500 mb-6">
+                <AlertCircle size={32} />
+              </div>
+              <h2 className="text-2xl font-bold text-primary-900">Account not found</h2>
+              <p className="mt-2 text-sm text-primary-500">{result.message}</p>
+            </>
+          )}
           <Link
             to="/auth/login"
             className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-accent hover:text-accent-600"
@@ -48,6 +58,12 @@ export function ForgotPasswordPage() {
             <ArrowLeft size={16} />
             Back to sign in
           </Link>
+          <button
+            onClick={() => setResult(null)}
+            className="mt-3 block w-full text-center text-sm text-primary-500 hover:text-primary-700 underline"
+          >
+            Try a different email or phone
+          </button>
         </div>
       </div>
     )

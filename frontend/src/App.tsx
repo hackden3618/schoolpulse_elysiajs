@@ -1,3 +1,4 @@
+import { LoadingScreen } from "./components/ui/LoadingScreen"
 import { Navigate, Route, Routes } from "react-router-dom"
 import { AuthProvider, useAuth } from "./lib/auth-context"
 import { AppShell } from "./components/shell/AppShell"
@@ -6,6 +7,7 @@ import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage"
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage"
 import { SchoolRegistrationPage } from "./pages/onboarding/SchoolRegistrationPage"
 import { SchoolSetupPage } from "./pages/onboarding/SchoolSetupPage"
+import { OnboardingCompletePage } from "./pages/onboarding/OnboardingCompletePage"
 import { Dashboard } from "./pages/Dashboard"
 import { StudentList } from "./pages/students/StudentList"
 import { StudentDetail } from "./pages/students/StudentDetail"
@@ -18,6 +20,7 @@ import { ReportsPage } from "./pages/reports/ReportsPage"
 import { SettingsPage } from "./pages/settings/SettingsPage"
 import { UserListPage } from "./pages/users/UserListPage"
 import { CreateUserPage } from "./pages/users/CreateUserPage"
+import { EditUserPage } from "./pages/users/EditUserPage"
 import { PlatformLoginPage } from "./pages/platform/PlatformLoginPage"
 import { PlatformDashboard } from "./pages/platform/PlatformDashboard"
 
@@ -31,7 +34,9 @@ export function App() {
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
         <Route path="/auth/register" element={<SchoolRegistrationPage />} />
         <Route path="/onboarding/register" element={<SchoolRegistrationPage />} />
+        <Route path="/setup" element={<SchoolSetupPage />} />
         <Route path="/onboarding/setup" element={<SchoolSetupPage />} />
+        <Route path="/onboarding/complete" element={<OnboardingCompletePage />} />
 
         {/* Platform Admin routes (outside AppShell) */}
         <Route path="/platform/login" element={<PlatformLoginPage />} />
@@ -48,6 +53,7 @@ export function App() {
                 <Route path="/students/:id" element={<StudentDetail />} />
                 <Route path="/users" element={<UserListPage />} />
                 <Route path="/users/create" element={<CreateUserPage />} />
+                <Route path="/users/:userId" element={<EditUserPage />} />
                 <Route path="/attendance" element={<AttendancePage />} />
                 <Route path="/finance" element={<FinancePage />} />
                 <Route path="/academics" element={<AcademicsPage />} />
@@ -68,7 +74,7 @@ export function App() {
 
 function RequireAuth({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth()
-  if (isLoading) return null
+  if (isLoading) return <LoadingScreen />
   if (!isAuthenticated) return <Navigate to="/auth/login" replace />
   return <>{children}</>
 }

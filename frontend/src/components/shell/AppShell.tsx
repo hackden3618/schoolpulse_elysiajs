@@ -55,7 +55,13 @@ export function AppShell({ children }: AppShellProps) {
 
       {/* Main Application Area */}
       <div className="flex flex-1 flex-col overflow-hidden">
-        <TopBar onMenuClick={() => setSidebarOpen(true)} />
+        <TopBar onMenuClick={() => {
+          if (isMobile) {
+            setSidebarOpen(true)
+          } else {
+            setSidebarCollapsed(!sidebarCollapsed)
+          }
+        }} />
         
         <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 md:px-10">
           <div className="mx-auto max-w-[1600px]">

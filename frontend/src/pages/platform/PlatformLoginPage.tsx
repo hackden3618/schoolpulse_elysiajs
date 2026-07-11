@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from "react"
 import { useNavigate } from "react-router-dom"
-import { AlertCircle, CheckCircle } from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { platformAdminApi, setPlatformToken } from "../../lib/api"
 import { Logo } from "../../components/ui/Logo"
 import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
+import { BrandedHero } from "../../components/ui/BrandedHero"
 
 export function PlatformLoginPage() {
   const navigate = useNavigate()
@@ -39,7 +40,7 @@ export function PlatformLoginPage() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
+      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:w-1/2 lg:flex-none lg:min-h-screen lg:justify-center lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm">
           <div className="flex items-center gap-3 mb-10">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-900 text-white shadow-inner">
@@ -98,36 +99,16 @@ export function PlatformLoginPage() {
         </div>
       </div>
 
-      <div className="relative hidden flex-1 lg:block">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-950" />
-        <div className="absolute inset-0 flex items-center justify-center p-12">
-          <div className="max-w-md text-center">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-accent/20 text-accent mb-6">
-              <Logo size={32} className="text-accent" />
-            </div>
-            <h3 className="text-3xl font-bold text-white tracking-tight">
-              SchoolPulse <span className="text-accent">Platform</span>
-            </h3>
-            <p className="mt-4 text-primary-300 text-sm leading-relaxed">
-              Internal administration panel for managing school registrations, 
-              monitoring system health, and overseeing the SchoolPulse ecosystem.
-            </p>
-            <ul className="mt-8 space-y-4 text-left">
-              {[
-                "Review and approve school join requests",
-                "Manage platform administrators",
-                "Monitor school onboarding flow",
-                "View system-wide analytics",
-              ].map((feature, i) => (
-                <li key={i} className="flex items-start gap-3 text-primary-300">
-                  <CheckCircle size={18} className="shrink-0 mt-0.5 text-accent" />
-                  <span className="text-sm">{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
+      <BrandedHero
+        title={<>SchoolPulse <span className="text-accent">Platform</span></>}
+        subtitle="Internal administration panel for managing school registrations, monitoring system health, and overseeing the SchoolPulse ecosystem."
+        features={[
+          "Review and approve school join requests",
+          "Manage platform administrators",
+          "Monitor school onboarding flow",
+          "View system-wide analytics",
+        ]}
+      />
     </div>
   )
 }

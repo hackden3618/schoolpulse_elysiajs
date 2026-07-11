@@ -9,7 +9,9 @@ import {
   resetPasswordController,
   approveJoinRequestController,
   rejectJoinRequestController,
-  claimSchoolController,
+  markUnderReviewController,
+  verifyOtpController,
+  setupAdminController,
   listSchoolsController,
   deleteSchoolController,
 } from "./controller"
@@ -18,7 +20,8 @@ import {
   createPlatformAdminSchema,
   updatePlatformAdminSchema,
   rejectJoinRequestSchema,
-  claimSchoolSchema,
+  verifyOtpSchema,
+  setupAdminSchema,
 } from "./schema"
 import { platformAuthGuard } from "./platformAuthGuard"
 
@@ -89,15 +92,29 @@ export const platformAdminJoinRequestRoute = new Elysia({
       tags: ["Platform Admin"],
     },
   })
+  .post("/:id/mark-review", markUnderReviewController, {
+    params: t.Object({ id: t.String({ format: "uuid" }) }),
+    detail: {
+      summary: "Mark a join request as under review (platform admin)",
+      tags: ["Platform Admin"],
+    },
+  })
 
 export const platformSchoolClaimRoute = new Elysia({
   prefix: `${API_PREFIX}/schools`,
 })
   .use(errorHandler)
-  .post("/claim", claimSchoolController, {
-    body: claimSchoolSchema,
+  .post("/verify-otp", verifyOtpController, {
+    body: verifyOtpSchema,
     detail: {
-      summary: "Claim a school after approval (public)",
+      summary: "Verify OTP and get setup token (public)",
+      tags: ["Onboarding"],
+    },
+  })
+  .post("/setup-admin", setupAdminController, {
+    body: setupAdminSchema,
+    detail: {
+      summary: "Create admin user + assign roles after OTP verification (public)",
       tags: ["Onboarding"],
     },
   })

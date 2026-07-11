@@ -3,7 +3,7 @@ import { writeEventOutbox } from "@/infrastructure/events";
 import * as repo from "./repository";
 import type { CreateSchoolInput, UpdateSchoolInput, UpdateSubscriptionInput } from "./schema";
 
-function extractInitials(name: string): string {
+export function extractInitials(name: string): string {
   return name
     .split(/[\s'-]+/)
     .filter(Boolean)
@@ -12,7 +12,7 @@ function extractInitials(name: string): string {
     .join("");
 }
 
-function generateSchoolCode(
+export function generateSchoolCode(
   county: string,
   town: string,
   initials: string,

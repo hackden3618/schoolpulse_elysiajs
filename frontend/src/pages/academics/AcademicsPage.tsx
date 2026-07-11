@@ -19,7 +19,7 @@ interface ModalState<T> {
   data: T | null
 }
 
-const MIN_LOAD_MS = 500
+import { withMinDelay } from "../../lib/ux"
 
 /* ───────────────────────────────────────────────
    Academic Years Tab
@@ -35,18 +35,14 @@ function AcademicYearsSection({ schoolId, activeYearId: _ }: { schoolId: string;
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
-    const start = Date.now()
     setLoading(true)
     setError("")
     try {
-      const res = await academicApi.years.list(schoolId)
+      const res = await withMinDelay(academicApi.years.list(schoolId))
       setYears(res.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load academic years")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -56,35 +52,27 @@ function AcademicYearsSection({ schoolId, activeYearId: _ }: { schoolId: string;
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!name || !startDate || !endDate) return
-    const start = Date.now()
     setSaving(true)
     try {
-      await academicApi.years.create(schoolId, { name, startDate, endDate })
+      await withMinDelay(academicApi.years.create(schoolId, { name, startDate, endDate }))
       setShowForm(false)
       setName(""); setStartDate(""); setEndDate("")
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
 
   const handleActivate = async (id: string) => {
-    const start = Date.now()
     setLoading(true)
     try {
-      await academicApi.years.activate(schoolId, id)
+      await withMinDelay(academicApi.years.activate(schoolId, id))
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to activate")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -165,22 +153,18 @@ function TermsSection({ schoolId }: { schoolId: string }) {
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
-    const start = Date.now()
     setLoading(true)
     setError("")
     try {
-      const [termsRes, yearsRes] = await Promise.all([
+      const [termsRes, yearsRes] = await withMinDelay(Promise.all([
         academicApi.terms.list(schoolId),
         academicApi.years.list(schoolId),
-      ])
+      ]))
       setTerms(termsRes.data)
       setYears(yearsRes.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load terms")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -190,35 +174,27 @@ function TermsSection({ schoolId }: { schoolId: string }) {
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!name || !academicYearId || !startDate || !endDate) return
-    const start = Date.now()
     setSaving(true)
     try {
-      await academicApi.terms.create(schoolId, { name, academicYearId, startDate, endDate })
+      await withMinDelay(academicApi.terms.create(schoolId, { name, academicYearId, startDate, endDate }))
       setShowForm(false)
       setName(""); setAcademicYearId(""); setStartDate(""); setEndDate("")
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
 
   const handleActivate = async (id: string) => {
-    const start = Date.now()
     setLoading(true)
     try {
-      await academicApi.terms.activate(schoolId, id)
+      await withMinDelay(academicApi.terms.activate(schoolId, id))
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to activate")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -306,24 +282,20 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
-    const start = Date.now()
     setLoading(true)
     setError("")
     try {
-      const [classesRes, instancesRes, yearsRes] = await Promise.all([
+      const [classesRes, instancesRes, yearsRes] = await withMinDelay(Promise.all([
         academicApi.classes.list(schoolId),
         academicApi.classInstances.list(schoolId),
         academicApi.years.list(schoolId),
-      ])
+      ]))
       setClasses(classesRes.data)
       setInstances(instancesRes.data)
       setYears(yearsRes.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load classes")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -333,19 +305,15 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
   const handleCreateClass = async (e: FormEvent) => {
     e.preventDefault()
     if (!className) return
-    const start = Date.now()
     setSaving(true)
     try {
-      await academicApi.classes.create(schoolId, { name: className, level: classLevel })
+      await withMinDelay(academicApi.classes.create(schoolId, { name: className, level: classLevel }))
       setShowClassForm(false)
       setClassName(""); setClassLevel(1)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create class")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
@@ -353,19 +321,15 @@ function ClassesSection({ schoolId }: { schoolId: string }) {
   const handleCreateStream = async (e: FormEvent) => {
     e.preventDefault()
     if (!streamClassId || !streamName || !streamYearId) return
-    const start = Date.now()
     setSaving(true)
     try {
-      await academicApi.classInstances.create(schoolId, { classId: streamClassId, streamName, academicYearId: streamYearId })
+      await withMinDelay(academicApi.classInstances.create(schoolId, { classId: streamClassId, streamName, academicYearId: streamYearId }))
       setShowStreamForm(false)
       setStreamClassId(""); setStreamName(""); setStreamYearId("")
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create stream")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
@@ -491,18 +455,14 @@ function SubjectsSection({ schoolId }: { schoolId: string }) {
   const [saving, setSaving] = useState(false)
 
   const load = async () => {
-    const start = Date.now()
     setLoading(true)
     setError("")
     try {
-      const res = await academicApi.subjects.list(schoolId)
+      const res = await withMinDelay(academicApi.subjects.list(schoolId))
       setSubjects(res.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load subjects")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -512,19 +472,15 @@ function SubjectsSection({ schoolId }: { schoolId: string }) {
   const handleCreate = async (e: FormEvent) => {
     e.preventDefault()
     if (!name || !code) return
-    const start = Date.now()
     setSaving(true)
     try {
-      await academicApi.subjects.create(schoolId, { name, code, isCompulsory: compulsory })
+      await withMinDelay(academicApi.subjects.create(schoolId, { name, code, isCompulsory: compulsory }))
       setShowForm(false)
       setName(""); setCode(""); setCompulsory(true)
       await load()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }

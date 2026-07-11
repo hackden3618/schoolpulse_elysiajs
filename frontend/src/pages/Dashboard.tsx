@@ -23,6 +23,7 @@ import {
 } from "lucide-react"
 import { dashboardApi, usersApi } from "../lib/api"
 import { useAuth } from "../lib/auth-context"
+import { UX_MIN_DELAY, withMinDelay } from "../lib/ux"
 import type { DashboardSummary, RecentActivity, User } from "../types"
 
 function timeAgo(dateStr: string): string {
@@ -48,10 +49,10 @@ export function Dashboard() {
     setLoading(true)
     setError("")
     try {
-      const [sumRes, actRes] = await Promise.all([
+      const [sumRes, actRes] = await withMinDelay(Promise.all([
         dashboardApi.summary(school.id),
         dashboardApi.activity(school.id),
-      ])
+      ]))
       setSummary(sumRes.data)
       setActivity(actRes.data)
     } catch (e) {

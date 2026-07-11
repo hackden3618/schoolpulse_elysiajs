@@ -7,10 +7,11 @@ export interface JwtPayload {
   sub: string
   schoolId: string
   roles: string[]
+  joinRequestId?: string
 }
 
-export function signToken(payload: JwtPayload): string {
-  return jwt.sign(payload, SECRET, { expiresIn: EXPIRES_IN })
+export function signToken(payload: JwtPayload, options?: { expiresIn?: string }): string {
+  return jwt.sign(payload, SECRET, { expiresIn: (options?.expiresIn || EXPIRES_IN) as any })
 }
 
 export function verifyToken(token: string): JwtPayload {

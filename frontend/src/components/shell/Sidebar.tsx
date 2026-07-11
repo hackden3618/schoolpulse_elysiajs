@@ -46,7 +46,7 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <aside
-      className={`flex flex-col bg-sidebar-bg text-sidebar-text transition-all duration-200 shrink-0 ${
+      className={`flex flex-col h-full bg-sidebar-bg text-sidebar-text transition-all duration-200 shrink-0 ${
         collapsed ? "w-[80px]" : "w-[260px]"
       }`}
     >

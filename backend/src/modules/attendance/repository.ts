@@ -31,7 +31,7 @@ export async function findSessions(schoolId: string, query: { classInstanceId?: 
 
 export async function findDuplicateSession(schoolId: string, classInstanceId: string, sessionDate: Date, sessionType: string) {
   return prisma.attendanceSession.findFirst({
-    where: { schoolId, classInstanceId, sessionDate, sessionType, deletedAt: null },
+    where: { schoolId, classInstanceId, sessionDate, sessionType: sessionType as any, deletedAt: null },
   })
 }
 
@@ -42,12 +42,18 @@ export async function createSession(data: {
   sessionDate: Date
   sessionType: string
 }) {
-  return prisma.attendanceSession.create({ data, include: sessionInclude })
+  return prisma.attendanceSession.create({
+    data: {
+      ...data,
+      sessionType: data.sessionType as any,
+    },
+    include: sessionInclude,
+  })
 }
 
 export async function createRecordsBulk(sessionId: string, records: { schoolId: string; studentId: string; status: string }[]) {
   return prisma.attendanceRecord.createMany({
-    data: records.map((r) => ({ sessionId, ...r })),
+    data: records.map((r) => ({ sessionId, schoolId: r.schoolId, studentId: r.studentId, status: r.status as any })),
   })
 }
 
@@ -68,7 +74,12 @@ export async function findRecord(sessionId: string, recordId: string) {
 export async function updateRecord(recordId: string, data: { status: string; editReason?: string; editedByMembershipId?: string; editedAt?: Date }) {
   return prisma.attendanceRecord.update({
     where: { id: recordId },
-    data: { ...data, editedAt: data.editedAt ?? new Date() },
+    data: {
+      status: data.status as any,
+      editReason: data.editReason,
+      editedByMembershipId: data.editedByMembershipId,
+      editedAt: data.editedAt ?? new Date(),
+    },
   })
 }
 

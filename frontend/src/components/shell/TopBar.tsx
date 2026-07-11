@@ -42,7 +42,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
     : "DO"
 
   return (
-    <header className="flex h-[72px] items-center gap-6 border-b border-primary-200 bg-white px-8 shrink-0 shadow-sm">
+    <header className="flex h-16 sm:h-[72px] items-center gap-3 sm:gap-6 border-b border-primary-200 bg-white px-4 sm:px-8 shrink-0 shadow-sm">
       <button
         onClick={onMenuClick}
         className="text-primary-500 hover:text-primary-800 transition-colors p-1"
@@ -50,15 +50,15 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
         <Menu size={20} />
       </button>
 
-      <nav className="flex items-center gap-2 text-xs font-semibold">
-        <span className="text-primary-400">{school?.schoolName || "School"}</span>
-        {breadcrumbs.length > 0 && <span className="text-primary-300 text-xs">/</span>}
+      <nav className="hidden sm:flex items-center gap-2 text-xs font-semibold min-w-0">
+        <span className="text-primary-400 truncate">{school?.schoolName || "School"}</span>
+        {breadcrumbs.length > 0 && <span className="text-primary-300 text-xs shrink-0">/</span>}
         {breadcrumbs.map((crumb, i) => (
-          <span key={crumb.href} className="flex items-center gap-2">
-            {i > 0 && <span className="text-primary-300 text-xs">/</span>}
+          <span key={crumb.href} className="flex items-center gap-2 min-w-0">
+            {i > 0 && <span className="text-primary-300 text-xs shrink-0">/</span>}
             <span
               className={
-                i === breadcrumbs.length - 1 ? "text-primary-900" : "text-primary-500"
+                i === breadcrumbs.length - 1 ? "text-primary-900 truncate" : "text-primary-500 truncate"
               }
             >
               {crumb.label}

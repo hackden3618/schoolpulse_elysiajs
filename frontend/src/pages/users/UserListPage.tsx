@@ -10,6 +10,7 @@ import { Badge, type BadgeVariant } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { Skeleton } from "../../components/ui/Skeleton"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import type { Membership } from "../../types"
 
 const statusVariant: Record<string, BadgeVariant> = {
@@ -32,7 +33,7 @@ export function UserListPage() {
     setLoading(true)
     setError("")
     try {
-      const res = await membershipsApi.list(school!.id)
+      const res = await withMinDelay(membershipsApi.list(school!.id))
       setMemberships(res.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load staff members")

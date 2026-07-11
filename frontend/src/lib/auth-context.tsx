@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
+import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react"
 import { authApi, setAccessToken, getAccessToken } from "./api"
 import type { AuthState, User, Membership, School } from "../types"
 
@@ -73,13 +73,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
+  const mountTime = useRef(Date.now())
+
   useEffect(() => {
     const stored = loadStoredAuth()
-    if (stored) {
-      applyAuth(stored)
-    } else {
-      setState((s) => ({ ...s, isLoading: false }))
-    }
+    const elapsed = Date.now() - mountTime.current
+    const remaining = Math.max(0, 1000 - elapsed)
+
+    const timer = setTimeout(() => {
+      if (stored) {
+        applyAuth(stored)
+      } else {
+        setState((s) => ({ ...s, isLoading: false }))
+      }
+    }, remaining)
+
+    return () => clearTimeout(timer)
   }, [applyAuth])
 
   useEffect(() => {

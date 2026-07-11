@@ -7,9 +7,8 @@ import { Card, CardContent } from "../../components/ui/Card"
 import { Button } from "../../components/ui/Button"
 import { Skeleton } from "../../components/ui/Skeleton"
 import { ErrorBanner } from "../../components/ui/ErrorBanner"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import type { ReportSummaryItem, AttendanceReport, FinanceReport, AcademicReport, StudentReport } from "../../types"
-
-const MIN_LOAD_MS = 500
 
 const iconMap: Record<string, React.ReactNode> = {
   attendance: <CalendarCheck size={20} />,
@@ -29,10 +28,8 @@ export function ReportsPage() {
     if (!school) return
     setLoading(true)
     setError("")
-    const start = Date.now()
     try {
-      const res = await reportsApi.summary(school.id)
-      await new Promise((r) => setTimeout(r, Math.max(0, MIN_LOAD_MS - (Date.now() - start))))
+      const res = await withMinDelay(reportsApi.summary(school.id))
       setSummary(res.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load reports")
@@ -46,7 +43,6 @@ export function ReportsPage() {
   const handleGenerate = async (type: string) => {
     if (!school) return
     setGenerating(type)
-    const start = Date.now()
     try {
       const promise = type === "attendance"
         ? reportsApi.attendance(school.id)
@@ -55,7 +51,7 @@ export function ReportsPage() {
         : type === "academic"
         ? reportsApi.academic(school.id)
         : reportsApi.students(school.id)
-      await Promise.all([promise, new Promise((r) => setTimeout(r, Math.max(0, MIN_LOAD_MS - (Date.now() - start))))])
+      await withMinDelay(promise as Promise<unknown>)
       alert(`${type.charAt(0).toUpperCase() + type.slice(1)} report generated successfully`)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to generate report")

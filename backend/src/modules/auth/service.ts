@@ -5,322 +5,349 @@ import { prisma } from "@/infrastructure/database/prisma"
 import { writeEventOutbox } from "@/infrastructure/events"
 import { sendSingleSms } from "@/infrastructure/messaging/sms/sms.provider"
 import { signToken } from "@/shared/jwt"
+import { normalizePhone } from "@/common/validation"
 import * as repo from "./repository"
 import type {
-  LoginInput,
-  RegisterInput,
-  ForgotPasswordInput,
-  ResetPasswordInput,
-  CreateJoinRequestInput,
+    LoginInput,
+    RegisterInput,
+    ForgotPasswordInput,
+    ResetPasswordInput,
+    CreateJoinRequestInput,
 } from "./schema"
+import { HOST } from "@/config"
+
+const BASE = process.env.SERVER_HOST
 
 export async function login(data: LoginInput) {
-  const user = await repo.findUserByPhone(data.login) ?? await repo.findUserByEmail(data.login)
-  if (!user || !user.hashedPassword) {
-    throw AppError.unauthenticated("Invalid credentials")
-  }
+    const loginStr = data.login.startsWith("0") ? normalizePhone(data.login) : data.login
+    const user = await repo.findUserByPhone(loginStr) ?? await repo.findUserByEmail(loginStr)
+    if (!user || !user.hashedPassword) {
+        throw AppError.unauthenticated("Invalid credentials")
+    }
 
-  await verifyPasswordOrThrow(data.password, user.hashedPassword)
+    await verifyPasswordOrThrow(data.password, user.hashedPassword)
 
-  const memberships = await repo.findActiveMemberships(user.id)
-  if (memberships.length === 0) {
-    throw AppError.forbidden("No active school membership found")
-  }
+    const memberships = await repo.findActiveMemberships(user.id)
+    if (memberships.length === 0) {
+        throw AppError.forbidden("No active school membership found")
+    }
 
-  const membership = memberships[0]!
-  const school = await prisma.school.findUnique({
-    where: { id: membership.schoolId },
-    select: { id: true, schoolName: true, schoolCode: true, schoolPhone: true, schoolEmail: true, schoolLogo: true, county: true, town: true, country: true, schoolLevel: true, schoolTier: true, subscriptionPlan: true, subscriptionStatus: true, currency: true, timezone: true, settings: true },
-  })
+    const membership = memberships[0]!
+    const school = await prisma.school.findUnique({
+        where: { id: membership.schoolId },
+        select: { id: true, schoolName: true, schoolCode: true, schoolPhone: true, schoolEmail: true, schoolLogo: true, county: true, town: true, country: true, schoolLevel: true, schoolTier: true, subscriptionPlan: true, subscriptionStatus: true, currency: true, timezone: true, settings: true },
+    })
 
-  const roleNames = membership.roles.map((r: any) => r.role.name)
-  const accessToken = signToken({ sub: user.id, schoolId: membership.schoolId, roles: roleNames })
+    const roleNames = membership.roles.map((r: any) => r.role.name)
+    const accessToken = signToken({ sub: user.id, schoolId: membership.schoolId, roles: roleNames })
 
-  const { hashedPassword: _, ...safeUser } = user
+    const { hashedPassword: _, ...safeUser } = user
 
-  return {
-    accessToken,
-    refreshToken: accessToken,
-    user: safeUser,
-    membership: {
-      id: membership.id,
-      schoolId: membership.schoolId,
-      userId: membership.userId,
-      status: membership.status,
-      joinedAt: membership.joinedAt,
-      roles: membership.roles.map((r: any) => ({ id: r.role.id, name: r.role.name, description: r.role.description })),
-    },
-    school,
-  }
+    return {
+        accessToken,
+        refreshToken: accessToken,
+        user: safeUser,
+        membership: {
+            id: membership.id,
+            schoolId: membership.schoolId,
+            userId: membership.userId,
+            status: membership.status,
+            joinedAt: membership.joinedAt,
+            roles: membership.roles.map((r: any) => ({ id: r.role.id, name: r.role.name, description: r.role.description })),
+        },
+        school,
+    }
 }
 
 export async function register(data: RegisterInput) {
-  const existing = await repo.findUserByPhone(data.phone)
-  if (existing) {
-    throw AppError.conflict("Phone number is already registered", [{ field: "phone", issue: "duplicate" }])
-  }
-
-  const hashed = await hashPassword(data.password)
-
-  let schoolId: string | null = null
-  if (data.schoolCode) {
-    const school = await repo.findSchoolByCode(data.schoolCode)
-    if (!school) {
-      throw AppError.notFound("School not found with the provided code")
+    data.phone = normalizePhone(data.phone)
+    const existing = await repo.findUserByPhone(data.phone)
+    if (existing) {
+        throw AppError.conflict("Phone number is already registered", [{ field: "phone", issue: "duplicate" }])
     }
-    schoolId = school.id
-  }
 
-  const result = await prisma.$transaction(async (tx: any) => {
-    const user = await tx.user.create({
-      data: {
-        firstName: data.firstName,
-        secondName: data.secondName,
-        lastName: data.lastName,
-        phone: data.phone,
-        email: data.email,
-        hashedPassword: hashed,
-      },
-      select: {
-        id: true, firstName: true, secondName: true, lastName: true,
-        phone: true, email: true, status: true, createdAt: true, updatedAt: true,
-      },
+    const hashed = await hashPassword(data.password)
+
+    let schoolId: string | null = null
+    if (data.schoolCode) {
+        const school = await repo.findSchoolByCode(data.schoolCode)
+        if (!school) {
+            throw AppError.notFound("School not found with the provided code")
+        }
+        schoolId = school.id
+    }
+
+    const result = await prisma.$transaction(async (tx: any) => {
+        const user = await tx.user.create({
+            data: {
+                firstName: data.firstName,
+                secondName: data.secondName,
+                lastName: data.lastName,
+                phone: data.phone,
+                email: data.email,
+                hashedPassword: hashed,
+            },
+            select: {
+                id: true, firstName: true, secondName: true, lastName: true,
+                phone: true, email: true, status: true, createdAt: true, updatedAt: true,
+            },
+        })
+
+        if (schoolId) {
+            const membership = await tx.schoolMembership.create({
+                data: { school: { connect: { id: schoolId } }, user: { connect: { id: user.id } } },
+            })
+
+            const parentRole = await repo.findRoleByName("Parent")
+            if (parentRole) {
+                await tx.schoolMembershipRole.create({
+                    data: { membershipId: membership.id, roleId: parentRole.id },
+                })
+            }
+        }
+
+        return user
+    })
+
+    await writeEventOutbox({
+        schoolId: schoolId ?? "",
+        aggregateId: result.id,
+        aggregateType: "user",
+        eventType: "UserCreated",
+        payload: { phone: result.phone, method: "register" },
     })
 
     if (schoolId) {
-      const membership = await tx.schoolMembership.create({
-        data: { school: { connect: { id: schoolId } }, user: { connect: { id: user.id } } },
-      })
-
-      const parentRole = await repo.findRoleByName("Parent")
-      if (parentRole) {
-        await tx.schoolMembershipRole.create({
-          data: { membershipId: membership.id, roleId: parentRole.id },
-        })
-      }
+        return login({ login: data.phone, password: data.password })
     }
 
-    return user
-  })
-
-  await writeEventOutbox({
-    schoolId: schoolId ?? "",
-    aggregateId: result.id,
-    aggregateType: "user",
-    eventType: "UserCreated",
-    payload: { phone: result.phone, method: "register" },
-  })
-
-  if (schoolId) {
-    return login({ login: data.phone, password: data.password })
-  }
-
-  const { hashedPassword: _, ...safeUser } = result as any
-  return { user: safeUser, schoolId: null }
+    const { hashedPassword: _, ...safeUser } = result as any
+    return { user: safeUser, schoolId: null }
 }
 
 export async function forgotPassword(data: ForgotPasswordInput) {
-  const user = await repo.findUserByPhone(data.login) ?? await repo.findUserByEmail(data.login)
-  if (!user) {
-    return { message: "If an account exists, a reset link will be sent" }
-  }
+    const loginStr = data.login.startsWith("0") ? normalizePhone(data.login) : data.login
+    const user = await repo.findUserByPhone(loginStr) ?? await repo.findUserByEmail(loginStr)
+    if (!user) {
+        return { found: false, message: "No account found with that email or phone number" }
+    }
 
-  const rawToken = crypto.randomBytes(32).toString("hex")
-  const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex")
-  const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
+    const rawToken = crypto.randomBytes(32).toString("hex")
+    const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex")
+    const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
 
-  await repo.createPasswordResetToken({ userId: user.id, tokenHash, expiresAt })
+    await repo.createPasswordResetToken({ userId: user.id, tokenHash, expiresAt })
 
-  await writeEventOutbox({
-    aggregateId: user.id,
-    aggregateType: "user",
-    eventType: "UserCreated",
-    payload: { action: "password-reset-requested", phone: user.phone },
-  })
+    const smsMessage = `SchoolPulse password reset code: ${rawToken}. Reset your password at ${HOST}/auth/reset-password. This code expires in 1 hour. If you did not request this, ignore this message.`
+    await sendSingleSms(user.phone, smsMessage).catch(() => {})
 
-  return { message: "If an account exists, a reset link will be sent", token: rawToken }
+    return { found: true, message: "Reset instructions sent to the phone number on file" }
 }
 
 export async function resetPassword(data: ResetPasswordInput) {
-  const tokenHash = crypto.createHash("sha256").update(data.token).digest("hex")
-  const record = await repo.findValidResetToken(tokenHash)
-  if (!record) {
-    throw AppError.validation("Invalid or expired reset token")
-  }
+    const tokenHash = crypto.createHash("sha256").update(data.token).digest("hex")
+    const record = await repo.findValidResetToken(tokenHash)
+    if (!record) {
+        throw AppError.validation("Invalid or expired reset token")
+    }
 
-  const hashed = await hashPassword(data.password)
+    const hashed = await hashPassword(data.password)
 
-  await prisma.$transaction(async (tx: any) => {
-    await tx.user.update({ where: { id: record.userId }, data: { hashedPassword: hashed } })
-    await tx.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } })
-  })
+    await prisma.$transaction(async (tx: any) => {
+        await tx.user.update({ where: { id: record.userId }, data: { hashedPassword: hashed } })
+        await tx.passwordResetToken.update({ where: { id: record.id }, data: { usedAt: new Date() } })
+    })
 
-  return { message: "Password successfully reset" }
+    return { message: "Password successfully reset" }
 }
 
 export async function refresh(token: string) {
-  const { verifyToken } = await import("@/shared/jwt")
-  let payload: any
-  try { payload = verifyToken(token) } catch { throw AppError.unauthenticated("Invalid refresh token") }
+    const { verifyToken } = await import("@/shared/jwt")
+    let payload: any
+    try { payload = verifyToken(token) } catch { throw AppError.unauthenticated("Invalid refresh token") }
 
-  const membership = await repo.findMembershipBySchoolAndUser(payload.schoolId, payload.sub)
-  if (!membership) {
-    throw AppError.forbidden("No active membership found")
-  }
+    const membership = await repo.findMembershipBySchoolAndUser(payload.schoolId, payload.sub)
+    if (!membership) {
+        throw AppError.forbidden("No active membership found")
+    }
 
-  const roleNames = membership.roles.map((r: any) => r.role.name)
-  const accessToken = signToken({ sub: payload.sub, schoolId: payload.schoolId, roles: roleNames })
+    const roleNames = membership.roles.map((r: any) => r.role.name)
+    const accessToken = signToken({ sub: payload.sub, schoolId: payload.schoolId, roles: roleNames })
 
-  return { accessToken, refreshToken: accessToken }
+    return { accessToken, refreshToken: accessToken }
 }
 
 export async function logout() {
-  return { message: "Logged out successfully" }
+    return { message: "Logged out successfully" }
 }
 
 export async function createJoinRequest(data: CreateJoinRequestInput) {
-  const existing = await prisma.joinRequest.findFirst({
-    where: { schoolName: data.schoolName, phone: data.phone, deletedAt: null },
-  })
-  if (existing) {
-    throw AppError.conflict("A join request with this school name and phone already exists")
-  }
+    data.phone = normalizePhone(data.phone)
+    const existing = await prisma.joinRequest.findFirst({
+        where: { schoolName: data.schoolName, phone: data.phone, deletedAt: null },
+    })
+    if (existing) {
+        throw AppError.conflict("A join request with this school name and phone already exists")
+    }
 
-  const joinRequest = await repo.createJoinRequest({
-    schoolName: data.schoolName,
-    phone: data.phone,
-    email: data.email,
-    adminPhone: data.adminPhone,
-    adminEmail: data.adminEmail,
-    county: data.county,
-    country: data.country,
-    town: data.town,
-    requestedBy: data.phone,
-  })
+    const joinRequest = await repo.createJoinRequest({
+        schoolName: data.schoolName,
+        phone: data.phone,
+        email: data.email,
+        schoolLevel: data.schoolLevel,
+        county: data.county,
+        country: data.country,
+        town: data.town,
+        requestedBy: data.phone,
+    })
 
-  await writeEventOutbox({
-    aggregateId: joinRequest.id,
-    aggregateType: "join_request",
-    eventType: "JoinRequestSubmitted",
-    payload: {
-      joinRequestId: joinRequest.id,
-      schoolName: data.schoolName,
-      phone: data.phone,
-      county: data.county ?? null,
-      country: data.country ?? null,
-      town: data.town ?? null,
-      requestedAt: joinRequest.requestedAt,
-    },
-  })
+    await writeEventOutbox({
+        aggregateId: joinRequest.id,
+        aggregateType: "join_request",
+        eventType: "JoinRequestSubmitted",
+        payload: {
+            joinRequestId: joinRequest.id,
+            schoolName: data.schoolName,
+            phone: data.phone,
+            county: data.county ?? null,
+            country: data.country ?? null,
+            town: data.town ?? null,
+            requestedAt: joinRequest.requestedAt,
+        },
+    })
 
-  const smsMessage = `Your request to join ${data.schoolName} has been submitted. We will review it and get back to you.`
-  await sendSingleSms(data.phone, smsMessage).catch(() => {})
+    const smsMessage = `Your request to join ${data.schoolName} has been submitted. We will review it and get back to you.`
+    await sendSingleSms(data.phone, smsMessage).catch(() => { })
 
-  return joinRequest
+    return joinRequest
 }
 
 export async function listJoinRequests() {
-  return repo.findAllJoinRequests()
+    return repo.findAllJoinRequests()
 }
 
 export async function approveJoinRequest(id: string, processedBy: string) {
-  const joinRequest = await repo.findJoinRequestById(id)
-  if (!joinRequest) {
-    throw AppError.notFound("Join request not found")
-  }
-
-  if (!["pending_review", "submitted"].includes(joinRequest.status)) {
-    throw AppError.validation("Join request is not in a pending state")
-  }
-
-  const county = joinRequest.county || "Unknown"
-  const prefix = county.slice(0, 3).toUpperCase()
-
-  const latestSchool = await repo.findLatestSchoolCode(prefix)
-  let nextNumber = 1
-  if (latestSchool) {
-    const numPart = parseInt(latestSchool.schoolCode.slice(3), 10)
-    if (!isNaN(numPart)) nextNumber = numPart + 1
-  }
-  const schoolCode = `${prefix}${String(nextNumber).padStart(3, "0")}`
-
-  const otp = Math.floor(100000 + Math.random() * 900000).toString()
-  const hashedOtp = await hashPassword(otp)
-
-  const result = await prisma.$transaction(async (tx: any) => {
-    const school = await tx.school.create({
-      data: {
-        schoolCode,
-        schoolName: joinRequest.schoolName,
-        schoolPhone: joinRequest.phone,
-        schoolEmail: joinRequest.email,
-        county: joinRequest.county || "Unknown",
-        town: joinRequest.town || "Unknown",
-        country: joinRequest.country || "Kenya",
-      },
-    })
-
-    await tx.smsWallet.create({
-      data: {
-        schoolId: school.id,
-        balance: 5,
-      },
-    })
-
-    const user = await tx.user.create({
-      data: {
-        firstName: "Admin",
-        lastName: joinRequest.schoolName,
-        phone: joinRequest.phone,
-        email: joinRequest.email,
-        hashedPassword: hashedOtp,
-      },
-    })
-
-    const membership = await tx.schoolMembership.create({
-      data: { schoolId: school.id, userId: user.id, status: "active" },
-    })
-
-    const superAdminRole = await repo.findRoleByName("Super Admin")
-    if (superAdminRole) {
-      await tx.schoolMembershipRole.create({
-        data: { membershipId: membership.id, roleId: superAdminRole.id },
-      })
+    const joinRequest = await repo.findJoinRequestById(id)
+    if (!joinRequest) {
+        throw AppError.notFound("Join request not found")
     }
 
-    await tx.joinRequest.update({
-      where: { id },
-      data: {
-        status: "approved",
-        processedBy,
-        processedAt: new Date(),
-        oneTimeCode: otp,
-      },
+    if (!["pending_review", "submitted"].includes(joinRequest.status)) {
+        throw AppError.validation("Join request is not in a pending state")
+    }
+
+    const county = joinRequest.county || "Unknown"
+    const prefix = county.slice(0, 3).toUpperCase()
+
+    const latestSchool = await repo.findLatestSchoolCode(prefix)
+    let nextNumber = 1
+    if (latestSchool) {
+        const numPart = parseInt(latestSchool.schoolCode.slice(3), 10)
+        if (!isNaN(numPart)) nextNumber = numPart + 1
+    }
+    const schoolCode = `${prefix}${String(nextNumber).padStart(3, "0")}`
+
+    const otp = Math.floor(100000 + Math.random() * 900000).toString()
+    const hashedOtp = await hashPassword(otp)
+
+    const result = await prisma.$transaction(async (tx: any) => {
+        // TODO have an approved school perform an appropriate fetch to create a school through it's API to avoid inconsistent results
+        // fetch(`${BASE}/api/v1/schools/`, {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json'
+        //     },
+        //     body: JSON.stringify({
+        //         schoolName: joinRequest.schoolName,
+        //         schoolPhone: joinRequest.phone,
+        //         schoolEmail: joinRequest.email,
+        //         county: joinRequest.county || "Unknown",
+        //         town: joinRequest.town || "Unknown",
+        //         country: joinRequest.country || "Kenya",
+        //         schoolWebsite: '',
+        //         schoolAddress: '',
+        //         schoolLogo: '',
+        //         postOffice: '',
+        //         currency: 'KES',
+        //         timezone: 'Africa/Nairobi',
+        //         schoolLevel: joinRequest.schoolLevel
+        //     })
+        // })
+
+        // TODO replace this
+        const school = await tx.school.create({
+            data: {
+                schoolCode,
+                schoolName: joinRequest.schoolName,
+                schoolPhone: joinRequest.phone,
+                schoolEmail: joinRequest.email,
+                county: joinRequest.county || "Unknown",
+                town: joinRequest.town || "Unknown",
+                country: joinRequest.country || "Kenya",
+            },
+        })
+
+        await tx.smsWallet.create({
+            data: {
+                schoolId: school.id,
+                balance: 5,
+            },
+        })
+
+        const user = await tx.user.create({
+            data: {
+                firstName: "Admin",
+                lastName: joinRequest.schoolName,
+                phone: joinRequest.phone,
+                email: joinRequest.email,
+                hashedPassword: hashedOtp,
+            },
+        })
+
+        const membership = await tx.schoolMembership.create({
+            data: { schoolId: school.id, userId: user.id, status: "active" },
+        })
+
+        const superAdminRole = await repo.findRoleByName("Super Admin")
+        if (superAdminRole) {
+            await tx.schoolMembershipRole.create({
+                data: { membershipId: membership.id, roleId: superAdminRole.id },
+            })
+        }
+
+        await tx.joinRequest.update({
+            where: { id },
+            data: {
+                status: "approved",
+                processedBy,
+                processedAt: new Date(),
+                oneTimeCode: otp,
+            },
+        })
+
+        return { school, user }
     })
 
-    return { school, user }
-  })
+    await writeEventOutbox({
+        schoolId: result.school.id,
+        aggregateId: id,
+        aggregateType: "join_request",
+        eventType: "JoinRequestApproved",
+        payload: {
+            joinRequestId: id,
+            schoolId: result.school.id,
+            schoolName: joinRequest.schoolName,
+            phone: joinRequest.phone,
+            userId: result.user.id,
+        },
+    })
 
-  await writeEventOutbox({
-    schoolId: result.school.id,
-    aggregateId: id,
-    aggregateType: "join_request",
-    eventType: "JoinRequestApproved",
-    payload: {
-      joinRequestId: id,
-      schoolId: result.school.id,
-      schoolName: joinRequest.schoolName,
-      phone: joinRequest.phone,
-      userId: result.user.id,
-    },
-  })
+    const smsMessage = `Your school ${joinRequest.schoolName} has been approved! Login at ${HOST}/auth/login with phone ${joinRequest.phone} and code ${otp}. Change your password on first login.`
+    await sendSingleSms(joinRequest.phone, smsMessage).catch(() => { })
 
-  const smsMessage = `Your school ${joinRequest.schoolName} has been approved! Login with phone ${joinRequest.phone} and code ${otp}. Change your password on first login.`
-  await sendSingleSms(joinRequest.phone, smsMessage).catch(() => {})
-
-  return {
-    school: result.school,
-    user: { id: result.user.id, phone: result.user.phone },
-    oneTimeCode: otp,
-  }
+    return {
+        school: result.school,
+        user: { id: result.user.id, phone: result.user.phone },
+        oneTimeCode: otp,
+    }
 }

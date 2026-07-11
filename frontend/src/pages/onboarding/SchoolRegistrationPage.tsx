@@ -5,6 +5,7 @@ import { joinRequestsApi } from "../../lib/api"
 import { Logo } from "../../components/ui/Logo"
 import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
+import { BrandedHero } from "../../components/ui/BrandedHero"
 
 export function SchoolRegistrationPage() {
   const navigate = useNavigate()
@@ -12,8 +13,7 @@ export function SchoolRegistrationPage() {
   const [schoolName, setSchoolName] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
-  const [adminPhone, setAdminPhone] = useState("")
-  const [adminEmail, setAdminEmail] = useState("")
+  const [schoolLevel, setSchoolLevel] = useState("")
   const [county, setCounty] = useState("")
   const [town, setTown] = useState("")
   const [country, setCountry] = useState("Kenya")
@@ -34,8 +34,7 @@ export function SchoolRegistrationPage() {
         schoolName,
         phone,
         email: email || undefined,
-        adminPhone,
-        adminEmail: adminEmail || undefined,
+        schoolLevel: schoolLevel || undefined,
         county: county || undefined,
         country: country || undefined,
         town: town || undefined,
@@ -73,7 +72,7 @@ export function SchoolRegistrationPage() {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:flex-none lg:px-20 xl:px-24">
+      <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:w-1/2 lg:flex-none lg:min-h-screen lg:justify-center lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm">
           <div className="flex items-center gap-3 mb-10">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-accent text-white shadow-inner">
@@ -107,17 +106,28 @@ export function SchoolRegistrationPage() {
               <Input label="School Name *" placeholder="e.g. St Mary's High School" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} />
               <Input label="Phone Number *" type="tel" placeholder="e.g. +254712345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
               <Input label="Email Address" type="email" placeholder="admin@school.sch.ke" value={email} onChange={(e) => setEmail(e.target.value)} />
-              <div className="border-t border-primary-100 pt-4">
-                <p className="text-xs font-semibold text-primary-500 uppercase tracking-wider mb-3">Admin Contact</p>
-                <Input label="Admin Phone *" type="tel" placeholder="e.g. +254712345678" value={adminPhone} onChange={(e) => setAdminPhone(e.target.value)} />
-                <Input label="Admin Email" type="email" placeholder="admin@school.sch.ke" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} />
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-primary-700">School Level</label>
+                <select
+                  value={schoolLevel}
+                  onChange={(e) => setSchoolLevel(e.target.value)}
+                  className="block w-full rounded-lg border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 placeholder-primary-400 shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value="">Select school level</option>
+                  <option value="pre_primary">Pre-Primary</option>
+                  <option value="primary">Primary</option>
+                  <option value="hybrid_pri_jsecondary">Hybrid (Primary & Junior Secondary)</option>
+                  <option value="junior_secondary">Junior Secondary</option>
+                  <option value="senior_secondary">Senior Secondary</option>
+                  <option value="tertiary">Tertiary</option>
+                </select>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <Input label="County *" placeholder="e.g. Nairobi" value={county} onChange={(e) => setCounty(e.target.value)} />
                 <Input label="Town / City" placeholder="e.g. Westlands" value={town} onChange={(e) => setTown(e.target.value)} />
               </div>
               <Input label="Country" placeholder="Kenya" value={country} onChange={(e) => setCountry(e.target.value)} />
-              <Button className="w-full" onClick={() => setStep(2)} disabled={!schoolName || !phone || !adminPhone}>
+              <Button className="w-full" onClick={() => setStep(2)} disabled={!schoolName || !phone}>
                 Continue
               </Button>
             </div>
@@ -138,8 +148,7 @@ export function SchoolRegistrationPage() {
                   <p><span className="font-medium">School:</span> {schoolName}</p>
                   <p><span className="font-medium">School Phone:</span> {phone}</p>
                   {email && <p><span className="font-medium">School Email:</span> {email}</p>}
-                  <p><span className="font-medium">Admin Phone:</span> {adminPhone}</p>
-                  {adminEmail && <p><span className="font-medium">Admin Email:</span> {adminEmail}</p>}
+                  {schoolLevel && <p><span className="font-medium">Level:</span> {schoolLevel.replace(/_/g, " ").replace(/pri/g, "Primary").replace(/jsecondary/g, "Junior Secondary")}</p>}
                   {county && <p><span className="font-medium">Location:</span> {county}{town ? `, ${town}` : ""}, {country}</p>}
                 </div>
               </div>
@@ -168,30 +177,17 @@ export function SchoolRegistrationPage() {
         </div>
       </div>
 
-      <div className="relative hidden flex-1 lg:block">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary-900 via-primary-800 to-primary-950" />
-        <div className="absolute inset-0 flex items-center justify-center p-12">
-          <div className="max-w-md text-center">
-            <h3 className="text-3xl font-bold text-white tracking-tight">
-              Join <span className="text-accent">98+</span> schools already on SchoolPulse
-            </h3>
-            <ul className="mt-8 space-y-4 text-left">
-              {[
-                "Multi-tenant architecture with full school isolation",
-                "Comprehensive student, academic & finance management",
-                "Built-in communication (SMS, email, in-app)",
-                "Role-based access control for staff & parents",
-                "99.9% uptime with enterprise-grade security",
-              ].map((feature, i) => (
-                <li key={i} className="flex items-start gap-3 text-primary-300">
-                  <CheckCircle size={18} className="shrink-0 mt-0.5 text-accent" />
-                  <span className="text-sm">{feature}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      </div>
+      <BrandedHero
+        title={<>Join <span className="text-accent">98+</span> schools on SchoolPulse</>}
+        subtitle="The all-in-one school management platform trusted by educational institutions across Kenya."
+        features={[
+          "Multi-tenant architecture with full school isolation",
+          "Comprehensive student, academic & finance management",
+          "Built-in communication (SMS, email, in-app)",
+          "Role-based access control for staff & parents",
+          "99.9% uptime with enterprise-grade security",
+        ]}
+      />
     </div>
   )
 }

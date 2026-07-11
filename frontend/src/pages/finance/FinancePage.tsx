@@ -1,7 +1,9 @@
 import { useState, useEffect, type FormEvent } from "react"
-import { DollarSign, Plus, Search, Loader2, AlertCircle, RefreshCw, X } from "lucide-react"
+import { DollarSign, Plus, Search, AlertCircle, RefreshCw, X } from "lucide-react"
 import { PageHeader } from "../../components/shell/PageHeader"
 import { Card, CardContent } from "../../components/ui/Card"
+import { Skeleton } from "../../components/ui/Skeleton"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import { Badge, type BadgeVariant } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
@@ -27,8 +29,6 @@ const statusVariant: Record<string, BadgeVariant> = {
   failed: "danger",
   reversed: "default",
 }
-
-const MIN_LOAD_MS = 500
 
 export function FinancePage() {
   const { school } = useAuth()
@@ -59,22 +59,18 @@ export function FinancePage() {
   const loadInvoices = async () => {
     setLoading(true)
     setError("")
-    const start = Date.now()
     try {
-      const [invRes, feeRes, stuRes] = await Promise.all([
+      const [invRes, feeRes, stuRes] = await withMinDelay(Promise.all([
         financeApi.invoices.list(schoolId),
         financeApi.feeStructures.list(schoolId),
         studentsApi.list(schoolId),
-      ])
+      ]))
       setInvoices(invRes.data)
       setFeeStructures(feeRes.data)
       setStudents(stuRes.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load finance data")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -85,22 +81,18 @@ export function FinancePage() {
     e.preventDefault()
     if (!genStudentId || !genFeeStructureId || !genTermId) return
     setSaving(true)
-    const start = Date.now()
     try {
-      await financeApi.invoices.generate(schoolId, {
+      await withMinDelay(financeApi.invoices.generate(schoolId, {
         studentId: genStudentId,
         feeStructureId: genFeeStructureId,
         termId: genTermId,
-      })
+      }))
       setShowGenerate(false)
       setGenStudentId(""); setGenFeeStructureId(""); setGenTermId("")
       await loadInvoices()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to generate invoice")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
@@ -109,24 +101,20 @@ export function FinancePage() {
     e.preventDefault()
     if (!payStudentId || !payInvoiceId || !payAmount) return
     setSaving(true)
-    const start = Date.now()
     try {
-      await financeApi.payments.record(schoolId, {
+      await withMinDelay(financeApi.payments.record(schoolId, {
         studentId: payStudentId,
         invoiceId: payInvoiceId,
         amount: Number(payAmount),
         method: payMethod,
         transactionRef: payRef,
-      })
+      }))
       setShowPayment(false)
       setPayStudentId(""); setPayInvoiceId(""); setPayAmount(""); setPayMethod("cash"); setPayRef("")
       await loadInvoices()
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to record payment")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
   }
@@ -312,8 +300,14 @@ export function FinancePage() {
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 size={24} className="animate-spin text-primary-400" />
+        <div className="space-y-4">
+          <Skeleton className="h-8 w-48" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Skeleton key={i} className="h-24" />
+            ))}
+          </div>
+          <Skeleton className="h-64" />
         </div>
       ) : tab === "invoices" ? (
         <Card>

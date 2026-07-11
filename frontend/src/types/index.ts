@@ -406,8 +406,7 @@ export interface JoinRequest {
   schoolName: string
   phone: string
   email?: string
-  adminPhone: string
-  adminEmail?: string
+  schoolLevel?: string
   county?: string
   country?: string
   town?: string

@@ -1,7 +1,9 @@
 import { useState, useEffect, type FormEvent } from "react"
-import { Plus, Search, Loader2, RefreshCw, X, Check, Eye, EyeOff, BookOpen, GraduationCap, FileSpreadsheet } from "lucide-react"
+import { Plus, Search, RefreshCw, X, Check, Eye, EyeOff, BookOpen, GraduationCap, FileSpreadsheet } from "lucide-react"
 import { PageHeader } from "../../components/shell/PageHeader"
 import { Card, CardContent, CardHeader } from "../../components/ui/Card"
+import { Skeleton } from "../../components/ui/Skeleton"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import { Badge } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
@@ -13,8 +15,6 @@ import { useAuth } from "../../lib/auth-context"
 import type { Exam, Assessment, AssessmentResult, Term, ClassInstance, Subject } from "../../types"
 
 type View = "list" | "detail" | "results"
-
-const MIN_LOAD_MS = 500
 
 export function ExamsPage() {
   const { school } = useAuth()
@@ -51,17 +51,16 @@ export function ExamsPage() {
   const [publishing, setPublishing] = useState(false)
 
   const load = async () => {
-    const start = Date.now()
     setLoading(true)
     setError("")
     try {
       const filter = termFilter ? { termId: termFilter } : undefined
-      const [examsRes, termsRes, clsRes, subRes] = await Promise.all([
+      const [examsRes, termsRes, clsRes, subRes] = await withMinDelay(Promise.all([
         examsApi.list(schoolId, filter?.termId),
         academicApi.terms.list(schoolId),
         academicApi.classInstances.list(schoolId),
         academicApi.subjects.list(schoolId),
-      ])
+      ]))
       setExams(examsRes.data)
       setTerms(termsRes.data)
       setClassInstances(clsRes.data)
@@ -69,9 +68,6 @@ export function ExamsPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load exams")
     } finally {
-      const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
-      if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
   }
@@ -98,7 +94,7 @@ export function ExamsPage() {
       setError(e instanceof Error ? e.message : "Failed to create exam")
     } finally {
       const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
+      const remaining = UX_MIN_DELAY - elapsed
       if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
@@ -115,7 +111,7 @@ export function ExamsPage() {
       setError(e instanceof Error ? e.message : "Failed to load exam")
     } finally {
       const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
+      const remaining = UX_MIN_DELAY - elapsed
       if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
@@ -141,7 +137,7 @@ export function ExamsPage() {
       setError(e instanceof Error ? e.message : "Failed to create assessment")
     } finally {
       const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
+      const remaining = UX_MIN_DELAY - elapsed
       if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
@@ -161,7 +157,7 @@ export function ExamsPage() {
       setError(e instanceof Error ? e.message : "Failed to load assessment")
     } finally {
       const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
+      const remaining = UX_MIN_DELAY - elapsed
       if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setLoading(false)
     }
@@ -183,7 +179,7 @@ export function ExamsPage() {
       setError(e instanceof Error ? e.message : "Failed to save results")
     } finally {
       const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
+      const remaining = UX_MIN_DELAY - elapsed
       if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setSaving(false)
     }
@@ -201,7 +197,7 @@ export function ExamsPage() {
       setError(e instanceof Error ? e.message : "Failed to publish exam")
     } finally {
       const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
+      const remaining = UX_MIN_DELAY - elapsed
       if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
       setPublishing(false)
     }
@@ -219,7 +215,7 @@ export function ExamsPage() {
       setError(e instanceof Error ? e.message : "Failed to publish")
     } finally {
       const elapsed = Date.now() - start
-      const remaining = MIN_LOAD_MS - elapsed
+      const remaining = UX_MIN_DELAY - elapsed
       if (remaining > 0) await new Promise(r => setTimeout(r, remaining))
     }
   }
@@ -459,8 +455,10 @@ export function ExamsPage() {
             </Button>
           </div>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-primary-400" />
+            <div className="space-y-3 p-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <EmptyState title="No exams found" description="Create your first examination to get started."

@@ -1,7 +1,9 @@
 import { useState, useEffect, type FormEvent } from "react"
-import { Plus, Search, Loader2, AlertCircle, RefreshCw, Lock, Check, X } from "lucide-react"
+import { Plus, Search, AlertCircle, RefreshCw, Lock, Check, X } from "lucide-react"
 import { PageHeader } from "../../components/shell/PageHeader"
 import { Card, CardContent } from "../../components/ui/Card"
+import { Skeleton } from "../../components/ui/Skeleton"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import { Badge } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
 import { Table } from "../../components/ui/Table"
@@ -10,8 +12,6 @@ import { Input } from "../../components/ui/Input"
 import { attendanceApi, academicApi } from "../../lib/api"
 import { useAuth } from "../../lib/auth-context"
 import type { AttendanceSession, AttendanceRecord, ClassInstance } from "../../types"
-
-const MIN_LOAD_MS = 500
 
 type View = "list" | "detail"
 
@@ -42,12 +42,10 @@ export function AttendancePage() {
     setLoading(true)
     setError("")
     try {
-      const start = Date.now()
-      const [sessRes, clsRes] = await Promise.all([
+      const [sessRes, clsRes] = await withMinDelay(Promise.all([
         attendanceApi.listSessions(schoolId),
         academicApi.classInstances.list(schoolId),
-        new Promise(r => setTimeout(r, Math.max(0, MIN_LOAD_MS - (Date.now() - start)))),
-      ])
+      ]))
       setSessions(sessRes.data)
       setClassInstances(clsRes.data)
     } catch (e) {
@@ -64,15 +62,11 @@ export function AttendancePage() {
     if (!formClass || !formDate) return
     setSaving(true)
     try {
-      const start = Date.now()
-      await Promise.all([
-        attendanceApi.createSession(schoolId, {
-          classInstanceId: formClass,
-          sessionDate: formDate,
-          sessionType: formType,
-        }),
-        new Promise(r => setTimeout(r, Math.max(0, MIN_LOAD_MS - (Date.now() - start)))),
-      ])
+      await withMinDelay(attendanceApi.createSession(schoolId, {
+        classInstanceId: formClass,
+        sessionDate: formDate,
+        sessionType: formType,
+      }))
       setShowForm(false)
       setFormClass("")
       setFormDate(new Date().toISOString().split("T")[0])
@@ -116,16 +110,8 @@ export function AttendancePage() {
     if (!selectedSession) return
     setLocking(true)
     try {
-      const start = Date.now()
-      await Promise.all([
-        attendanceApi.lockSession(schoolId, selectedSession.id),
-        new Promise(r => setTimeout(r, Math.max(0, MIN_LOAD_MS - (Date.now() - start)))),
-      ])
-      const start2 = Date.now()
-      const [res] = await Promise.all([
-        attendanceApi.getSession(schoolId, selectedSession.id),
-        new Promise(r => setTimeout(r, Math.max(0, MIN_LOAD_MS - (Date.now() - start2)))),
-      ])
+      await withMinDelay(attendanceApi.lockSession(schoolId, selectedSession.id))
+      const res = await withMinDelay(attendanceApi.getSession(schoolId, selectedSession.id))
       setSelectedSession(res.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to lock session")
@@ -292,8 +278,10 @@ export function AttendancePage() {
             </Button>
           </div>
           {loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-primary-400" />
+            <div className="space-y-3 p-4">
+              {Array.from({ length: 5 }).map((_, i) => (
+                <Skeleton key={i} className="h-12 w-full" />
+              ))}
             </div>
           ) : filtered.length === 0 ? (
             <EmptyState title="No sessions found" description={search ? "Try a different search term." : "Create your first attendance session."} />

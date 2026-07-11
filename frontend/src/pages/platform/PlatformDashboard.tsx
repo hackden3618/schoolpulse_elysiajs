@@ -12,7 +12,9 @@ import { Input } from "../../components/ui/Input"
 import { Table } from "../../components/ui/Table"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { Logo } from "../../components/ui/Logo"
+import { ConfirmModal } from "../../components/ui/Modal"
 import { joinRequestsApi, platformAdminApi, setPlatformToken, getPlatformToken } from "../../lib/api"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import type { JoinRequest } from "../../types"
 
 type Tab = "requests" | "admins" | "schools"
@@ -29,6 +31,20 @@ function timeAgo(dateStr: string): string {
     return `${days}d ago`
 }
 
+const schoolLevelLabels: Record<string, string> = {
+    pre_primary: "Pre-Primary",
+    primary: "Primary",
+    hybrid_pri_jsecondary: "Hybrid (Primary & Junior Secondary)",
+    junior_secondary: "Junior Secondary",
+    senior_secondary: "Senior Secondary",
+    tertiary: "Tertiary",
+    mixed: "Mixed",
+}
+
+function schoolLevelLabel(level: string): string {
+    return schoolLevelLabels[level] || level.replace(/_/g, " ")
+}
+
 export function PlatformDashboard() {
     const navigate = useNavigate()
     const [admin, setAdmin] = useState<any>(null)
@@ -41,6 +57,7 @@ export function PlatformDashboard() {
     const [search, setSearch] = useState("")
     const [approving, setApproving] = useState<string | null>(null)
     const [rejecting, setRejecting] = useState<string | null>(null)
+    const [reviewing, setReviewing] = useState<string | null>(null)
     const [rejectReason, setRejectReason] = useState("")
     const [showRejectInput, setShowRejectInput] = useState<string | null>(null)
     const [requestFilter, setRequestFilter] = useState<RequestFilter>("all")
@@ -57,6 +74,7 @@ export function PlatformDashboard() {
     const [adminRole, setAdminRole] = useState("staff")
     const [saving, setSaving] = useState(false)
     const [deleting, setDeleting] = useState<string | null>(null)
+    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
 
     useEffect(() => {
         const stored = localStorage.getItem("schoolpulse:platform")
@@ -78,11 +96,11 @@ export function PlatformDashboard() {
         setLoading(true)
         setError("")
         try {
-            const [reqRes, adminsRes, schoolsRes] = await Promise.all([
+            const [reqRes, adminsRes, schoolsRes] = await withMinDelay(Promise.all([
                 joinRequestsApi.list(),
                 platformAdminApi.listAdmins(),
                 platformAdminApi.listSchools(),
-            ])
+            ]))
             setJoinRequests(reqRes.data)
             setPlatformAdmins(adminsRes.data)
             setSchools(schoolsRes.data)
@@ -99,7 +117,7 @@ export function PlatformDashboard() {
         setApproving(id)
         setError("")
         try {
-            const res = await joinRequestsApi.approve(id)
+            const res = await withMinDelay(joinRequestsApi.approve(id))
             setApprovedId(id)
             setNewCode(res.data.oneTimeCode)
             setNewSchoolCode(res.data.school.schoolCode)
@@ -115,7 +133,7 @@ export function PlatformDashboard() {
         setRejecting(id)
         setError("")
         try {
-            await joinRequestsApi.reject(id, rejectReason || undefined)
+            await withMinDelay(joinRequestsApi.reject(id, rejectReason || undefined))
             setShowRejectInput(null)
             setRejectReason("")
             await load()
@@ -126,18 +144,31 @@ export function PlatformDashboard() {
         }
     }
 
+    const handleMarkReview = async (id: string) => {
+        setReviewing(id)
+        setError("")
+        try {
+            await withMinDelay(joinRequestsApi.markReview(id))
+            await load()
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Failed to mark as under review")
+        } finally {
+            setReviewing(null)
+        }
+    }
+
     const handleCreateAdmin = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!adminFirstName || !adminLastName || !adminEmail || !adminPhone) return
         setSaving(true)
         try {
-            await platformAdminApi.createAdmin({
+            await withMinDelay(platformAdminApi.createAdmin({
                 firstName: adminFirstName,
                 lastName: adminLastName,
                 email: adminEmail,
                 phone: adminPhone,
                 role: adminRole,
-            })
+            }))
             setShowForm(false)
             setAdminFirstName(""); setAdminLastName(""); setAdminEmail(""); setAdminPhone(""); setAdminRole("staff")
             await load()
@@ -149,12 +180,12 @@ export function PlatformDashboard() {
     }
 
     const handleDeleteSchool = async (id: string) => {
-        if (!window.confirm("Are you sure you want to permanently delete this school? This action cannot be undone.")) return
         setDeleting(id)
         setError("")
         try {
-            await platformAdminApi.deleteSchool(id)
+            await withMinDelay(platformAdminApi.deleteSchool(id))
             setSchools((prev) => prev.filter((s) => s.id !== id))
+            setDeleteConfirmId(null)
         } catch (e) {
             setError(e instanceof Error ? e.message : "Failed to delete school")
         } finally {
@@ -195,6 +226,13 @@ export function PlatformDashboard() {
         pending_review: "warning",
         approved: "success",
         rejected: "danger",
+    }
+
+    const statusLabel: Record<string, string> = {
+        submitted: "New",
+        pending_review: "Under Review",
+        approved: "Approved",
+        rejected: "Rejected",
     }
 
     if (!admin) return null
@@ -315,14 +353,13 @@ export function PlatformDashboard() {
                                                             <Building2 size={16} className="text-primary-400 shrink-0" />
                                                             <h3 className="text-sm font-bold text-primary-900">{req.schoolName}</h3>
                                                             <Badge variant={statusVariant[req.status] || "default"}>
-                                                                {req.status.replace(/_/g, " ")}
+                                                                {statusLabel[req.status] || req.status.replace(/_/g, " ")}
                                                             </Badge>
                                                         </div>
                                                         <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-xs text-surface-500">
                                                             <span className="flex items-center gap-1"><Phone size={12} /> School: {req.phone}</span>
                                                             {req.email && <span className="flex items-center gap-1"><Mail size={12} /> School: {req.email}</span>}
-                                                            <span className="flex items-center gap-1"><Phone size={12} /> Admin: {req.adminPhone}</span>
-                                                            {req.adminEmail && <span className="flex items-center gap-1"><Mail size={12} /> Admin: {req.adminEmail}</span>}
+                                                            {req.schoolLevel && <span className="flex items-center gap-1"><Building2 size={12} /> {schoolLevelLabel(req.schoolLevel)}</span>}
                                                             {req.county && <span className="flex items-center gap-1"><MapPin size={12} /> {req.county}{req.town ? `, ${req.town}` : ""}{req.country ? `, ${req.country}` : ""}</span>}
                                                             <span className="flex items-center gap-1"><Clock size={12} /> {timeAgo(req.requestedAt)}</span>
                                                         </div>
@@ -330,6 +367,12 @@ export function PlatformDashboard() {
                                                     <div className="flex items-center gap-2 shrink-0">
                                                         {(req.status === "pending_review" || req.status === "submitted") && (
                                                             <>
+                                                                {req.status === "submitted" && (
+                                                                    <Button size="sm" variant="secondary" onClick={() => handleMarkReview(req.id)} disabled={reviewing === req.id}>
+                                                                        {reviewing === req.id ? <Loader2 size={14} className="animate-spin" /> : <Clock size={14} />}
+                                                                        {reviewing === req.id ? "Marking..." : "Under Review"}
+                                                                    </Button>
+                                                                )}
                                                                 <Button size="sm" variant="danger" onClick={() => setShowRejectInput(showRejectInput === req.id ? null : req.id)}>
                                                                     <XCircle size={14} /> Reject
                                                                 </Button>
@@ -405,7 +448,7 @@ export function PlatformDashboard() {
                                                     <Button
                                                         size="sm"
                                                         variant="danger"
-                                                        onClick={() => handleDeleteSchool(s.id)}
+                                                        onClick={() => setDeleteConfirmId(s.id)}
                                                         disabled={deleting === s.id}
                                                     >
                                                         {deleting === s.id ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={12} />}
@@ -495,6 +538,17 @@ export function PlatformDashboard() {
                     </div>
                 )}
             </main>
+
+            <ConfirmModal
+                open={deleteConfirmId !== null}
+                onClose={() => setDeleteConfirmId(null)}
+                onConfirm={() => handleDeleteSchool(deleteConfirmId!)}
+                title="Delete school?"
+                description="This action permanently removes the school and all associated data. This cannot be undone."
+                confirmLabel="Delete School"
+                variant="danger"
+                loading={deleting !== null}
+            />
         </div>
     )
 }

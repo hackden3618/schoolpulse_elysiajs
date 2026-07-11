@@ -47,7 +47,18 @@ export async function rejectJoinRequestController({ params, platformAdmin, body,
   return success(result)
 }
 
-export async function claimSchoolController({ body, set }: any) {
-  const result = await svc.claimSchool(body)
+export async function markUnderReviewController({ params, platformAdmin, set }: any) {
+  const result = await svc.markUnderReview(params.id, platformAdmin.id)
+  return success(result)
+}
+
+export async function verifyOtpController({ body, set }: any) {
+  const result = await svc.verifyOtp(body)
+  return success(result)
+}
+
+export async function setupAdminController({ body, set }: any) {
+  set.status = 201
+  const result = await svc.setupAdmin(body)
   return success(result)
 }

@@ -7,6 +7,7 @@ import { Card, CardContent } from "../../components/ui/Card"
 import { Input } from "../../components/ui/Input"
 import { Button } from "../../components/ui/Button"
 import { Skeleton } from "../../components/ui/Skeleton"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import type { School } from "../../types"
 
 export function SettingsPage() {
@@ -21,7 +22,7 @@ export function SettingsPage() {
     setLoading(true)
     setError("")
     try {
-      const res = await schoolsApi.get(authSchool!.id)
+      const res = await withMinDelay(schoolsApi.get(authSchool!.id))
       setSchool(res.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load school profile")

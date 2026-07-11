@@ -96,14 +96,13 @@ export async function createJoinRequest(data: {
   schoolName: string
   phone: string
   email?: string
-  adminPhone: string
-  adminEmail?: string
+  schoolLevel?: string
   county?: string
   country?: string
   town?: string
   requestedBy: string
 }) {
-  return prisma.joinRequest.create({ data: { ...data, status: "submitted" } })
+  return prisma.joinRequest.create({ data: { ...data, status: "submitted" } as Prisma.JoinRequestCreateInput })
 }
 
 export async function findAllJoinRequests() {

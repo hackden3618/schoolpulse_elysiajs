@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react"
-import { useNavigate } from "react-router-dom"
+import { useNavigate, useParams } from "react-router-dom"
 import { ArrowLeft, AlertCircle, Shield, Plus, X, Check } from "lucide-react"
 import { usersApi, membershipsApi, rolesApi } from "../../lib/api"
 import { useAuth } from "../../lib/auth-context"
@@ -9,46 +9,69 @@ import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
 import { Skeleton } from "../../components/ui/Skeleton"
 import { ErrorBanner } from "../../components/ui/ErrorBanner"
-import type { Role } from "../../types"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
+import type { Role, User, Membership } from "../../types"
 
-import { withMinDelay } from "../../lib/ux"
-
-export function CreateUserPage() {
+export function EditUserPage() {
   const navigate = useNavigate()
+  const { userId } = useParams<{ userId: string }>()
+  const { school } = useAuth()
+
   const [firstName, setFirstName] = useState("")
   const [secondName, setSecondName] = useState("")
   const [lastName, setLastName] = useState("")
   const [phone, setPhone] = useState("")
   const [email, setEmail] = useState("")
-  const [password, setPassword] = useState("")
+  const [status, setStatus] = useState<string>("active")
   const [selectedRoleIds, setSelectedRoleIds] = useState<string[]>([])
+  const [membershipId, setMembershipId] = useState<string | null>(null)
   const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
 
   const [roles, setRoles] = useState<Role[]>([])
   const [rolesLoading, setRolesLoading] = useState(true)
   const [rolesError, setRolesError] = useState("")
 
-  const { school } = useAuth()
-
   useEffect(() => {
+    if (!school || !userId) return
     let cancelled = false
     const load = async () => {
-      setRolesLoading(true)
-      setRolesError("")
+      setLoading(true)
+      setError("")
       try {
-        const res = await rolesApi.list()
-        if (!cancelled) setRoles(res.data)
+        const [userRes, membershipsRes, rolesRes] = await withMinDelay(Promise.all([
+          usersApi.get(school.id, userId),
+          membershipsApi.list(school.id),
+          rolesApi.list(),
+        ]))
+        if (cancelled) return
+        const user = userRes.data
+        setFirstName(user.firstName || "")
+        setSecondName(user.secondName || "")
+        setLastName(user.lastName || "")
+        setPhone(user.phone || "")
+        setEmail(user.email || "")
+        setStatus(user.status || "active")
+        setRoles(rolesRes.data)
+        const membership = membershipsRes.data.find((m: Membership) => m.userId === userId)
+        if (membership) {
+          setMembershipId(membership.id)
+          setSelectedRoleIds((membership.roles || []).map((r: any) => r.role?.id).filter(Boolean))
+        }
       } catch (e) {
-        if (!cancelled) setRolesError(e instanceof Error ? e.message : "Failed to load roles")
+        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load user data")
       } finally {
-        if (!cancelled) setRolesLoading(false)
+        if (!cancelled) {
+          setLoading(false)
+          setRolesLoading(false)
+        }
       }
     }
     load()
     return () => { cancelled = true }
-  }, [])
+  }, [school, userId])
 
   const toggleRole = (roleId: string) => {
     setSelectedRoleIds((prev) =>
@@ -59,41 +82,64 @@ export function CreateUserPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError("")
-
     if (!firstName || !lastName || !phone) {
       setError("First name, last name, and phone are required.")
       return
     }
-    if (selectedRoleIds.length === 0) {
-      setError("Please assign at least one role.")
-      return
-    }
-
-    setLoading(true)
+    setSaving(true)
     try {
-      const userRes = await withMinDelay(
-        usersApi.create(school!.id, {
+      await withMinDelay(Promise.all([
+        usersApi.update(school!.id, userId!, {
           firstName,
           secondName: secondName || undefined,
           lastName,
           phone,
           email: email || undefined,
-          password: password || undefined,
-        })
-      )
-
-      await membershipsApi.create(school!.id, {
-        userId: userRes.data.id,
-        roleIds: selectedRoleIds,
-      })
-
+          status: status as any,
+        }),
+        membershipId && selectedRoleIds.length > 0
+          ? membershipsApi.assignRoles(school!.id, membershipId, selectedRoleIds)
+          : Promise.resolve(),
+      ]))
       setSuccess(true)
       setTimeout(() => navigate("/users"), 1500)
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to create user.")
+      setError(err instanceof Error ? err.message : "Failed to update user.")
     } finally {
-      setLoading(false)
+      setSaving(false)
     }
+  }
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-8 w-32" />
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <Card><CardContent className="p-6 space-y-4">
+              <Skeleton className="h-5 w-40" />
+              <div className="grid grid-cols-3 gap-4">
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Skeleton className="h-10" />
+                <Skeleton className="h-10" />
+              </div>
+            </CardContent></Card>
+          </div>
+          <div><Card><CardContent className="p-6 space-y-3">
+            <Skeleton className="h-5 w-24" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-3/4" />
+          </CardContent></Card></div>
+        </div>
+      </div>
+    )
   }
 
   if (success) {
@@ -103,7 +149,7 @@ export function CreateUserPage() {
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-success-50 text-success-500 mb-4">
             <Check size={32} />
           </div>
-          <h2 className="text-xl font-bold text-primary-900">Staff user created</h2>
+          <h2 className="text-xl font-bold text-primary-900">User updated</h2>
           <p className="text-sm text-primary-500 mt-1">Redirecting to staff list...</p>
         </div>
       </div>
@@ -113,8 +159,8 @@ export function CreateUserPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Add Staff User"
-        description="Create a new staff account and assign roles."
+        title="Edit Staff User"
+        description="Update user profile, status, and role assignments."
         actions={
           <Button variant="secondary" onClick={() => navigate("/users")}>
             <ArrowLeft size={16} />
@@ -138,23 +184,28 @@ export function CreateUserPage() {
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <Input label="First Name *" placeholder="John" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
-                  <Input label="Second Name" placeholder="(optional)" value={secondName} onChange={(e) => setSecondName(e.target.value)} />
-                  <Input label="Last Name *" placeholder="Doe" value={lastName} onChange={(e) => setLastName(e.target.value)} />
+                  <Input label="First Name *" value={firstName} onChange={(e) => setFirstName(e.target.value)} />
+                  <Input label="Second Name" value={secondName} onChange={(e) => setSecondName(e.target.value)} />
+                  <Input label="Last Name *" value={lastName} onChange={(e) => setLastName(e.target.value)} />
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <Input label="Phone Number *" type="tel" placeholder="+254712345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
-                  <Input label="Email" type="email" placeholder="john.doe@school.sch.ke" value={email} onChange={(e) => setEmail(e.target.value)} />
+                  <Input label="Phone Number *" type="tel" value={phone} onChange={(e) => setPhone(e.target.value)} />
+                  <Input label="Email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
                 </div>
 
-                <Input
-                  label="Password (optional)"
-                  type="password"
-                  placeholder="Leave blank to send invite"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+                <div>
+                  <label className="mb-1.5 block text-sm font-medium text-primary-700">Status</label>
+                  <select
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    className="block w-full rounded-lg border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  >
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                    <option value="archived">Archived</option>
+                  </select>
+                </div>
               </CardContent>
             </Card>
 
@@ -232,6 +283,10 @@ export function CreateUserPage() {
                     <p className="text-primary-900 font-medium">{phone || "—"}</p>
                   </div>
                   <div>
+                    <span className="text-primary-400 text-xs">Status</span>
+                    <p className="text-primary-900 font-medium capitalize">{status}</p>
+                  </div>
+                  <div>
                     <span className="text-primary-400 text-xs">Roles</span>
                     <div className="flex flex-wrap gap-1 mt-1">
                       {selectedRoleIds.length === 0 ? (
@@ -252,8 +307,8 @@ export function CreateUserPage() {
               </CardContent>
             </Card>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? "Creating..." : "Create Staff User"}
+            <Button type="submit" className="w-full" disabled={saving}>
+              {saving ? "Saving..." : "Save Changes"}
             </Button>
           </div>
         </div>

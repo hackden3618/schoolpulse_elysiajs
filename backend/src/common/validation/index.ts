@@ -7,6 +7,16 @@ export const phoneString = (required: boolean = true) =>
     ? t.String({ minLength: 10, maxLength: 13, pattern: phonePattern })
     : t.Optional(t.String({ minLength: 10, maxLength: 13, pattern: phonePattern }));
 
+export function normalizePhone(phone: string): string {
+  if (phone.startsWith("0")) {
+    return "+254" + phone.slice(1)
+  }
+  if (phone.startsWith("254") && !phone.startsWith("+")) {
+    return "+" + phone
+  }
+  return phone
+}
+
 export const emailString = (required: boolean = true) =>
   required
     ? t.String({ format: "email", maxLength: 255 })

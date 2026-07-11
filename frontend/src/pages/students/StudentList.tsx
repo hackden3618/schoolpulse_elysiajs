@@ -10,6 +10,7 @@ import { Badge, type BadgeVariant } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
 import { EmptyState } from "../../components/ui/EmptyState"
 import { Skeleton } from "../../components/ui/Skeleton"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import type { Student } from "../../types"
 
 const statusVariant: Record<string, BadgeVariant> = {
@@ -33,7 +34,7 @@ export function StudentList() {
     setLoading(true)
     setError("")
     try {
-      const res = await studentsApi.list(school!.id)
+      const res = await withMinDelay(studentsApi.list(school!.id))
       setStudents(res.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load students")

@@ -1,7 +1,9 @@
 import { useState, useEffect, type FormEvent } from "react"
-import { MessageSquare, Send, Users, Loader2, AlertCircle, RefreshCw, X, Plus } from "lucide-react"
+import { MessageSquare, Send, Users, AlertCircle, RefreshCw, X, Plus, Loader2 } from "lucide-react"
 import { PageHeader } from "../../components/shell/PageHeader"
 import { Card, CardContent, CardHeader } from "../../components/ui/Card"
+import { Skeleton } from "../../components/ui/Skeleton"
+import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import { Badge } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
 import { EmptyState } from "../../components/ui/EmptyState"
@@ -40,7 +42,7 @@ export function CommunicationPage() {
     setLoading(true)
     setError("")
     try {
-      const res = await conversationsApi.list(schoolId)
+      const res = await withMinDelay(conversationsApi.list(schoolId))
       setConversations(res.data)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load conversations")
@@ -83,7 +85,7 @@ export function CommunicationPage() {
   const handleCreateConv = async (e: FormEvent) => {
     e.preventDefault()
     if (!convSubject && convType !== "direct") return
-    setSaving(true)
+    setSending(true)
     try {
       const res = await conversationsApi.create(schoolId, {
         type: convType,
@@ -97,7 +99,7 @@ export function CommunicationPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to create conversation")
     } finally {
-      setSaving(false)
+      setSending(false)
     }
   }
 
@@ -155,7 +157,7 @@ export function CommunicationPage() {
                   placeholder="Conversation subject..." className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm" />
               </div>
               <div className="flex gap-2 pb-1">
-                <Button size="sm" type="submit" disabled={saving}>{saving ? "Creating..." : "Create"}</Button>
+                <Button size="sm" type="submit" disabled={sending}>{sending ? "Creating..." : "Create"}</Button>
                 <Button size="sm" variant="secondary" type="button" onClick={() => setShowNewConv(false)}><X size={14} /></Button>
               </div>
             </form>
@@ -168,8 +170,16 @@ export function CommunicationPage() {
         <Card className="lg:col-span-1">
           <CardContent className="p-0">
             {loading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 size={20} className="animate-spin text-primary-400" />
+              <div className="p-4 space-y-4">
+                {Array.from({ length: 5 }).map((_, i) => (
+                  <div key={i} className="flex gap-3">
+                    <Skeleton className="h-8 w-8 rounded-full" />
+                    <div className="flex-1 space-y-2">
+                      <Skeleton className="h-4 w-3/4" />
+                      <Skeleton className="h-3 w-1/2" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : conversations.length === 0 ? (
               <div className="p-6 text-center">
