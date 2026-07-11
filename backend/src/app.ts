@@ -17,7 +17,7 @@ import {
 import { communicationRoute } from "@/modules/communication/router"
 import { attendanceRoute } from "@/modules/attendance/route"
 import { examRoute, assessmentRoute } from "@/modules/exams/route"
-import { financeRoute } from "@/modules/finance/route"
+import { financeRoute, mpesaWebhookRoute } from "@/modules/finance/route"
 import { dashboardRoute } from "@/modules/dashboard/route"
 import { reportsRoute } from "@/modules/reports/route"
 import { notificationsRoute } from "@/modules/notifications/route"
@@ -36,6 +36,7 @@ export const app = new Elysia()
   .get("/api/v1/ready", { status: "ok", uptime: process.uptime() }, {
     detail: { summary: "Readiness check", tags: ["System"] },
   })
+  .use(mpesaWebhookRoute)
   .use(authGuard)
   .use(rolesRoute)
   .use(schoolRoute)

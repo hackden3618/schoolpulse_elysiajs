@@ -34,7 +34,36 @@ export const reversePaymentSchema = t.Object({
   reason: t.String({ minLength: 1, maxLength: 500 }),
 })
 
+export const initiateMpesaPaymentSchema = t.Object({
+  invoiceId: uuidString(true),
+  phoneNumber: t.String({ minLength: 9, maxLength: 15 }),
+  amount: t.Number({ minimum: 1 }),
+})
+
+export const mpesaCallbackSchema = t.Object({
+  Body: t.Object({
+    stkCallback: t.Object({
+      MerchantRequestID: t.String(),
+      CheckoutRequestID: t.String(),
+      ResultCode: t.Number(),
+      ResultDesc: t.String(),
+      CallbackMetadata: t.Optional(
+        t.Object({
+          Item: t.Array(
+            t.Object({
+              Name: t.String(),
+              Value: t.Any(),
+            })
+          ),
+        })
+      ),
+    }),
+  }),
+})
+
 export type CreateFeeStructureInput = typeof createFeeStructureSchema.static
 export type GenerateInvoiceInput = typeof generateInvoiceSchema.static
 export type RecordPaymentInput = typeof recordPaymentSchema.static
 export type ReversePaymentInput = typeof reversePaymentSchema.static
+export type InitiateMpesaPaymentInput = typeof initiateMpesaPaymentSchema.static
+export type MpesaCallbackInput = typeof mpesaCallbackSchema.static

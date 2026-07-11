@@ -100,3 +100,14 @@ export async function findPaymentById(schoolId: string, paymentId: string) {
     include: paymentInclude,
   })
 }
+
+export async function findPendingPaymentByCheckoutRequestId(checkoutRequestId: string) {
+  return prisma.payment.findFirst({
+    where: {
+      transactionRef: checkoutRequestId,
+      status: "pending",
+      method: "mpesa_stk",
+    },
+    include: paymentInclude,
+  })
+}

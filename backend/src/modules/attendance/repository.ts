@@ -1,4 +1,5 @@
 import { prisma } from "@/infrastructure/database/prisma"
+import { AttendanceSessionType, AttendanceStatus } from "@root/generated/prisma-client/client"
 
 const sessionInclude = {
   classInstance: { include: { class: true } },
@@ -29,9 +30,9 @@ export async function findSessions(schoolId: string, query: { classInstanceId?: 
   })
 }
 
-export async function findDuplicateSession(schoolId: string, classInstanceId: string, sessionDate: Date, sessionType: string) {
+export async function findDuplicateSession(schoolId: string, classInstanceId: string, sessionDate: Date, sessionType: AttendanceSessionType) {
   return prisma.attendanceSession.findFirst({
-    where: { schoolId, classInstanceId, sessionDate, sessionType: sessionType as any, deletedAt: null },
+    where: { schoolId, classInstanceId, sessionDate, sessionType, deletedAt: null },
   })
 }
 
@@ -40,20 +41,20 @@ export async function createSession(data: {
   classInstanceId: string
   markerMembershipId: string
   sessionDate: Date
-  sessionType: string
+  sessionType: AttendanceSessionType
 }) {
   return prisma.attendanceSession.create({
     data: {
       ...data,
-      sessionType: data.sessionType as any,
+      sessionType: data.sessionType,
     },
     include: sessionInclude,
   })
 }
 
-export async function createRecordsBulk(sessionId: string, records: { schoolId: string; studentId: string; status: string }[]) {
+export async function createRecordsBulk(sessionId: string, records: { schoolId: string; studentId: string; status: AttendanceStatus }[]) {
   return prisma.attendanceRecord.createMany({
-    data: records.map((r) => ({ sessionId, schoolId: r.schoolId, studentId: r.studentId, status: r.status as any })),
+    data: records.map((r) => ({ sessionId, schoolId: r.schoolId, studentId: r.studentId, status: r.status })),
   })
 }
 
@@ -71,11 +72,11 @@ export async function findRecord(sessionId: string, recordId: string) {
   })
 }
 
-export async function updateRecord(recordId: string, data: { status: string; editReason?: string; editedByMembershipId?: string; editedAt?: Date }) {
+export async function updateRecord(recordId: string, data: { status: AttendanceStatus; editReason?: string; editedByMembershipId?: string; editedAt?: Date }) {
   return prisma.attendanceRecord.update({
     where: { id: recordId },
     data: {
-      status: data.status as any,
+      status: data.status,
       editReason: data.editReason,
       editedByMembershipId: data.editedByMembershipId,
       editedAt: data.editedAt ?? new Date(),

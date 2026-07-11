@@ -9,12 +9,25 @@ import {
   getInvoiceController,
   recordPaymentController,
   getPaymentsController,
+  initiateMpesaPaymentController,
+  mpesaCallbackController,
 } from "./controller"
 import {
   createFeeStructureSchema,
   generateInvoiceSchema,
   recordPaymentSchema,
+  initiateMpesaPaymentSchema,
+  mpesaCallbackSchema,
 } from "./schema"
+
+// Callback Route (Public, no schoolId prefix required by Safaricom, but we can put it anywhere if we extract schoolId, 
+// wait, the callback URL in Daraja doesn't easily support dynamic paths if we register a static one, but we pass CallBackURL dynamically per request!)
+export const mpesaWebhookRoute = new Elysia({ prefix: `/mpesa` })
+  .use(errorHandler)
+  .post("/callback", mpesaCallbackController, {
+    body: mpesaCallbackSchema,
+    detail: { summary: "M-Pesa Webhook Callback", tags: ["Finance", "Webhooks"] },
+  })
 
 export const financeRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/finance` })
   .use(errorHandler)
@@ -50,4 +63,9 @@ export const financeRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolI
     params: t.Object({ schoolId: t.String() }),
     query: t.Object({ studentId: t.Optional(t.String()) }),
     detail: { summary: "List payments", tags: ["Finance"] },
+  })
+  .post("/mpesa/stk-push", initiateMpesaPaymentController, {
+    params: t.Object({ schoolId: t.String() }),
+    body: initiateMpesaPaymentSchema,
+    detail: { summary: "Initiate M-Pesa STK Push", tags: ["Finance"] },
   })
