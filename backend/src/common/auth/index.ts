@@ -3,7 +3,7 @@ import { SALT_ROUNDS } from "@/shared/constants";
 import { AppError } from "@/common/errors";
 
 export async function hashPassword(password: string): Promise<string> {
-  return bcrypt.hash(password, SALT_ROUNDS);
+  return await bcrypt.hash(password, SALT_ROUNDS);
 }
 
 export async function verifyPassword(
