@@ -22,6 +22,9 @@ import type {
     JoinRequest,
     LoginResponse,
     Assessment,
+    SmsTemplate,
+    SmsSendResult,
+    SmsSegmentInfo,
 } from "../types"
 
 const API_BASE = "/api/v1"
@@ -522,6 +525,34 @@ export const conversationsApi = {
             request<ApiResponse<Message>>(`/schools/${schoolId}/conversations/${conversationId}/messages`, {
                 method: "POST",
                 body: JSON.stringify(data),
+            }),
+    },
+}
+
+export const smsApi = {
+    send: (schoolId: string, data: { recipients: string[]; message: string }) =>
+        request<ApiResponse<SmsSendResult>>(`/schools/${schoolId}/sms/send`, {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
+    segmentInfo: (schoolId: string, data: { message: string }) =>
+        request<ApiResponse<SmsSegmentInfo>>(`/schools/${schoolId}/sms/segment-info`, {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
+    balance: (schoolId: string) =>
+        request<ApiResponse<{ balance: string }>>(`/schools/${schoolId}/sms/balance`),
+    templates: {
+        list: (schoolId: string) =>
+            request<ApiResponse<SmsTemplate[]>>(`/schools/${schoolId}/sms/templates`),
+        create: (schoolId: string, data: { name: string; message: string }) =>
+            request<ApiResponse<SmsTemplate>>(`/schools/${schoolId}/sms/templates`, {
+                method: "POST",
+                body: JSON.stringify(data),
+            }),
+        delete: (schoolId: string, templateId: string) =>
+            request<ApiResponse<{ deleted: boolean }>>(`/schools/${schoolId}/sms/templates/${templateId}`, {
+                method: "DELETE",
             }),
     },
 }

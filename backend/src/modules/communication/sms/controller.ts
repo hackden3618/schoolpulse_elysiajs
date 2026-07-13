@@ -1,12 +1,33 @@
-import { sendSms, checkSmsBalance, handleDeliveryReceipt } from "./service";
+import {
+  sendSms,
+  listSmsTemplates,
+  createSmsTemplate,
+  deleteSmsTemplate,
+} from "./service";
 import { success } from "@/common/responses";
 import { calculateGsm7Segments } from "@/shared/utils";
 
-export async function sendSmsController({ body, set }: any) {
+export async function sendSmsController({ params: { schoolId }, body, set }: any) {
   const { recipients, message } = body;
   const result = await sendSms({ recipients, message });
   set.status = 201;
-  return success(result, body.schoolId);
+  return success(result, schoolId);
+}
+
+export async function getSmsTemplatesController({ params: { schoolId }, set }: any) {
+  const templates = await listSmsTemplates(schoolId);
+  return success(templates, schoolId);
+}
+
+export async function createSmsTemplateController({ params: { schoolId }, body, set }: any) {
+  const template = await createSmsTemplate(schoolId, body);
+  set.status = 201;
+  return success(template, schoolId);
+}
+
+export async function deleteSmsTemplateController({ params: { schoolId, templateId }, set }: any) {
+  await deleteSmsTemplate(schoolId, templateId);
+  return success({ deleted: true }, schoolId);
 }
 
 export async function deliveryReceiptController({ body, set }: any) {

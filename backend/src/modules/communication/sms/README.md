@@ -17,11 +17,14 @@ Handles SMS sending via TextSMS Kenya integration.
   - `TEXTSMS_SENDER_ID`
 
 ## Endpoints
-- `GET  /api/v1/sms`              – Service health check.
-- `POST /api/v1/sms/send`          – Send SMS (up to 20 recipients per call).
-- `POST /api/v1/sms/segment-info` – Calculate GSM-7 segments for a draft message.
-- `GET  /api/v1/sms/balance`       – Check TextSMS Kenya account balance.
-- `POST /api/v1/sms/delivery`      – Delivery receipt webhook.
+- `GET  /api/v1/schools/:schoolId/sms`              – Service health check.
+- `POST /api/v1/schools/:schoolId/sms/send`          – Send SMS (up to 20 recipients per call).
+- `POST /api/v1/schools/:schoolId/sms/segment-info` – Calculate GSM-7 segments for a draft message.
+- `GET  /api/v1/schools/:schoolId/sms/balance`       – Check TextSMS Kenya account balance.
+- `GET  /api/v1/schools/:schoolId/sms/templates`     – List SMS templates for a school.
+- `POST /api/v1/schools/:schoolId/sms/templates`    – Create an SMS template.
+- `DELETE /api/v1/schools/:schoolId/sms/templates/:templateId` – Delete an SMS template.
+- `POST /api/v1/schools/:schoolId/sms/delivery`      – Delivery receipt webhook.
 
 ## GSM-7 Segment Cost Table
 

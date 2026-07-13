@@ -1,5 +1,5 @@
 import { useState, useEffect, type FormEvent } from "react"
-import { MessageSquare, Send, Users, AlertCircle, RefreshCw, X, Plus, Loader2 } from "lucide-react"
+import { MessageSquare, Send, Users, AlertCircle, RefreshCw, X, Plus, Loader2, Trash2 } from "lucide-react"
 import { PageHeader } from "../../components/shell/PageHeader"
 import { Card, CardContent, CardHeader } from "../../components/ui/Card"
 import { Skeleton } from "../../components/ui/Skeleton"
@@ -7,9 +7,9 @@ import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
 import { Badge } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
 import { EmptyState } from "../../components/ui/EmptyState"
-import { conversationsApi } from "../../lib/api"
+import { conversationsApi, smsApi } from "../../lib/api"
 import { useAuth } from "../../lib/auth-context"
-import type { Conversation, Message } from "../../types"
+import type { Conversation, Message, SmsTemplate } from "../../types"
 
 function timeAgo(dateStr: string): string {
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -32,6 +32,16 @@ export function CommunicationPage() {
   const [error, setError] = useState("")
   const [sending, setSending] = useState(false)
   const [newMessage, setNewMessage] = useState("")
+  const [messageChannel, setMessageChannel] = useState<"in_app" | "sms">("in_app")
+
+  const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([])
+  const [smsTemplatesLoading, setSmsTemplatesLoading] = useState(true)
+  const [smsRecipients, setSmsRecipients] = useState("")
+  const [smsMessage, setSmsMessage] = useState("")
+  const [smsTemplateName, setSmsTemplateName] = useState("")
+  const [smsTemplateMessage, setSmsTemplateMessage] = useState("")
+  const [smsSending, setSmsSending] = useState(false)
+  const [smsError, setSmsError] = useState("")
 
   /* create conversation */
   const [showNewConv, setShowNewConv] = useState(false)
@@ -51,7 +61,20 @@ export function CommunicationPage() {
     }
   }
 
-  useEffect(() => { loadConversations() }, [schoolId])
+  const loadSmsTemplates = async () => {
+    setSmsTemplatesLoading(true)
+    setSmsError("")
+    try {
+      const res = await smsApi.templates.list(schoolId)
+      setSmsTemplates(res.data)
+    } catch (e) {
+      setSmsError(e instanceof Error ? e.message : "Failed to load SMS templates")
+    } finally {
+      setSmsTemplatesLoading(false)
+    }
+  }
+
+  useEffect(() => { loadConversations(); loadSmsTemplates() }, [schoolId])
 
   const selectConversation = async (conv: Conversation) => {
     setSelectedConv(conv)
@@ -70,7 +93,10 @@ export function CommunicationPage() {
     if (!newMessage.trim() || !selectedConv) return
     setSending(true)
     try {
-      await conversationsApi.messages.send(schoolId, selectedConv.id, { content: newMessage })
+      await conversationsApi.messages.send(schoolId, selectedConv.id, {
+        content: newMessage,
+        channel: messageChannel,
+      })
       setNewMessage("")
       const res = await conversationsApi.messages.list(schoolId, selectedConv.id)
       setMessages(res.data)
@@ -101,6 +127,61 @@ export function CommunicationPage() {
     } finally {
       setSending(false)
     }
+  }
+
+  const handleSendSms = async (e: FormEvent) => {
+    e.preventDefault()
+    const recipients = smsRecipients
+      .split(/[\s,;]+/)
+      .map((value) => value.trim())
+      .filter(Boolean)
+
+    if (!recipients.length || !smsMessage.trim()) return
+    setSmsSending(true)
+    setSmsError("")
+
+    try {
+      await smsApi.send(schoolId, { recipients, message: smsMessage })
+      setSmsRecipients("")
+      setSmsMessage("")
+      await loadSmsTemplates()
+    } catch (e) {
+      setSmsError(e instanceof Error ? e.message : "Failed to send SMS")
+    } finally {
+      setSmsSending(false)
+    }
+  }
+
+  const handleCreateSmsTemplate = async (e: FormEvent) => {
+    e.preventDefault()
+    if (!smsTemplateName.trim() || !smsTemplateMessage.trim()) return
+    setSmsError("")
+
+    try {
+      await smsApi.templates.create(schoolId, {
+        name: smsTemplateName,
+        message: smsTemplateMessage,
+      })
+      setSmsTemplateName("")
+      setSmsTemplateMessage("")
+      await loadSmsTemplates()
+    } catch (e) {
+      setSmsError(e instanceof Error ? e.message : "Failed to save SMS template")
+    }
+  }
+
+  const handleDeleteSmsTemplate = async (templateId: string) => {
+    setSmsError("")
+    try {
+      await smsApi.templates.delete(schoolId, templateId)
+      await loadSmsTemplates()
+    } catch (e) {
+      setSmsError(e instanceof Error ? e.message : "Failed to delete SMS template")
+    }
+  }
+
+  const applyTemplate = (template: SmsTemplate) => {
+    setSmsMessage(template.message)
   }
 
   const convName = (c: Conversation) => {
@@ -167,8 +248,9 @@ export function CommunicationPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Conversation List */}
-        <Card className="lg:col-span-1">
-          <CardContent className="p-0">
+        <div className="space-y-6 lg:col-span-1">
+          <Card>
+            <CardContent className="p-0">
             {loading ? (
               <div className="p-4 space-y-4">
                 {Array.from({ length: 5 }).map((_, i) => (
@@ -221,6 +303,106 @@ export function CommunicationPage() {
           </CardContent>
         </Card>
 
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-surface-900">SMS Templates</h3>
+                  <p className="text-xs text-surface-500">Save and reuse SMS drafts.</p>
+                </div>
+                <Button size="sm" variant="secondary" onClick={loadSmsTemplates}>
+                  <RefreshCw size={14} />
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="p-4 space-y-4">
+              {smsError && (
+                <div className="rounded-lg bg-danger-50 p-3 text-sm text-danger-700">{smsError}</div>
+              )}
+              <form onSubmit={handleSendSms} className="space-y-3">
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium text-surface-700">Recipients</label>
+                  <input
+                    value={smsRecipients}
+                    onChange={(e) => setSmsRecipients(e.target.value)}
+                    placeholder="+254700000000, +254700000001"
+                    className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="block text-xs font-medium text-surface-700">Message</label>
+                  <textarea
+                    value={smsMessage}
+                    onChange={(e) => setSmsMessage(e.target.value)}
+                    rows={4}
+                    className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm"
+                  />
+                </div>
+                <Button type="submit" disabled={smsSending || !smsRecipients.trim() || !smsMessage.trim()}>
+                  {smsSending ? "Sending..." : "Send SMS"}
+                </Button>
+              </form>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-sm font-semibold text-surface-900">Saved Templates</h4>
+                  <span className="text-xs text-surface-500">{smsTemplates.length} saved</span>
+                </div>
+                {smsTemplatesLoading ? (
+                  <div className="space-y-2">
+                    <Skeleton className="h-10" />
+                    <Skeleton className="h-10" />
+                  </div>
+                ) : smsTemplates.length === 0 ? (
+                  <p className="text-xs text-surface-500">No templates yet.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {smsTemplates.map((template) => (
+                      <div key={template.id} className="rounded-lg border border-surface-200 bg-surface-50 p-3">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <p className="text-sm font-semibold text-surface-900">{template.name}</p>
+                            <p className="text-xs text-surface-500 truncate">{template.message}</p>
+                          </div>
+                          <div className="flex gap-2">
+                            <Button size="sm" variant="secondary" type="button" onClick={() => applyTemplate(template)}>
+                              Use
+                            </Button>
+                            <Button size="sm" variant="ghost" type="button" onClick={() => handleDeleteSmsTemplate(template.id)}>
+                              <Trash2 size={14} />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <form onSubmit={handleCreateSmsTemplate} className="space-y-3 pt-3">
+                <div className="grid gap-3">
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium text-surface-700">Template name</label>
+                    <input
+                      value={smsTemplateName}
+                      onChange={(e) => setSmsTemplateName(e.target.value)}
+                      className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="block text-xs font-medium text-surface-700">Template message</label>
+                    <textarea
+                      value={smsTemplateMessage}
+                      onChange={(e) => setSmsTemplateMessage(e.target.value)}
+                      rows={3}
+                      className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+                <Button type="submit">Save template</Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
         {/* Message Area */}
         <Card className="lg:col-span-2 flex flex-col h-[600px]">
           {selectedConv ? (
@@ -266,17 +448,30 @@ export function CommunicationPage() {
                 )}
               </CardContent>
               <div className="p-4 border-t border-surface-100 shrink-0">
-                <form onSubmit={handleSend} className="flex gap-2">
-                  <input
-                    type="text"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    className="flex-1 rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
-                  />
-                  <Button type="submit" disabled={sending || !newMessage.trim()}>
-                    {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                  </Button>
+                <form onSubmit={handleSend} className="space-y-3">
+                  <div className="flex gap-2">
+                    <select
+                      value={messageChannel}
+                      onChange={(e) => setMessageChannel(e.target.value as any)}
+                      className="rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm"
+                    >
+                      <option value="in_app">In-App</option>
+                      <option value="sms">SMS</option>
+                    </select>
+                    <input
+                      type="text"
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type a message..."
+                      className="flex-1 rounded-lg border border-surface-200 bg-surface-50 px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                    />
+                    <Button type="submit" disabled={sending || !newMessage.trim()}>
+                      {sending ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    </Button>
+                  </div>
+                  {messageChannel === "sms" && (
+                    <p className="text-xs text-surface-500">Sending on SMS channel will dispatch an SMS to conversation participants with phone numbers.</p>
+                  )}
                 </form>
               </div>
             </>

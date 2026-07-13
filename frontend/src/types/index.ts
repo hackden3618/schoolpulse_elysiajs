@@ -392,6 +392,36 @@ export interface Message {
   }[]
 }
 
+export interface SmsRecipientResult {
+  mobile: string
+  success: boolean
+  messageId?: number
+  error?: string
+}
+
+export interface SmsSegmentInfo {
+  characterCount: number
+  segmentCount: number
+  perSegmentMax: number
+  remaining: number
+}
+
+export interface SmsSendResult {
+  totalRecipients: number
+  successful: number
+  failed: number
+  segmentInfo: SmsSegmentInfo
+  results: SmsRecipientResult[]
+}
+
+export interface SmsTemplate {
+  id: string
+  name: string
+  message: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Notification {
   id: string
   type: string

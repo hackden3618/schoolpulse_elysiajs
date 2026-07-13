@@ -6,28 +6,49 @@ import {
   deliveryReceiptController,
   checkBalanceController,
   segmentInfoController,
+  getSmsTemplatesController,
+  createSmsTemplateController,
+  deleteSmsTemplateController,
 } from "./controller";
-import { sendSmsSchema, segmentInfoSchema } from "./schema";
+import { sendSmsSchema, segmentInfoSchema, smsTemplateSchema } from "./schema";
 
-export const smsRoute = new Elysia({ prefix: `${API_PREFIX}` })
+export const smsRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/sms` })
   .use(errorHandler)
-  .get("/sms", () => ({ message: "SMS service is running", status: "ok" }), {
+  .get("/", () => ({ message: "SMS service is running", status: "ok" }), {
+    params: t.Object({ schoolId: t.String() }),
     detail: { summary: "SMS service status", tags: ["Communication"] },
   })
-  .post("/sms/send", sendSmsController, {
+  .post("/send", sendSmsController, {
+    params: t.Object({ schoolId: t.String() }),
     body: sendSmsSchema,
     detail: { summary: "Send SMS via TextSMS Kenya", tags: ["Communication"] },
   })
-  .post("/sms/segment-info", segmentInfoController, {
+  .post("/segment-info", segmentInfoController, {
+    params: t.Object({ schoolId: t.String() }),
     body: segmentInfoSchema,
     detail: {
       summary: "Calculate GSM-7 segments for a message",
       tags: ["Communication"],
     },
   })
-  .get("/sms/balance", checkBalanceController, {
+  .get("/balance", checkBalanceController, {
+    params: t.Object({ schoolId: t.String() }),
     detail: { summary: "Check TextSMS Kenya account balance", tags: ["Communication"] },
   })
-  .post("/sms/delivery", deliveryReceiptController, {
+  .get("/templates", getSmsTemplatesController, {
+    params: t.Object({ schoolId: t.String() }),
+    detail: { summary: "List SMS templates", tags: ["Communication"] },
+  })
+  .post("/templates", createSmsTemplateController, {
+    params: t.Object({ schoolId: t.String() }),
+    body: smsTemplateSchema,
+    detail: { summary: "Create an SMS template", tags: ["Communication"] },
+  })
+  .delete("/templates/:templateId", deleteSmsTemplateController, {
+    params: t.Object({ schoolId: t.String(), templateId: t.String() }),
+    detail: { summary: "Delete an SMS template", tags: ["Communication"] },
+  })
+  .post("/delivery", deliveryReceiptController, {
+    params: t.Object({ schoolId: t.String() }),
     detail: { summary: "Delivery receipt webhook", tags: ["Communication"] },
   });

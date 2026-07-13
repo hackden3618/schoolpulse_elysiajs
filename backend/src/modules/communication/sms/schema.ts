@@ -6,7 +6,11 @@ export const sendSmsSchema = t.Object({
     { minItems: 1, maxItems: 20 }
   ),
   message: t.String({ minLength: 1, maxLength: 1530 }),
-  schoolId: t.Optional(t.String({ format: "uuid" })),
+});
+
+export const smsTemplateSchema = t.Object({
+  name: t.String({ minLength: 3, maxLength: 100 }),
+  message: t.String({ minLength: 1, maxLength: 1530 }),
 });
 
 export const smsResponseSchema = t.Object({

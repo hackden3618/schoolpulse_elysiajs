@@ -8,6 +8,7 @@
   },
   "scripts": {
     "dev": "bun run --watch src/server.ts",
+    "test": "bun test",
     "seed": "bun run prisma/seed.ts"
   },
   "peerDependencies": {
