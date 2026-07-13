@@ -4,12 +4,12 @@ import { Logo } from "../../components/ui/Logo"
 import {
   ChevronLeft,
   ChevronDown,
-  School,
   ChevronRight,
   LogOut,
 } from "lucide-react"
 import { navigation } from "../../lib/constants"
 import { useAuth } from "../../lib/auth-context"
+import { SchoolSwitcher } from "./SchoolSwitcher"
 
 interface SidebarProps {
   collapsed: boolean
@@ -131,22 +131,15 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* School Selector */}
       <div className="px-3 py-3 border-t border-white/5">
-        <button
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-xs text-primary-400 hover:bg-white/5 hover:text-white transition-all ${
-            collapsed ? "justify-center" : ""
-          }`}
-        >
-          <School size={16} className="shrink-0 text-accent" />
-          {!collapsed && (
-            <div className="flex-1 text-left min-w-0">
-              <p className="font-semibold text-white truncate text-xs">
-                {school?.schoolName || "School"}
-              </p>
-              <p className="text-[10px] text-primary-500 font-semibold mt-0.5">&nbsp;</p>
+        {collapsed ? (
+          <div className="flex justify-center">
+            <div className="h-8 w-8 flex items-center justify-center rounded-lg bg-white/5">
+              <span className="text-accent font-bold text-xs">{school?.schoolName?.[0] || "?"}</span>
             </div>
-          )}
-          {!collapsed && <ChevronDown size={12} className="shrink-0 text-primary-500" />}
-        </button>
+          </div>
+        ) : (
+          <SchoolSwitcher />
+        )}
       </div>
 
       {/* User Summary Footer */}

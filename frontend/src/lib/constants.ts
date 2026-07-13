@@ -58,7 +58,7 @@ export const navigation: NavGroup[] = [
 ]
 
 export const quickActions = [
-  { label: "Admit Student", href: "/students/admit" },
+  { label: "Admit Student", href: "/students/create" },
   { label: "Record Payment", href: "/finance/payments" },
   { label: "Mark Attendance", href: "/attendance" },
   { label: "Create Invoice", href: "/finance/invoices" },

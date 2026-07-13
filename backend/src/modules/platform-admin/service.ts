@@ -171,6 +171,9 @@ export async function approveJoinRequest(id: string, processedBy: string) {
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
 
     const school = await prisma.$transaction(async (tx) => {
+      // NOTE: School code generation is duplicated inline (rather than
+      // calling schools/service.ts) because it must be inside this
+      // transaction to avoid race conditions on the sequential code.
       const existing = await tx.school.findMany({
         where: { schoolCode: { startsWith: prefix }, deletedAt: null },
         select: { schoolCode: true },
@@ -191,6 +194,9 @@ export async function approveJoinRequest(id: string, processedBy: string) {
         throw AppError.conflict("Generated school code collides with an existing school")
       }
 
+      // NOTE: School creation is duplicated inline (rather than calling
+      // schools/service.ts) because the centralized function uses the global
+      // prisma client and cannot participate in this transaction.
       const s = await tx.school.create({
         data: {
           schoolCode,
@@ -372,6 +378,9 @@ export async function setupAdmin(data: SetupAdminInput) {
   const hashedOtp = await hashPassword(otp)
 
   const { user, membership } = await prisma.$transaction(async (tx) => {
+    // NOTE: User & membership creation is duplicated inline (rather than
+    // calling users/service.ts) because the centralized functions use the
+    // global prisma client and cannot participate in this transaction.
     const existingPhone = await tx.user.findFirst({
       where: { phone: data.phone, deletedAt: null }
     })

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react"
-import { BarChart3, Users, GraduationCap, DollarSign, FileDown, RefreshCw, CalendarCheck } from "lucide-react"
+import { BarChart3, Users, GraduationCap, DollarSign, FileDown, RefreshCw, CalendarCheck, CheckCircle2 } from "lucide-react"
 import { reportsApi } from "../../lib/api"
 import { useAuth } from "../../lib/auth-context"
 import { PageHeader } from "../../components/shell/PageHeader"
@@ -23,6 +23,7 @@ export function ReportsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
   const [generating, setGenerating] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState("")
 
   const load = async () => {
     if (!school) return
@@ -52,7 +53,8 @@ export function ReportsPage() {
         ? reportsApi.academic(school.id)
         : reportsApi.students(school.id)
       await withMinDelay(promise as Promise<unknown>)
-      alert(`${type.charAt(0).toUpperCase() + type.slice(1)} report generated successfully`)
+      setSuccessMsg(`${type.charAt(0).toUpperCase() + type.slice(1)} report generated successfully`)
+      setTimeout(() => setSuccessMsg(""), 4000)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to generate report")
     } finally {
@@ -83,7 +85,7 @@ export function ReportsPage() {
         title="Reports"
         description="Generate and export operational reports."
         actions={
-          <Button variant="secondary" disabled>
+          <Button variant="secondary" onClick={() => handleGenerate(summary.map(s => s.type).join(","))}>
             <FileDown size={16} />
             Export All
           </Button>
@@ -94,6 +96,13 @@ export function ReportsPage() {
         <div className="flex items-center gap-2 rounded-lg bg-danger-50 border border-danger-100 px-4 py-3 text-sm text-danger-700">
           <BarChart3 size={16} className="shrink-0" />
           <span>{error}</span>
+        </div>
+      )}
+
+      {successMsg && (
+        <div className="flex items-center gap-2 rounded-lg bg-success-50 border border-success-100 px-4 py-3 text-sm text-success-700">
+          <CheckCircle2 size={16} className="shrink-0" />
+          <span>{successMsg}</span>
         </div>
       )}
 

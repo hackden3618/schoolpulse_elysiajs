@@ -6,6 +6,7 @@ const EXPIRES_IN = process.env.JWT_EXPIRES_IN || "7d"
 export interface JwtPayload {
   sub: string
   schoolId: string
+  membershipId?: string | null
   roles: string[]
   joinRequestId?: string
 }

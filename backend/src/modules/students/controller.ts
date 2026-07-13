@@ -54,3 +54,8 @@ export async function addGuardianByDetailsController({ params: { schoolId, stude
   set.status = 201;
   return success(guardian, schoolId);
 }
+
+export async function getMyStudentsController({ params: { schoolId }, authUser }: any) {
+  const students = await svc.listMyStudents(schoolId, authUser.userId);
+  return success(students, schoolId);
+}

@@ -7,6 +7,7 @@ import {
   getConversationController,
   getMessagesController,
   sendMessageController,
+  markMessageReadController,
 } from "./controller"
 import { createConversationSchema, sendMessageSchema } from "./schema"
 
@@ -33,4 +34,8 @@ export const notificationsRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:s
     params: t.Object({ schoolId: t.String(), conversationId: t.String() }),
     body: sendMessageSchema,
     detail: { summary: "Send message in conversation", tags: ["Notifications"] },
+  })
+  .post("/messages/:messageId/read", markMessageReadController, {
+    params: t.Object({ schoolId: t.String(), messageId: t.String() }),
+    detail: { summary: "Mark message as read", tags: ["Notifications"] },
   })

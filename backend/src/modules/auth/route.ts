@@ -12,6 +12,8 @@ import {
   createJoinRequestController,
   listJoinRequestsController,
   approveJoinRequestController,
+  listMembershipsController,
+  switchSchoolController,
 } from "./controller"
 import {
   loginSchema,
@@ -21,6 +23,7 @@ import {
   changePasswordSchema,
   refreshSchema,
   createJoinRequestSchema,
+  switchSchoolSchema,
 } from "./schema"
 
 export const authRoute = new Elysia({ prefix: `${API_PREFIX}/auth` })
@@ -53,6 +56,13 @@ export const authRoute = new Elysia({ prefix: `${API_PREFIX}/auth` })
     body: changePasswordSchema,
     detail: { summary: "Change password for logged-in user", tags: ["Auth"] },
   })
+  .get("/memberships", listMembershipsController, {
+    detail: { summary: "List all memberships for the current user", tags: ["Auth"] },
+  })
+  .post("/switch-school", switchSchoolController, {
+    body: switchSchoolSchema,
+    detail: { summary: "Switch active school without re-login", tags: ["Auth"] },
+  })
 
 export const joinRequestRoute = new Elysia({ prefix: `${API_PREFIX}/join-requests` })
   .use(errorHandler)
@@ -60,6 +70,9 @@ export const joinRequestRoute = new Elysia({ prefix: `${API_PREFIX}/join-request
     body: createJoinRequestSchema,
     detail: { summary: "Submit school join request", tags: ["Onboarding"] },
   })
+export const joinRequestListRoute = new Elysia({ prefix: `${API_PREFIX}/join-requests` })
+  .use(errorHandler)
+  .use(authGuard)
   .get("/", listJoinRequestsController, {
     detail: { summary: "List join requests (admin)", tags: ["Onboarding"] },
   })

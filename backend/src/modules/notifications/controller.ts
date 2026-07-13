@@ -27,3 +27,8 @@ export async function sendMessageController({ params: { schoolId, conversationId
   const result = await svc.sendMessage(schoolId, conversationId, authUser, body)
   return success(result, schoolId)
 }
+
+export async function markMessageReadController({ params: { schoolId, messageId }, authUser, set }: any) {
+  const result = await svc.markMessageRead(schoolId, messageId, authUser.userId)
+  return success(result, schoolId)
+}

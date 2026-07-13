@@ -1,11 +1,12 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react"
 import { authApi, setAccessToken, getAccessToken } from "./api"
-import type { AuthState, User, Membership, School } from "../types"
+import type { AuthState, User, Membership, School, Role } from "../types"
 
 interface AuthContextType extends AuthState {
   login: (login: string, password: string) => Promise<void>
   logout: () => Promise<void>
   refreshAuth: () => Promise<void>
+  switchSchool: (membershipId: string) => Promise<void>
   switchRole: (role: Role) => void
 }
 
@@ -19,6 +20,8 @@ interface StoredAuth {
   user: User
   membership: Membership
   school: School
+  allMemberships?: Membership[]
+  allSchools?: School[]
 }
 
 function loadStoredAuth(): StoredAuth | null {
@@ -49,19 +52,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: true,
     activeRole: null,
     roles: [],
+    allMemberships: [],
+    allSchools: [],
   })
 
   const applyAuth = useCallback((stored: StoredAuth) => {
     setAccessToken(stored.accessToken)
     const roles = stored.membership?.roles?.map((r: any) => r.role || r) || []
-    
-    // Check if there is a saved activeRole in localStorage
-    const savedRoleId = localStorage.getItem("schoolpulse:activeRole")
-    const activeRole = roles.find((r: any) => r.id === savedRoleId) || roles[0] || null
+    const allMemberships = stored.allMemberships || [stored.membership]
+    const allSchools = stored.allSchools || [stored.school]
 
-    if (activeRole) {
-      localStorage.setItem("schoolpulse:activeRole", activeRole.id)
-    }
+    const savedRoleId = localStorage.getItem("schoolpulse:activeRole")
+    const activeRole = savedRoleId
+      ? roles.find((r: any) => r.id === savedRoleId) || roles[0] || null
+      : roles.length > 0 ? roles[0] : null
 
     setState({
       user: stored.user,
@@ -72,13 +76,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: false,
       activeRole,
       roles,
+      allMemberships,
+      allSchools,
     })
   }, [])
 
   const clearAuth = useCallback(() => {
     setAccessToken(null)
     clearStoredAuth()
-    localStorage.removeItem("schoolpulse:activeRole")
     setState({
       user: null,
       membership: null,
@@ -88,6 +93,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: false,
       activeRole: null,
       roles: [],
+      allMemberships: [],
+      allSchools: [],
     })
   }, [])
 
@@ -119,9 +126,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (loginStr: string, password: string) => {
     const res = await authApi.login({ login: loginStr, password })
-    const { accessToken, refreshToken, user, membership, school } = res.data
+    const { accessToken, refreshToken, user, membership, school, memberships, schools } = res.data
 
-    const stored: StoredAuth = { accessToken, refreshToken, user, membership, school }
+    const stored: StoredAuth = {
+      accessToken, refreshToken, user, membership, school,
+      allMemberships: memberships || [membership],
+      allSchools: schools || [school],
+    }
     storeAuth(stored)
     applyAuth(stored)
   }, [applyAuth])
@@ -155,13 +166,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [applyAuth, clearAuth])
 
+  const switchSchool = useCallback(async (membershipId: string) => {
+    const res = await authApi.switchSchool({ membershipId })
+    const { accessToken, refreshToken, membership, school } = res.data
+    const stored = loadStoredAuth()
+    if (!stored) return
+    const newStored: StoredAuth = {
+      ...stored,
+      accessToken,
+      refreshToken,
+      membership,
+      school,
+    }
+    storeAuth(newStored)
+    applyAuth(newStored)
+  }, [applyAuth])
+
   const switchRole = useCallback((role: Role) => {
     localStorage.setItem("schoolpulse:activeRole", role.id)
     setState((s) => ({ ...s, activeRole: role }))
   }, [])
 
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, refreshAuth, switchRole }}>
+    <AuthContext.Provider value={{ ...state, login, logout, refreshAuth, switchSchool, switchRole }}>
       {children}
     </AuthContext.Provider>
   )

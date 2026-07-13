@@ -12,6 +12,7 @@ import {
   enrollStudentController,
   updateEnrollmentController,
   addGuardianByDetailsController,
+  getMyStudentsController,
 } from "./controller";
 import {
   createStudentSchema,
@@ -75,4 +76,8 @@ export const studentRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolI
     params: t.Object({ schoolId: t.String(), studentId: t.String() }),
     body: addGuardianByDetailsSchema,
     detail: { summary: "Add guardian by contact details (creates user if needed)", tags: ["Students"] },
+  })
+  .get("/my", getMyStudentsController, {
+    params: t.Object({ schoolId: t.String() }),
+    detail: { summary: "Get my students (guardian view)", tags: ["Students"] },
   });

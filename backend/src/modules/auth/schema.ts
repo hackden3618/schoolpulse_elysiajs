@@ -4,6 +4,12 @@ import { phoneString, emailString, nameString } from "@/common/validation"
 export const loginSchema = t.Object({
   login: t.String({ minLength: 1 }),
   password: t.String({ minLength: 1 }),
+  membershipId: t.Optional(t.String({ format: "uuid" })),
+})
+
+export const switchSchoolSchema = t.Object({
+  membershipId: t.Optional(t.String({ format: "uuid" })),
+  schoolId: t.Optional(t.String({ format: "uuid" })),
 })
 
 export const registerSchema = t.Object({
@@ -56,3 +62,4 @@ export type ChangePasswordInput = typeof changePasswordSchema.static
 export type RefreshInput = typeof refreshSchema.static
 export type CreateJoinRequestInput = typeof createJoinRequestSchema.static
 export type ApproveJoinRequestInput = typeof approveJoinRequestSchema.static
+export type SwitchSchoolInput = typeof switchSchoolSchema.static

@@ -1,7 +1,9 @@
 import { AppError } from "@/common/errors"
 import { prisma } from "@/infrastructure/database/prisma"
 import { writeEventOutbox } from "@/infrastructure/events"
+import { wsManager } from "@/infrastructure/websocket"
 import { sendSms } from "@/modules/communication/sms/service"
+import { normalizePhone } from "@/common/validation"
 import { cleanPhone } from "@/shared/utils"
 import * as repo from "./repository"
 import type { CreateConversationInput, SendMessageInput } from "./schema"
@@ -10,8 +12,8 @@ export async function listConversations(schoolId: string, authUser: { userId?: s
   return repo.findConversations(schoolId, authUser.userId)
 }
 
-export async function createConversation(schoolId: string, authUser: { membershipId?: string }, data: CreateConversationInput) {
-  const result = await prisma.$transaction(async (tx: any) => {
+export async function createConversation(schoolId: string, authUser: { userId?: string | null }, data: CreateConversationInput) {
+  const convId = await prisma.$transaction(async (tx: any) => {
     const conv = await tx.conversation.create({
       data: {
         schoolId,
@@ -20,7 +22,10 @@ export async function createConversation(schoolId: string, authUser: { membershi
       },
     })
 
-    const participants = [{ schoolId, conversationId: conv.id, userId: authUser.membershipId ?? "", participantType: "member" }]
+    const participants: { schoolId: string; conversationId: string; userId: string; participantType: string }[] = []
+    if (authUser.userId) {
+      participants.push({ schoolId, conversationId: conv.id, userId: authUser.userId, participantType: "member" })
+    }
     if (data.participantIds) {
       for (const userId of data.participantIds) {
         participants.push({ schoolId, conversationId: conv.id, userId, participantType: "member" })
@@ -28,8 +33,10 @@ export async function createConversation(schoolId: string, authUser: { membershi
     }
     await tx.conversationParticipant.createMany({ data: participants })
 
-    return repo.findConversationById(schoolId, conv.id)
+    return conv.id
   })
+
+  const result = await repo.findConversationById(schoolId, convId)
 
   await writeEventOutbox({
     schoolId,
@@ -38,6 +45,8 @@ export async function createConversation(schoolId: string, authUser: { membershi
     eventType: "ConversationCreated",
     payload: { type: data.type },
   })
+
+  wsManager.broadcastToSchool(schoolId, "conversation:created", result)
 
   return result
 }
@@ -55,13 +64,11 @@ export async function listMessages(schoolId: string, conversationId: string) {
 }
 
 function normalizeMobileForSms(mobile: string) {
-  let normalized = cleanPhone(mobile)
-  if (normalized.startsWith("+")) normalized = normalized.slice(1)
-  if (normalized.startsWith("0")) normalized = `254${normalized.slice(1)}`
-  return normalized
+  const normalized = normalizePhone(cleanPhone(mobile))
+  return normalized.replace(/^\+/, "")
 }
 
-export async function sendMessage(schoolId: string, conversationId: string, authUser: { membershipId?: string }, data: SendMessageInput) {
+export async function sendMessage(schoolId: string, conversationId: string, authUser: { membershipId?: string; userId?: string }, data: SendMessageInput) {
   const conv = await repo.findConversationById(schoolId, conversationId)
   if (!conv) throw AppError.notFound("Conversation not found")
 
@@ -85,7 +92,9 @@ export async function sendMessage(schoolId: string, conversationId: string, auth
     for (const participant of conv.participants) {
       const phone = participant.user?.phone ?? participant.membership?.user?.phone
       if (!phone) continue
-      userByPhone.set(normalizeMobileForSms(phone), participant.user?.id ?? participant.membership?.user?.id)
+      const userId = participant.user?.id ?? participant.membership?.user?.id
+      if (!userId) continue
+      userByPhone.set(normalizeMobileForSms(phone), userId)
     }
 
     receipts = smsResult.results.map((result) => ({
@@ -117,5 +126,39 @@ export async function sendMessage(schoolId: string, conversationId: string, auth
     payload: { conversationId, channel: data.channel ?? "in_app" },
   })
 
+  wsManager.broadcastToConversation(conversationId, "message:new", message)
+
   return message
+}
+
+export async function markMessageRead(schoolId: string, messageId: string, userId: string) {
+  const existing = await prisma.messageReceipt.findFirst({
+    where: { messageId, schoolId, recipientUserId: userId },
+  })
+
+  if (existing) {
+    if (existing.status !== "read") {
+      await prisma.messageReceipt.update({
+        where: { id: existing.id },
+        data: { status: "read" },
+      })
+    }
+  } else {
+    await prisma.messageReceipt.create({
+      data: {
+        schoolId,
+        messageId,
+        recipientUserId: userId,
+        status: "read",
+        channel: "in_app",
+      },
+    })
+  }
+
+  const message = await repo.findMessageById(schoolId, messageId)
+  if (message) {
+    wsManager.broadcastToConversation(message.conversationId!, "receipt:updated", message)
+  }
+
+  return { success: true }
 }

@@ -136,6 +136,7 @@ export interface Student {
 
 export interface Guardian {
   id: string
+  guardianId?: string
   relationship: Relationship
   isPrimary: boolean
   canPay: boolean
@@ -288,7 +289,7 @@ export interface FeeStructure {
   termId: string
   classId: string | null
   isGlobal: boolean
-  isLatest: boolean
+  isLatest?: boolean
   createdAt: string
   updatedAt: string
   academicYear: AcademicYear
@@ -319,6 +320,7 @@ export interface Invoice {
   totalAmount: number
   paidAmount: number
   balance: number
+  outstanding?: number
   status: "draft" | "issued" | "partially_paid" | "paid" | "overdue" | "cancelled" | "written_off"
   isCurrent: boolean
   dueDate: string
@@ -454,6 +456,8 @@ export interface LoginResponse {
   user: User
   membership: Membership
   school: School
+  memberships?: Membership[]
+  schools?: School[]
 }
 
 export interface DashboardSummary {
@@ -488,6 +492,8 @@ export interface AuthState {
   isLoading: boolean
   activeRole: Role | null
   roles: Role[]
+  allMemberships: Membership[]
+  allSchools: School[]
 }
 
 export interface ReportSummaryItem {

@@ -43,6 +43,19 @@ export async function findAllStudents(schoolId: string) {
   });
 }
 
+export async function findStudentsByGuardian(schoolId: string, userId: string) {
+  return prisma.student.findMany({
+    where: {
+      schoolId,
+      deletedAt: null,
+      status: { not: "archived" },
+      guardians: { some: { guardianId: userId, deletedAt: null } },
+    },
+    include: studentInclude,
+    orderBy: { createdAt: "desc" },
+  });
+}
+
 export async function findStudentById(schoolId: string, id: string) {
   return prisma.student.findFirst({
     where: { id, schoolId, deletedAt: null },

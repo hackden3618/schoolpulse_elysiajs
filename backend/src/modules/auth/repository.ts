@@ -53,6 +53,24 @@ export async function findMembershipById(id: string) {
   })
 }
 
+export async function findMembershipsByUserId(userId: string) {
+  return prisma.schoolMembership.findMany({
+    where: { userId, deletedAt: null, status: "active" },
+    include: {
+      ...membershipInclude,
+      school: {
+        select: {
+          id: true, schoolName: true, schoolCode: true, schoolPhone: true,
+          schoolEmail: true, schoolLogo: true, county: true, town: true,
+          country: true, schoolLevel: true, schoolTier: true,
+          subscriptionPlan: true, subscriptionStatus: true, currency: true,
+          timezone: true, settings: true,
+        },
+      },
+    },
+  })
+}
+
 export async function findMembershipBySchoolAndUser(schoolId: string, userId: string) {
   return prisma.schoolMembership.findFirst({
     where: { schoolId, userId, deletedAt: null, status: "active" },

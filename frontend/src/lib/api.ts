@@ -47,11 +47,15 @@ function getAuthHeaders(): Record<string, string> {
     return headers
 }
 
-async function request<T>(path: string, options?: RequestInit): Promise<T> {
+async function apiFetch<T>(
+    path: string,
+    getHeaders: () => Record<string, string>,
+    options?: RequestInit,
+): Promise<T> {
     const url = `${API_BASE}${path}`
     const res = await fetch(url, {
         ...options,
-        headers: { ...getAuthHeaders(), ...options?.headers },
+        headers: { ...getHeaders(), ...options?.headers },
     })
 
     if (!res.ok) {
@@ -67,12 +71,16 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
     return res.json() as Promise<T>
 }
 
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+    return apiFetch(path, getAuthHeaders, options)
+}
+
 /* =========================================================================
  * AUTHENTICATION
  * ========================================================================= */
 
 export const authApi = {
-    login: (data: { login: string; password: string }) =>
+    login: (data: { login: string; password: string; membershipId?: string }) =>
         request<ApiResponse<LoginResponse>>("/auth/login", {
             method: "POST",
             body: JSON.stringify(data),
@@ -96,6 +104,13 @@ export const authApi = {
         }),
     changePassword: (data: { currentPassword: string; newPassword: string }) =>
         request<ApiResponse<void>>("/auth/change-password", {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
+    listMemberships: () =>
+        request<ApiResponse<{ memberships: Membership[]; schools: School[] }>>("/auth/memberships"),
+    switchSchool: (data: { membershipId?: string; schoolId?: string }) =>
+        request<ApiResponse<{ accessToken: string; refreshToken: string; membership: Membership; school: School }>>("/auth/switch-school", {
             method: "POST",
             body: JSON.stringify(data),
         }),
@@ -213,7 +228,7 @@ export const membershipsApi = {
 }
 
 /* =========================================================================
- * ROLES (not yet in backend)
+ * ROLES
  * ========================================================================= */
 
 export const rolesApi = {
@@ -228,6 +243,8 @@ export const rolesApi = {
 export const studentsApi = {
     list: (schoolId: string) =>
         request<ApiResponse<Student[]>>(`/schools/${schoolId}/students`),
+    my: (schoolId: string) =>
+        request<ApiResponse<Student[]>>(`/schools/${schoolId}/students/my`),
     get: (schoolId: string, studentId: string) =>
         request<ApiResponse<Student>>(`/schools/${schoolId}/students/${studentId}`),
     create: (schoolId: string, data: {
@@ -616,19 +633,7 @@ function getPlatformHeaders(): Record<string, string> {
 }
 
 async function platformRequest<T>(path: string, options?: RequestInit): Promise<T> {
-    const url = `${API_BASE}${path}`
-    const res = await fetch(url, {
-        ...options,
-        headers: { ...getPlatformHeaders(), ...options?.headers },
-    })
-
-    if (!res.ok) {
-        const body = await res.json().catch(() => ({}))
-        const message = body?.error?.message || `API error: ${res.status}`
-        throw new Error(message)
-    }
-
-    return res.json() as Promise<T>
+    return apiFetch(path, getPlatformHeaders, options)
 }
 
 export const platformAdminApi = {

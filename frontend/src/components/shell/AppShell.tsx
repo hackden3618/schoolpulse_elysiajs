@@ -63,7 +63,7 @@ export function AppShell({ children }: AppShellProps) {
           }
         }} />
         
-        <main className="flex-1 overflow-y-auto px-4 py-6 sm:px-8 md:px-10">
+        <main className="flex-1 overflow-y-auto px-4 pt-6 pb-24 sm:px-8 md:px-10 lg:py-6">
           <div className="mx-auto max-w-[1600px]">
             {children}
           </div>
@@ -71,13 +71,13 @@ export function AppShell({ children }: AppShellProps) {
 
         {/* Mobile Bottom Navigation */}
         {isMobile && (
-          <div className="fixed bottom-0 left-0 right-0 z-50 h-16 bg-white border-t border-primary-100 px-4 flex items-center justify-around shadow-lg">
-            {navigation[0]?.items.map((item) => {
+          <div className="fixed bottom-0 left-0 right-0 z-50 h-16 bg-white border-t border-primary-100 px-4 flex items-center justify-around shadow-lg overflow-x-auto">
+            {navigation.flatMap((group) => group.items).slice(0, 5).map((item) => {
               const Icon = item.icon
               return (
                 <button 
                   key={item.href} 
-                  className="flex flex-col items-center justify-center gap-1 text-primary-400 hover:text-accent transition-colors"
+                  className="flex shrink-0 flex-col items-center justify-center gap-1 text-primary-400 hover:text-accent transition-colors"
                   onClick={() => navigate(item.href)}
                 >
                   {Icon && <Icon size={20} />}
@@ -86,7 +86,7 @@ export function AppShell({ children }: AppShellProps) {
               )
             })}
             <button 
-              className="flex flex-col items-center justify-center gap-1 text-primary-400 hover:text-accent transition-colors"
+              className="flex shrink-0 flex-col items-center justify-center gap-1 text-primary-400 hover:text-accent transition-colors"
               onClick={() => navigate("/settings")}
             >
               <Settings size={20} />

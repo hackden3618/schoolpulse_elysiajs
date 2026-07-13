@@ -3,13 +3,15 @@ import {
   listSmsTemplates,
   createSmsTemplate,
   deleteSmsTemplate,
+  handleDeliveryReceipt,
+  checkSmsBalance,
 } from "./service";
 import { success } from "@/common/responses";
 import { calculateGsm7Segments } from "@/shared/utils";
 
 export async function sendSmsController({ params: { schoolId }, body, set }: any) {
   const { recipients, message } = body;
-  const result = await sendSms({ recipients, message });
+  const result = await sendSms({ recipients, message, schoolId });
   set.status = 201;
   return success(result, schoolId);
 }

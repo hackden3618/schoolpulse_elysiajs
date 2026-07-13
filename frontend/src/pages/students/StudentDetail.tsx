@@ -491,7 +491,7 @@ export function StudentDetail() {
                         </div>
                         <button
                           onClick={() => setUnlinkingGuardian({
-                            guardianId: g.guardianId,
+                            guardianId: g.guardianId ?? g.id,
                             name: `${g.guardian?.firstName || ""} ${g.guardian?.lastName || ""}`.trim()
                           })}
                           className="p-1.5 text-surface-400 hover:text-danger-500 hover:bg-danger-50 rounded transition-colors opacity-0 group-hover:opacity-100"

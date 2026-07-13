@@ -15,8 +15,10 @@ import { useAuth } from "../../lib/auth-context"
 export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, school, logout } = useAuth()
+  const { user, school, allSchools, activeRole, logout } = useAuth()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState("")
+  const searchRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -28,6 +30,29 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
   }, [])
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault()
+        searchRef.current?.focus()
+      }
+    }
+    document.addEventListener("keydown", handler)
+    return () => document.removeEventListener("keydown", handler)
+  }, [])
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!searchQuery.trim()) return
+    const q = searchQuery.trim().toLowerCase()
+    if (/^\d+$/.test(q)) {
+      navigate(`/students?admission=${q}`)
+    } else {
+      navigate(`/students?search=${encodeURIComponent(q)}`)
+    }
+    setSearchQuery("")
+  }
 
   const breadcrumbs = location.pathname
     .split("/")
@@ -52,6 +77,11 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
 
       <nav className="hidden sm:flex items-center gap-2 text-xs font-semibold min-w-0">
         <span className="text-primary-400 truncate">{school?.schoolName || "School"}</span>
+        {allSchools.length > 1 && school && (
+          <span className="text-[10px] text-accent font-medium ml-0.5 px-1.5 py-0.5 rounded bg-accent/10">
+            {allSchools.indexOf(school) + 1}/{allSchools.length}
+          </span>
+        )}
         {breadcrumbs.length > 0 && <span className="text-primary-300 text-xs shrink-0">/</span>}
         {breadcrumbs.map((crumb, i) => (
           <span key={crumb.href} className="flex items-center gap-2 min-w-0">
@@ -69,27 +99,36 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
 
       <div className="flex-1" />
 
-      <div className="relative hidden md:block w-[380px]">
+      <form onSubmit={handleSearch} className="relative hidden md:block w-[380px]">
         <Search
           size={14}
-          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-400"
+          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-primary-400 pointer-events-none"
         />
         <input
+          ref={searchRef}
           type="text"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search students, admissions, classes, staff..."
           className="w-full rounded-full border border-primary-200 bg-primary-50/50 pl-10 pr-12 py-2 text-xs text-primary-900 placeholder-primary-400 focus:border-accent focus:bg-white focus:outline-none focus:ring-1 focus:ring-accent transition-all"
         />
         <kbd className="absolute right-3.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5 rounded border border-primary-200 bg-white px-1.5 py-0.5 text-[9px] font-bold text-primary-400 uppercase">
           ⌘K
         </kbd>
-      </div>
+      </form>
 
       <div className="flex items-center gap-5">
-        <button className="relative rounded-full p-2 text-primary-500 hover:bg-primary-50 hover:text-primary-800 transition-all">
+        <button
+          onClick={() => navigate("/communication")}
+          className="relative rounded-full p-2 text-primary-500 hover:bg-primary-50 hover:text-primary-800 transition-all"
+        >
           <Bell size={18} />
         </button>
 
-        <button className="relative rounded-full p-2 text-primary-500 hover:bg-primary-50 hover:text-primary-800 transition-all">
+        <button
+          onClick={() => navigate("/communication")}
+          className="relative rounded-full p-2 text-primary-500 hover:bg-primary-50 hover:text-primary-800 transition-all"
+        >
           <Mail size={18} />
         </button>
 
@@ -108,8 +147,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
                 {user ? `${user.firstName} ${user.lastName || ""}` : ""}
               </p>
               <p className="text-[10px] text-primary-400 font-semibold uppercase mt-0.5">
-                {/* Show first role if available */}
-                {user?.status || ""}
+                {activeRole?.name === "guardian" ? "Parent / Guardian" : (activeRole?.name || "")}
               </p>
             </div>
             <ChevronDown size={12} className="text-primary-400" />

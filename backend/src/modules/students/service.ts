@@ -18,6 +18,10 @@ export async function listAllStudents(schoolId: string) {
   return repo.findAllStudents(schoolId);
 }
 
+export async function listMyStudents(schoolId: string, userId: string) {
+  return repo.findStudentsByGuardian(schoolId, userId);
+}
+
 export async function getStudentById(schoolId: string, studentId: string) {
   const student = await repo.findStudentById(schoolId, studentId);
   if (!student) throw AppError.notFound("Student not found");

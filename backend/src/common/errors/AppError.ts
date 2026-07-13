@@ -39,6 +39,10 @@ export class AppError extends Error {
     return new AppError(ERROR_CODES.CONFLICT, message, 409, details);
   }
 
+  static badRequest(message: string, details?: ErrorDetail[]): AppError {
+    return new AppError(ERROR_CODES.VALIDATION_ERROR, message, 400, details);
+  }
+
   static internal(message: string = "An unexpected error occurred"): AppError {
     return new AppError(ERROR_CODES.INTERNAL_ERROR, message, 500);
   }

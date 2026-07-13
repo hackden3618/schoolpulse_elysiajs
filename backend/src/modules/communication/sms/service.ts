@@ -1,13 +1,15 @@
 import crypto from "crypto";
 import { AppError } from "@/common/errors";
+import { normalizePhone } from "@/common/validation";
 import { sendBulkSms, checkBalance as checkBalanceProvider } from "@/infrastructure/messaging/sms/sms.provider";
-import { calculateGsm7Segments } from "@/shared/utils";
+import { calculateGsm7Segments, cleanPhone } from "@/shared/utils";
 import type { Gsm7SegmentInfo } from "@/shared/utils";
 import * as schoolRepo from "@/modules/schools/repository";
 
 export interface SmsOptions {
   recipients: string[];
   message: string;
+  schoolId?: string;
 }
 
 export interface RecipientResult {
@@ -62,7 +64,7 @@ export function getSmsSettings(settings: unknown): { templates: SmsTemplate[] } 
   };
 }
 
-export function buildSettings(settings: unknown, templates: SmsTemplate[]) {
+export function buildSettings(settings: unknown, templates: SmsTemplate[]): Record<string, unknown> & { sms: Record<string, unknown> & { templates: SmsTemplate[] } } {
   const baseSettings = typeof settings === "object" && settings !== null && !Array.isArray(settings)
     ? { ...(settings as Record<string, unknown>) }
     : {};
@@ -102,7 +104,7 @@ export async function createSmsTemplate(schoolId: string, data: { name: string; 
   };
 
   await schoolRepo.updateSchool(schoolId, {
-    settings: buildSettings(school.settings, [...templates, template]) as any,
+    settings: buildSettings(school.settings as unknown, [...templates, template]) as any,
   });
 
   return template;
@@ -118,18 +120,17 @@ export async function deleteSmsTemplate(schoolId: string, templateId: string): P
   }
 
   await schoolRepo.updateSchool(schoolId, {
-    settings: buildSettings(school.settings, remaining) as any,
+    settings: buildSettings(school.settings as unknown, remaining) as any,
   });
 }
 
 export async function sendSms(options: SmsOptions): Promise<SmsSendResult> {
   const segmentInfo = calculateGsm7Segments(options.message);
 
-  const payload = options.recipients.map((mobile) => {
-    let normalized = mobile.replace(/^\+/, "");
-    normalized = normalized.startsWith("0") ? `254${normalized.slice(1)}` : normalized;
-    return { mobile: normalized, message: options.message };
-  });
+  const payload = options.recipients.map((mobile) => ({
+    mobile: normalizePhone(cleanPhone(mobile)).replace(/^\+/, ""),
+    message: options.message,
+  }));
 
   const providerResults = await sendBulkSms(payload);
 

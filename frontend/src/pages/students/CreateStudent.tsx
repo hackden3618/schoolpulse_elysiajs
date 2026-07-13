@@ -31,7 +31,7 @@ const SPECIAL_NEED_CATEGORIES = [
   "Allergy",
   "Medication",
   "Other",
-]
+] as const
 
 interface SpecialNeedEntry { category: string; details: string }
 interface GuardianEntry { firstName: string; lastName: string; phone: string; email: string; relationship: string }

@@ -52,3 +52,13 @@ export async function approveJoinRequestController({ params, authUser, set }: an
   const result = await svc.approveJoinRequest(params.id, authUser.userId)
   return success(result)
 }
+
+export async function listMembershipsController({ authUser }: any) {
+  const result = await svc.listMemberships(authUser.userId)
+  return success(result)
+}
+
+export async function switchSchoolController({ body, authUser }: any) {
+  const result = await svc.switchSchool(authUser.userId, body)
+  return success(result)
+}

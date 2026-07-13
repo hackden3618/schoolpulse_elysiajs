@@ -7,6 +7,7 @@ import {
   MPESA_BASE_URL,
 } from "@/config"
 import { AppError } from "@/common/errors"
+import { normalizePhone } from "@/common/validation"
 
 export class DarajaProvider {
   /**
@@ -52,9 +53,7 @@ export class DarajaProvider {
     const token = await this.getAccessToken()
     
     // Safaricom requires format 2547XXXXXXXX
-    const formattedPhone = phoneNumber.startsWith("0") 
-      ? `254${phoneNumber.slice(1)}` 
-      : phoneNumber.startsWith("+") ? phoneNumber.slice(1) : phoneNumber
+    const formattedPhone = normalizePhone(phoneNumber).replace(/^\+/, "")
 
     const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, -3)
     const password = Buffer.from(`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`).toString("base64")

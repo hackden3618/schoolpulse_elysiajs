@@ -6,6 +6,7 @@ import { writeEventOutbox } from "@/infrastructure/events"
 import { sendSingleSms } from "@/infrastructure/messaging/sms/sms.provider"
 import { signToken } from "@/shared/jwt"
 import { normalizePhone } from "@/common/validation"
+import { extractInitials, generateSchoolCode } from "@/modules/schools/service"
 import * as repo from "./repository"
 import type {
     LoginInput,
@@ -19,8 +20,44 @@ import { HOST } from "@/config"
 
 const BASE = process.env.SERVER_HOST
 
+function buildRoles(membership: any, isGuardianInSchool: boolean) {
+    const roles = membership ? membership.roles.map((r: any) => ({
+        id: r.role.id,
+        name: r.role.name,
+        description: r.role.description
+    })) : [];
+    if (isGuardianInSchool) {
+        roles.push({
+            id: "guardian-virtual-role",
+            name: "guardian",
+            description: "Parent / Guardian"
+        });
+    }
+    return roles;
+}
+
+function buildMembershipResponse(membership: any, schoolId: string, userId: string, roles: any[]) {
+    return {
+        id: membership ? membership.id : `virtual-${schoolId}`,
+        schoolId,
+        userId,
+        status: membership ? membership.status : "active",
+        joinedAt: membership ? membership.joinedAt : new Date(),
+        user: membership?.user ?? { id: userId },
+        roles,
+    };
+}
+
+const schoolSelect = {
+    id: true, schoolName: true, schoolCode: true, schoolPhone: true,
+    schoolEmail: true, schoolLogo: true, county: true, town: true,
+    country: true, schoolLevel: true, schoolTier: true,
+    subscriptionPlan: true, subscriptionStatus: true, currency: true,
+    timezone: true, settings: true,
+} as const;
+
 export async function login(data: LoginInput) {
-    const loginStr = data.login.startsWith("0") ? normalizePhone(data.login) : data.login
+    const loginStr = normalizePhone(data.login)
     const user = await repo.findUserByPhone(loginStr) ?? await repo.findUserByEmail(loginStr)
     if (!user || !user.hashedPassword) {
         throw AppError.unauthenticated("Invalid credentials")
@@ -28,23 +65,29 @@ export async function login(data: LoginInput) {
 
     await verifyPasswordOrThrow(data.password, user.hashedPassword)
 
-    const memberships = await repo.findActiveMemberships(user.id)
+    const allMemberships = await repo.findMembershipsByUserId(user.id)
     const guardianLinks = await prisma.studentGuardian.findMany({
         where: { guardianId: user.id },
         include: { student: { select: { schoolId: true } } }
     })
 
-    if (memberships.length === 0 && guardianLinks.length === 0) {
+    if (allMemberships.length === 0 && guardianLinks.length === 0) {
         throw AppError.forbidden("No active school membership found")
     }
 
     let schoolId: string;
-    let baseMembership: any = null;
+    let activeMembership: any = null;
     let isGuardianInSchool = false;
 
-    if (memberships.length > 0) {
-        baseMembership = memberships[0];
-        schoolId = baseMembership.schoolId;
+    if (data.membershipId) {
+        activeMembership = allMemberships.find((m: any) => m.id === data.membershipId) ?? null;
+    }
+    if (!activeMembership && allMemberships.length > 0) {
+        activeMembership = allMemberships[0];
+    }
+
+    if (activeMembership) {
+        schoolId = activeMembership.schoolId;
         isGuardianInSchool = guardianLinks.some((g: any) => g.student.schoolId === schoolId);
     } else {
         schoolId = guardianLinks[0]!.student.schoolId;
@@ -53,25 +96,12 @@ export async function login(data: LoginInput) {
 
     const school = await prisma.school.findUnique({
         where: { id: schoolId },
-        select: { id: true, schoolName: true, schoolCode: true, schoolPhone: true, schoolEmail: true, schoolLogo: true, county: true, town: true, country: true, schoolLevel: true, schoolTier: true, subscriptionPlan: true, subscriptionStatus: true, currency: true, timezone: true, settings: true },
+        select: schoolSelect,
     })
 
-    const roles = baseMembership ? baseMembership.roles.map((r: any) => ({
-        id: r.role.id,
-        name: r.role.name,
-        description: r.role.description
-    })) : [];
-
-    if (isGuardianInSchool) {
-        roles.push({
-            id: "guardian-virtual-role",
-            name: "guardian",
-            description: "Parent / Guardian"
-        });
-    }
-
+    const roles = buildRoles(activeMembership, isGuardianInSchool);
     const roleNames = roles.map((r: any) => r.name)
-    const accessToken = signToken({ sub: user.id, schoolId, roles: roleNames })
+    const accessToken = signToken({ sub: user.id, schoolId, membershipId: activeMembership?.id ?? null, roles: roleNames })
 
     const { hashedPassword: _, ...safeUser } = user
 
@@ -79,14 +109,71 @@ export async function login(data: LoginInput) {
         accessToken,
         refreshToken: accessToken,
         user: safeUser,
-        membership: {
-            id: baseMembership ? baseMembership.id : `virtual-${schoolId}`,
-            schoolId,
-            userId: user.id,
-            status: baseMembership ? baseMembership.status : "active",
-            joinedAt: baseMembership ? baseMembership.joinedAt : new Date(),
-            roles,
-        },
+        membership: buildMembershipResponse(activeMembership, schoolId, user.id, roles),
+        school,
+        memberships: allMemberships.map((m: any) => {
+            const mRoles = buildRoles(m, guardianLinks.some((g: any) => g.student.schoolId === m.schoolId));
+            return buildMembershipResponse(m, m.schoolId, user.id, mRoles);
+        }),
+        schools: allMemberships.map((m: any) => m.school),
+    }
+}
+
+export async function listMemberships(userId: string) {
+    const allMemberships = await repo.findMembershipsByUserId(userId)
+    const guardianLinks = await prisma.studentGuardian.findMany({
+        where: { guardianId: userId },
+        include: { student: { select: { schoolId: true } } }
+    })
+
+    const memberships = allMemberships.map((m: any) => {
+        const isGuardian = guardianLinks.some((g: any) => g.student.schoolId === m.schoolId);
+        const roles = buildRoles(m, isGuardian);
+        return buildMembershipResponse(m, m.schoolId, userId, roles);
+    });
+
+    const schools = allMemberships.map((m: any) => m.school);
+
+    return { memberships, schools }
+}
+
+export async function switchSchool(userId: string, data: { membershipId?: string; schoolId?: string }) {
+    const targetId = data.membershipId || data.schoolId;
+    if (!targetId) {
+        throw AppError.validation("membershipId or schoolId is required");
+    }
+
+    let membership: any;
+    if (data.membershipId) {
+        membership = await repo.findMembershipById(data.membershipId);
+    } else {
+        const allMemberships = await repo.findMembershipsByUserId(userId);
+        membership = allMemberships.find((m: any) => m.schoolId === data.schoolId) ?? null;
+    }
+
+    if (!membership || membership.userId !== userId) {
+        throw AppError.forbidden("No active membership found for the target school");
+    }
+
+    const guardianLinks = await prisma.studentGuardian.findMany({
+        where: { guardianId: userId },
+        include: { student: { select: { schoolId: true } } }
+    })
+
+    const isGuardianInSchool = guardianLinks.some((g: any) => g.student.schoolId === membership.schoolId);
+    const roles = buildRoles(membership, isGuardianInSchool);
+    const roleNames = roles.map((r: any) => r.name);
+    const accessToken = signToken({ sub: userId, schoolId: membership.schoolId, membershipId: membership.id, roles: roleNames });
+
+    const school = await prisma.school.findUnique({
+        where: { id: membership.schoolId },
+        select: schoolSelect,
+    })
+
+    return {
+        accessToken,
+        refreshToken: accessToken,
+        membership: buildMembershipResponse(membership, membership.schoolId, userId, roles),
         school,
     }
 }
@@ -158,7 +245,7 @@ export async function register(data: RegisterInput) {
 }
 
 export async function forgotPassword(data: ForgotPasswordInput) {
-    const loginStr = data.login.startsWith("0") ? normalizePhone(data.login) : data.login
+    const loginStr = normalizePhone(data.login)
     const user = await repo.findUserByPhone(loginStr) ?? await repo.findUserByEmail(loginStr)
     if (!user) {
         return { found: false, message: "No account found with that email or phone number" }
@@ -282,45 +369,32 @@ export async function approveJoinRequest(id: string, processedBy: string) {
         throw AppError.validation("Join request is not in a pending state")
     }
 
-    const county = joinRequest.county || "Unknown"
-    const prefix = county.slice(0, 3).toUpperCase()
-
-    const latestSchool = await repo.findLatestSchoolCode(prefix)
-    let nextNumber = 1
-    if (latestSchool) {
-        const numPart = parseInt(latestSchool.schoolCode.slice(3), 10)
-        if (!isNaN(numPart)) nextNumber = numPart + 1
-    }
-    const schoolCode = `${prefix}${String(nextNumber).padStart(3, "0")}`
-
     const otp = Math.floor(100000 + Math.random() * 900000).toString()
     const hashedOtp = await hashPassword(otp)
 
     const result = await prisma.$transaction(async (tx: any) => {
-        // TODO have an approved school perform an appropriate fetch to create a school through it's API to avoid inconsistent results
-        // fetch(`${BASE}/api/v1/schools/`, {
-        //     method: 'POST',
-        //     headers: {
-        //         'Content-Type': 'application/json'
-        //     },
-        //     body: JSON.stringify({
-        //         schoolName: joinRequest.schoolName,
-        //         schoolPhone: joinRequest.phone,
-        //         schoolEmail: joinRequest.email,
-        //         county: joinRequest.county || "Unknown",
-        //         town: joinRequest.town || "Unknown",
-        //         country: joinRequest.country || "Kenya",
-        //         schoolWebsite: '',
-        //         schoolAddress: '',
-        //         schoolLogo: '',
-        //         postOffice: '',
-        //         currency: 'KES',
-        //         timezone: 'Africa/Nairobi',
-        //         schoolLevel: joinRequest.schoolLevel
-        //     })
-        // })
+        const county = joinRequest.county || "Unknown"
+        const town = joinRequest.town || "Unknown"
+        const initials = extractInitials(joinRequest.schoolName)
+        const prefix = `${county.slice(0, 3).toUpperCase()}${town.slice(0, 3).toUpperCase()}${initials}`
 
-        // TODO replace this
+        const existing = await tx.school.findMany({
+            where: { schoolCode: { startsWith: prefix }, deletedAt: null },
+            select: { schoolCode: true },
+            orderBy: { schoolCode: "desc" },
+            take: 1,
+        })
+        const sequence = existing.length > 0
+            ? parseInt(existing[0]!.schoolCode.slice(-3), 10) + 1
+            : 1
+        const schoolCode = generateSchoolCode(county, town, initials, sequence)
+
+        const codeTaken = await tx.school.findFirst({
+            where: { schoolCode, deletedAt: null },
+        })
+        if (codeTaken) {
+            throw AppError.conflict("Generated school code collides with an existing school")
+        }
         const school = await tx.school.create({
             data: {
                 schoolCode,
@@ -340,6 +414,9 @@ export async function approveJoinRequest(id: string, processedBy: string) {
             },
         })
 
+        // NOTE: User & membership creation is duplicated inline (rather than
+        // calling users/service.ts) because the centralized functions use
+        // the global prisma client and cannot participate in this transaction.
         const user = await tx.user.create({
             data: {
                 firstName: "Admin",

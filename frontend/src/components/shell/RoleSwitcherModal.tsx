@@ -1,6 +1,6 @@
 import { useState } from "react"
+import { Shield, Eye } from "lucide-react"
 import { useAuth } from "../../lib/auth-context"
-import { Shield } from "lucide-react"
 
 interface RoleSwitcherModalProps {
   onClose: () => void
@@ -21,7 +21,10 @@ export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-surface-900/40 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
-        <h3 className="mb-4 text-lg font-bold text-surface-900">Switch Role</h3>
+        <h3 className="mb-1 text-lg font-bold text-surface-900">Your Roles</h3>
+        <p className="mb-6 text-sm text-surface-500">
+          Select a role to filter what you see. Your access is the same regardless — this only changes the view.
+        </p>
         
         <div className="space-y-2 mb-6">
           {roles.map(role => (
@@ -37,7 +40,7 @@ export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
               <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
                 selected === role.id ? "bg-accent text-white" : "bg-surface-100 text-surface-500"
               }`}>
-                <Shield size={14} />
+                {role.name === "guardian" ? <Eye size={14} /> : <Shield size={14} />}
               </div>
               <div className="flex-1">
                 <p className={`text-sm font-semibold ${selected === role.id ? "text-accent-700" : "text-primary-900"}`}>
@@ -45,6 +48,9 @@ export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
                 </p>
                 {role.description && <p className="text-xs text-primary-400">{role.description}</p>}
               </div>
+              {selected === role.id && (
+                <span className="text-[10px] text-accent font-semibold">Active</span>
+              )}
             </button>
           ))}
         </div>
@@ -61,7 +67,7 @@ export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
             disabled={!selected || selected === activeRole?.id}
             className="rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white hover:bg-accent-600 disabled:opacity-50 transition-colors"
           >
-            Switch Role
+            Switch View
           </button>
         </div>
       </div>

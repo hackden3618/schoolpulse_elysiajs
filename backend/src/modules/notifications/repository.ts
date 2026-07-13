@@ -4,7 +4,7 @@ const conversationInclude = {
   participants: {
     include: {
       user: { select: { id: true, firstName: true, lastName: true, phone: true } },
-      membership: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
+      membership: { include: { user: { select: { id: true, firstName: true, lastName: true, phone: true } } } },
     },
   },
   messages: {
@@ -55,6 +55,13 @@ export async function findMessages(schoolId: string, conversationId: string) {
     where: { conversationId, schoolId, deletedAt: null },
     include: messageInclude,
     orderBy: { createdAt: "asc" },
+  })
+}
+
+export async function findMessageById(schoolId: string, messageId: string) {
+  return prisma.message.findFirst({
+    where: { id: messageId, schoolId, deletedAt: null },
+    include: messageInclude,
   })
 }
 

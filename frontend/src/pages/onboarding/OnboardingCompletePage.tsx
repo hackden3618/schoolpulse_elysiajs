@@ -16,7 +16,7 @@ export function OnboardingCompletePage() {
         <p className="mt-2 text-sm text-primary-500">
           Your admin account has been created. Let's set up your school to get started.
         </p>
-        <Button className="mt-8 w-full" onClick={() => navigate("/onboarding/school-profile", { replace: true })}>
+        <Button className="mt-8 w-full" onClick={() => navigate("/settings", { replace: true })}>
           Continue Setup <ArrowRight size={16} />
         </Button>
         <button
