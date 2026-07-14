@@ -27,6 +27,11 @@ export async function getMembershipsController({ params: { schoolId }, set }: an
   return success(memberships, schoolId);
 }
 
+export async function searchMembersController({ params: { schoolId }, query: { q } }: any) {
+  const results = await svc.searchMembers(schoolId, q || "");
+  return success(results, schoolId);
+}
+
 export async function createMembershipController({ params: { schoolId }, body, set }: any) {
   const membership = await svc.createMembership(schoolId, body);
   set.status = 201;
@@ -36,6 +41,11 @@ export async function createMembershipController({ params: { schoolId }, body, s
 export async function updateMembershipController({ params: { schoolId, membershipId }, body, set }: any) {
   const membership = await svc.updateMembership(membershipId, body);
   return success(membership, schoolId);
+}
+
+export async function deleteUserController({ params: { schoolId, userId }, set }: any) {
+  const result = await svc.deleteUser(schoolId, userId);
+  return success(result, schoolId);
 }
 
 export async function assignRolesController({ params: { schoolId, membershipId }, body, set }: any) {

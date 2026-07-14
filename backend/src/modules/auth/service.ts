@@ -75,7 +75,7 @@ async function ensureGuardianMemberships(userId: string, guardianLinks: any[], m
 
 export async function login(data: LoginInput) {
     const loginStr = normalizePhone(data.login)
-    const user = await repo.findUserByPhone(loginStr) ?? await repo.findUserByEmail(loginStr)
+    const user = await repo.findUserByPhone(loginStr) ?? await repo.findUserByEmail(loginStr) ?? await repo.findUserByEmail(data.login)
     if (!user || !user.hashedPassword) {
         throw AppError.unauthenticated("Invalid credentials")
     }
@@ -292,7 +292,7 @@ export async function register(data: RegisterInput) {
 
 export async function forgotPassword(data: ForgotPasswordInput) {
     const loginStr = normalizePhone(data.login)
-    const user = await repo.findUserByPhone(loginStr) ?? await repo.findUserByEmail(loginStr)
+    const user = await repo.findUserByPhone(loginStr) ?? await repo.findUserByEmail(loginStr) ?? await repo.findUserByEmail(data.login)
     if (!user) {
         return { found: false, message: "No account found with that email or phone number" }
     }

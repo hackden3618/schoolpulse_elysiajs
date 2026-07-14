@@ -424,6 +424,31 @@ export interface SmsTemplate {
   updatedAt: string
 }
 
+export interface SupportTicket {
+  id: string
+  schoolId: string
+  subject: string
+  category: "query" | "support" | "feedback" | "other"
+  status: "open" | "in_progress" | "resolved" | "closed"
+  createdBy: string
+  creator?: { id: string; firstName: string; lastName: string; phone: string }
+  school?: { id: string; schoolName: string; schoolCode: string }
+  messages?: SupportTicketMessage[]
+  _count?: { messages: number }
+  createdAt: string
+  updatedAt: string
+}
+
+export interface SupportTicketMessage {
+  id: string
+  ticketId: string
+  senderId: string
+  content: string
+  isFromPlatform: boolean
+  sender?: { id: string; firstName: string; lastName: string }
+  createdAt: string
+}
+
 export interface Notification {
   id: string
   type: string

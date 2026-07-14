@@ -6,7 +6,9 @@ import {
   getUserController,
   createUserController,
   updateUserController,
+  deleteUserController,
   getMembershipsController,
+  searchMembersController,
   createMembershipController,
   updateMembershipController,
   assignRolesController,
@@ -39,6 +41,10 @@ const userRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/users` }
     params: t.Object({ schoolId: t.String(), userId: t.String() }),
     body: updateUserSchema,
     detail: { summary: "Update user profile", tags: ["Users"] },
+  })
+  .delete("/:userId", deleteUserController, {
+    params: t.Object({ schoolId: t.String(), userId: t.String() }),
+    detail: { summary: "Remove user from school (soft-delete)", tags: ["Users"] },
   });
 
 const membershipRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/memberships` })
@@ -47,6 +53,11 @@ const membershipRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/me
   .get("/", getMembershipsController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "List memberships", tags: ["Memberships"] },
+  })
+  .get("/search", searchMembersController, {
+    params: t.Object({ schoolId: t.String() }),
+    query: t.Object({ q: t.Optional(t.String()) }),
+    detail: { summary: "Search school members", tags: ["Memberships"] },
   })
   .post("/", createMembershipController, {
     params: t.Object({ schoolId: t.String() }),

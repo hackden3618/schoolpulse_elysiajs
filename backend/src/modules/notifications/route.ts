@@ -9,8 +9,10 @@ import {
   sendMessageController,
   markMessageReadController,
   deleteMessageController,
+  deleteConversationController,
+  editMessageController,
 } from "./controller"
-import { createConversationSchema, sendMessageSchema } from "./schema"
+import { createConversationSchema, sendMessageSchema, editMessageSchema } from "./schema"
 
 export const notificationsRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId` })
   .use(errorHandler)
@@ -44,4 +46,13 @@ export const notificationsRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:s
   .delete("/messages/:messageId", deleteMessageController, {
     params: t.Object({ schoolId: t.String(), messageId: t.String() }),
     detail: { summary: "Delete (soft) a message", tags: ["Notifications"] },
+  })
+  .delete("/conversations/:conversationId", deleteConversationController, {
+    params: t.Object({ schoolId: t.String(), conversationId: t.String() }),
+    detail: { summary: "Delete (soft) a conversation", tags: ["Notifications"] },
+  })
+  .patch("/messages/:messageId", editMessageController, {
+    params: t.Object({ schoolId: t.String(), messageId: t.String() }),
+    body: editMessageSchema,
+    detail: { summary: "Edit a message (in-app, within 30 min)", tags: ["Notifications"] },
   })

@@ -7,8 +7,8 @@ interface WsMessage {
   data?: Record<string, unknown>
 }
 
-export function handleWsOpen(ws: WebSocket, userId: string, schoolId: string): WsClient {
-  return wsManager.register(ws, userId, schoolId)
+export function handleWsOpen(ws: WebSocket, userId: string, schoolId: string, isPlatformAdmin: boolean = false): WsClient {
+  return wsManager.register(ws, userId, schoolId, isPlatformAdmin)
 }
 
 export function handleWsMessage(client: WsClient, raw: string | Buffer) {
@@ -38,6 +38,26 @@ export function handleWsMessage(client: WsClient, raw: string | Buffer) {
       break
     case "ping":
       client.ws.send(JSON.stringify({ event: "pong" }))
+      break
+    case "typing:start":
+      if (typeof parsed.data?.conversationId === "string" && typeof parsed.data?.displayName === "string") {
+        wsManager.broadcastToConversationExcept(
+          parsed.data.conversationId,
+          "typing:indicator",
+          { conversationId: parsed.data.conversationId, userId: client.userId, displayName: parsed.data.displayName, typing: true },
+          client.userId
+        )
+      }
+      break
+    case "typing:stop":
+      if (typeof parsed.data?.conversationId === "string") {
+        wsManager.broadcastToConversationExcept(
+          parsed.data.conversationId,
+          "typing:indicator",
+          { conversationId: parsed.data.conversationId, userId: client.userId, typing: false },
+          client.userId
+        )
+      }
       break
     default:
       break

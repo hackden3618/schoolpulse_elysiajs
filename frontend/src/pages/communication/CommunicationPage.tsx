@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent } from "react"
-import { MessageSquare, Send, AlertCircle, RefreshCw, X, Plus, CheckCheck, Check, XCircle, Clock, Megaphone, ArrowLeft, Users, Smartphone, ChevronDown, ChevronRight, UserCheck, Trash2 } from "lucide-react"
+import { MessageSquare, Send, AlertCircle, RefreshCw, X, Plus, CheckCheck, Check, XCircle, Clock, Megaphone, ArrowLeft, Users, Smartphone, ChevronDown, ChevronRight, UserCheck, Trash2, MoreVertical, Pencil } from "lucide-react"
 import { Card } from "../../components/ui/Card"
+import { Modal } from "../../components/ui/Modal"
+import { Input } from "../../components/ui/Input"
 import { Skeleton } from "../../components/ui/Skeleton"
 import { Badge } from "../../components/ui/Badge"
 import { Button } from "../../components/ui/Button"
 import { withMinDelay } from "../../lib/ux"
 import { conversationsApi, smsApi, membershipsApi, studentsApi } from "../../lib/api"
 import { useAuth } from "../../lib/auth-context"
-import { useWebSocket } from "../../lib/websocket"
+import { useWs } from "../../lib/ws-context"
+import { useUnread } from "../../lib/unread-context"
 import type { Conversation, Message, SmsTemplate, Student, Guardian } from "../../types"
 
 const OPTOUT_CHARS = 15
@@ -81,9 +84,27 @@ function calcSegmentInfo(text: string): { charCount: number; segmentCount: numbe
   }
 }
 
+
+function countUnread(conversations: Conversation[], currentUserId?: string): number {
+  let count = 0
+  for (const c of conversations) {
+    if (hasUnread(c, currentUserId)) count++
+  }
+  return count
+}
+
+function hasUnread(conv: Conversation, currentUserId?: string): boolean {
+  if (!currentUserId) return false
+  return (conv.messages || []).some(
+    (m) => m.sender?.userId !== currentUserId
+      && !m.receipts?.some((r) => r.recipientUserId === currentUserId && r.status === "read")
+  )
+}
+
 export function CommunicationPage() {
   const { school, user, membership } = useAuth()
   const schoolId = school!.id
+  const { unreadCount, increment, decrement, reset: resetUnread } = useUnread()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [selectedConv, setSelectedConv] = useState<Conversation | null>(null)
   const [messages, setMessages] = useState<Message[]>([])
@@ -96,6 +117,8 @@ export function CommunicationPage() {
   const [smsTemplates, setSmsTemplates] = useState<SmsTemplate[]>([])
   const [smsTemplatesLoading, setSmsTemplatesLoading] = useState(true)
   const [showTemplates, setShowTemplates] = useState(false)
+  const [showSaveTemplate, setShowSaveTemplate] = useState(false)
+  const [templateName, setTemplateName] = useState("")
 
   const [staffMembers, setStaffMembers] = useState<StaffEntry[]>([])
   const [guardianEntries, setGuardianEntries] = useState<GuardianEntry[]>([])
@@ -104,6 +127,8 @@ export function CommunicationPage() {
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const initializedRef = useRef(false)
+  const selectedConvRef = useRef<Conversation | null>(null)
+  useEffect(() => { selectedConvRef.current = selectedConv }, [selectedConv])
 
   const [showNewConv, setShowNewConv] = useState(false)
   const [convType, setConvType] = useState<"direct" | "group" | "announcement">("direct")
@@ -112,15 +137,30 @@ export function CommunicationPage() {
   const [convError, setConvError] = useState("")
   const [creatingConv, setCreatingConv] = useState(false)
 
+  const [menuConvId, setMenuConvId] = useState<string | null>(null)
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null)
+  const [editContent, setEditContent] = useState("")
+
+  const [typingUsers, setTypingUsers] = useState<Map<string, { displayName: string; lastTypedAt: number }>>(new Map())
+  const typingIntervalRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined)
+  const lastTypingEmitRef = useRef(0)
+
   const onNewMessage = useCallback((msg: Message) => {
-    setMessages((prev) => {
-      if (prev.some((m) => m.id === msg.id)) return prev
-      return [...prev, msg]
-    })
     setConversations((prev) => prev.map((c) => {
       if (c.id === msg.conversationId) return { ...c, messages: [{ ...msg, isLatest: true }, ...c.messages.slice(0, 0)] }
       return c
     }))
+    if (selectedConvRef.current?.id === msg.conversationId) {
+      if (msg.sender?.userId !== user?.id) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === msg.id)) return prev
+          return [...prev, msg]
+        })
+        markRead(msg.id, schoolId)
+      }
+    } else if (msg.sender?.userId !== user?.id) {
+      increment()
+    }
   }, [])
 
   const onReceiptUpdate = useCallback((msg: Message) => {
@@ -131,11 +171,75 @@ export function CommunicationPage() {
     setMessages((prev) => prev.filter((m) => m.id !== data.messageId))
   }, [])
 
-  const wsSubs = selectedConv
-    ? [{ conversationId: selectedConv.id, onMessage: onNewMessage, onReceiptUpdate, onDelete: onDeleteMessage }]
-    : []
+  const onMessageUpdated = useCallback((msg: Message) => {
+    setMessages((prev) => prev.map((m) => m.id === msg.id ? msg : m))
+    setConversations((prev) => prev.map((c) => {
+      if (c.id === msg.conversationId) return { ...c, messages: c.messages.map((lm) => lm.id === msg.id ? { ...lm, content: msg.content } : lm) }
+      return c
+    }))
+  }, [])
 
-  const { subscribe } = useWebSocket(wsSubs)
+  const wsSubs = conversations.map((c) => ({
+    conversationId: c.id,
+    onMessage: onNewMessage,
+    onReceiptUpdate,
+    onDelete: onDeleteMessage,
+    onMessageUpdated,
+  }))
+
+  const handleConversationCreated = useCallback((data: Conversation) => {
+    setConversations((prev) => prev.some((c) => c.id === data.id) ? prev : [data, ...prev])
+  }, [])
+
+  const handleTyping = useCallback((data: { conversationId: string; userId: string; displayName: string; typing: boolean }) => {
+    if (data.conversationId !== selectedConvRef.current?.id) return
+    if (data.userId === user?.id) return
+    setTypingUsers((prev) => {
+      const next = new Map(prev)
+      if (data.typing) {
+        next.set(data.userId, { displayName: data.displayName, lastTypedAt: Date.now() })
+      } else {
+        next.delete(data.userId)
+      }
+      return next
+    })
+  }, [])
+
+  const { subscribe, markRead, send, registerSubscriptions, registerCallbacks } = useWs()
+
+  useEffect(() => {
+    const unsub = registerSubscriptions(wsSubs)
+    const uncb = registerCallbacks({ onConversationCreated: handleConversationCreated, onTyping: handleTyping })
+    return () => { unsub(); uncb() }
+  }, [wsSubs, handleConversationCreated, handleTyping])
+
+  const emitTyping = useCallback((typing: boolean) => {
+    if (!selectedConvRef.current) return
+    const now = Date.now()
+    if (typing && now - lastTypingEmitRef.current < 3000) return
+    lastTypingEmitRef.current = typing ? now : 0
+    send({
+      event: typing ? "typing:start" : "typing:stop",
+      data: {
+        conversationId: selectedConvRef.current.id,
+        displayName: `${user?.firstName ?? ""} ${user?.lastName ?? ""}`.trim(),
+      },
+    })
+  }, [])
+
+  useEffect(() => {
+    typingIntervalRef.current = setInterval(() => {
+      setTypingUsers((prev) => {
+        const now = Date.now()
+        const next = new Map(prev)
+        for (const [id, u] of next) {
+          if (now - u.lastTypedAt > 4000) next.delete(id)
+        }
+        return next.size === prev.size ? prev : next
+      })
+    }, 1000)
+    return () => { clearInterval(typingIntervalRef.current) }
+  }, [])
 
   useEffect(() => {
     setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 50)
@@ -151,6 +255,9 @@ export function CommunicationPage() {
     try {
       const res = await withMinDelay(conversationsApi.list(schoolId))
       setConversations(res.data)
+      reset()
+      const count = countUnread(res.data, user?.id)
+      if (count > 0) increment(count)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load conversations")
     } finally {
@@ -232,6 +339,16 @@ export function CommunicationPage() {
     }
   }, [messageChannel, schoolId, selectedConv?.id])
 
+  useEffect(() => {
+    if (!menuConvId) return
+    const handler = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+      if (!target.closest("[data-menu]")) setMenuConvId(null)
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [menuConvId])
+
   const handleDeleteMsg = async (msgId: string) => {
     try {
       await conversationsApi.messages.delete(schoolId, msgId)
@@ -239,6 +356,34 @@ export function CommunicationPage() {
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to delete message")
     }
+  }
+
+  const handleDeleteConv = async (convId: string) => {
+    try {
+      await conversationsApi.delete(schoolId, convId)
+      setConversations((prev) => prev.filter((c) => c.id !== convId))
+      if (selectedConv?.id === convId) setSelectedConv(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete conversation")
+    }
+    setMenuConvId(null)
+  }
+
+  const handleEditMessage = async (msgId: string) => {
+    if (!editContent.trim()) return
+    try {
+      const res = await conversationsApi.messages.edit(schoolId, msgId, { content: editContent.trim() })
+      setMessages((prev) => prev.map((m) => m.id === msgId ? res.data : m))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to edit message")
+    }
+    setEditingMsgId(null)
+    setEditContent("")
+  }
+
+  const handleEditCancel = () => {
+    setEditingMsgId(null)
+    setEditContent("")
   }
 
   const selectConversation = async (conv: Conversation) => {
@@ -249,6 +394,13 @@ export function CommunicationPage() {
       const res = await conversationsApi.messages.list(schoolId, conv.id)
       setMessages(res.data)
       subscribe(conv.id)
+      // Mark unread messages as read
+      const otherMessages = res.data.filter(
+        (m) => m.sender?.userId !== user?.id && m.senderMembershipId !== membership?.id
+          && !m.receipts?.some((r) => r.recipientUserId === user?.id && r.status === "read")
+      )
+      for (const msg of otherMessages) markRead(msg.id, schoolId)
+      if (otherMessages.length > 0) decrement(otherMessages.length)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to load messages")
       setMessages([])
@@ -278,21 +430,13 @@ export function CommunicationPage() {
           setSending(false)
           return
         }
-        const res = await smsApi.send(schoolId, { recipients: recipientPhones, message: content })
-        // Optimistically add the SMS send result as a message in the conversation
-        if (selectedConv) {
-          const smsMsg: Message = {
-            id: `sms_${Date.now()}`,
-            schoolId,
-            conversationId: selectedConv.id,
-            channel: "sms",
-            messageType: "text",
-            content,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            sender: { userId: user?.id ?? "", membershipId: membership?.id },
-          }
-          setMessages((prev) => (prev.some((m) => m.id === smsMsg.id) ? prev : [...prev, smsMsg]))
+        const res = await conversationsApi.messages.send(schoolId, selectedConv.id, {
+          content,
+          channel: "sms",
+          recipientPhones,
+        })
+        if (res?.data) {
+          setMessages((prev) => (prev.some((m) => m.id === res.data.id) ? prev : [...prev, res.data]))
         }
       } else {
         const res = await conversationsApi.messages.send(schoolId, selectedConv.id, {
@@ -305,6 +449,7 @@ export function CommunicationPage() {
         }
       }
       setNewMessage("")
+      emitTyping(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : "Failed to send message")
     } finally {
@@ -356,29 +501,6 @@ export function CommunicationPage() {
     })
   }
 
-  const toggleAllGuardiansOfRelationship = (relationship: string, checked: boolean) => {
-    const ids = guardianEntries.filter((g) => g.relationship === relationship).map((g) => g.userId)
-    setSelectedRecipientIds((prev) => {
-      const next = new Set(prev)
-      for (const id of ids) {
-        if (checked) next.add(id)
-        else next.delete(id)
-      }
-      return next
-    })
-  }
-
-  const toggleAllStaff = (checked: boolean) => {
-    setSelectedRecipientIds((prev) => {
-      const next = new Set(prev)
-      for (const s of staffMembers) {
-        if (checked) next.add(s.userId)
-        else next.delete(s.userId)
-      }
-      return next
-    })
-  }
-
   const convName = (c: Conversation) => {
     if (c.subject) return c.subject
     const names = c.participants
@@ -395,20 +517,7 @@ export function CommunicationPage() {
 
   const showMobileChat = selectedConv !== null
 
-  const relationshipLabels: Record<string, string> = {
-    father: "Father",
-    mother: "Mother",
-    sibling: "Sibling",
-    emergency: "Emergency Contact",
-    sponsor: "Sponsor",
-    legal_guardian: "Legal Guardian",
-    step_parent: "Step Parent",
-    relative: "Relative",
-    other: "Other",
-  }
-
   const selectedCount = selectedRecipientIds.size
-  const relationshipGroups = Array.from(new Set(guardianEntries.map((g) => g.relationship)))
 
   const renderSmsCompose = () => {
     if (messageChannel !== "sms" || !selectedConv) return null
@@ -422,116 +531,48 @@ export function CommunicationPage() {
               <span className="text-xs font-semibold text-surface-700 flex items-center gap-1.5">
                 <Users size={12} /> Recipients {selectedCount > 0 && <span className="text-accent font-medium">({selectedCount})</span>}
               </span>
-              <div className="flex gap-2">
-                <button type="button" onClick={() => toggleAllStaff(true)}
-                  className="text-[10px] text-accent font-semibold hover:underline">All Staff</button>
-                <button type="button" onClick={() => toggleAllStaff(false)}
-                  className="text-[10px] text-surface-400 hover:underline">Clear Staff</button>
-              </div>
             </div>
             {recipientsLoading ? (
               <Skeleton className="h-16" />
             ) : (
-              <div className="space-y-1.5 max-h-32 overflow-y-auto border border-surface-100 rounded-lg p-2">
-                {/* Staff grouped by role */}
-                {staffMembers.length > 0 && (
-                  <div>
-                    <div className="flex items-center justify-between px-1 py-0.5">
-                      <span className="text-[10px] font-semibold text-surface-600">Staff ({staffMembers.length})</span>
-                      <span className="text-[9px] text-surface-400">{staffMembers.filter((s) => selectedRecipientIds.has(s.userId)).length}/{staffMembers.length}</span>
-                    </div>
-                    {(() => {
-                      const roleGroups = new Map<string, typeof staffMembers>()
-                      for (const s of staffMembers) {
-                        const roles = s.role ? s.role.split(",").map((r) => r.trim()).filter(Boolean) : ["Staff"]
-                        for (const role of roles) {
-                          if (!roleGroups.has(role)) roleGroups.set(role, [])
-                          roleGroups.get(role)!.push(s)
-                        }
-                      }
-                      return Array.from(roleGroups.entries()).map(([role, members]) => {
-                        const roleSelected = members.filter((m) => selectedRecipientIds.has(m.userId)).length
-                        const allSelected = roleSelected === members.length
-                        return (
-                          <div key={role} className="mb-1">
-                            <div className="flex items-center gap-1.5 px-1 py-0.5">
-                              <button type="button" onClick={() => {
-                                for (const m of members) {
-                                  if (allSelected && selectedRecipientIds.has(m.userId)) toggleRecipient(m.userId)
-                                  else if (!allSelected && !selectedRecipientIds.has(m.userId)) toggleRecipient(m.userId)
-                                }
-                              }}
-                                className={`text-[9px] rounded-full px-2 py-0.5 border transition-colors ${
-                                  allSelected ? "bg-accent text-white border-accent"
-                                    : roleSelected > 0 ? "bg-accent-50 text-accent border-accent-200"
-                                    : "bg-white text-surface-500 border-surface-200 hover:border-surface-300"
-                                }`}>
-                                {role} {roleSelected}/{members.length}
-                              </button>
-                            </div>
-                            {members.map((s) => (
-                              <label key={s.userId} className="flex items-center gap-2 px-2 py-0.5 rounded hover:bg-surface-50 cursor-pointer">
-                                <input type="checkbox" checked={selectedRecipientIds.has(s.userId)}
-                                  onChange={() => toggleRecipient(s.userId)}
-                                  className="h-3 w-3 rounded border-surface-300 text-accent focus:ring-accent" />
-                                <span className="text-xs text-surface-700 truncate flex-1">{s.name}</span>
-                                <span className="text-[9px] text-surface-400">{s.phone}</span>
-                              </label>
-                            ))}
-                          </div>
-                        )
-                      })
-                    })()}
-                  </div>
-                )}
-
-                {/* Guardians grouped by relationship */}
-                {relationshipGroups.length > 0 && (
-                  <div className="border-t border-surface-100 pt-1.5 mt-1.5">
-                    <div className="flex items-center justify-between px-1 pb-1">
-                      <span className="text-[10px] font-semibold text-surface-600">Guardians ({guardianEntries.length})</span>
-                      <span className="text-[9px] text-surface-400">{guardianEntries.filter((g) => selectedRecipientIds.has(g.userId)).length}/{guardianEntries.length}</span>
-                    </div>
-                    <div className="flex items-center gap-1.5 px-1 pb-1.5 flex-wrap">
-                      {relationshipGroups.map((rel) => {
-                        const relGuardians = guardianEntries.filter((g) => g.relationship === rel)
-                        const relSelected = relGuardians.filter((g) => selectedRecipientIds.has(g.userId)).length
-                        const allSelected = relSelected === relGuardians.length
-                        const label = relationshipLabels[rel] || rel
-                        return (
-                          <button
-                            key={rel}
-                            type="button"
-                            onClick={() => toggleAllGuardiansOfRelationship(rel, !allSelected)}
-                            className={`text-[9px] rounded-full px-2 py-0.5 border transition-colors ${
-                              allSelected
-                                ? "bg-accent text-white border-accent"
-                                : relSelected > 0
-                                ? "bg-accent-50 text-accent border-accent-200"
-                                : "bg-white text-surface-500 border-surface-200 hover:border-surface-300"
-                            }`}
-                          >
-                            {label} {relSelected}/{relGuardians.length}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    {guardianEntries.map((g) => (
-                      <label key={g.userId} className="flex items-center gap-2 px-2 py-0.5 rounded hover:bg-surface-50 cursor-pointer">
-                        <input type="checkbox" checked={selectedRecipientIds.has(g.userId)}
-                          onChange={() => toggleRecipient(g.userId)}
-                          className="h-3 w-3 rounded border-surface-300 text-accent focus:ring-accent" />
-                        <span className="text-xs text-surface-700 truncate flex-1">{g.name}</span>
-                        {g.isPrimary && <UserCheck size={10} className="text-accent shrink-0" />}
-                        <span className="text-[9px] text-surface-400 capitalize">{g.relationship}</span>
-                      </label>
-                    ))}
-                  </div>
-                )}
-
-                {staffMembers.length === 0 && guardianEntries.length === 0 && (
-                  <p className="text-[10px] text-surface-400 text-center py-2">No recipients available.</p>
-                )}
+              <div className="flex flex-wrap gap-1.5">
+                {(() => {
+                  const roleGroups = new Map<string, typeof staffMembers>()
+                  for (const s of staffMembers) {
+                    const roles = s.role ? s.role.split(",").map((r) => r.trim()).filter(Boolean) : ["Staff"]
+                    for (const role of roles) {
+                      if (!roleGroups.has(role)) roleGroups.set(role, [])
+                      roleGroups.get(role)!.push(s)
+                    }
+                  }
+                  const groups: { label: string; members: { userId: string }[] }[] = []
+                  for (const [role, members] of roleGroups) {
+                    groups.push({ label: role, members })
+                  }
+                  if (guardianEntries.length > 0) {
+                    groups.push({ label: "Guardians", members: guardianEntries })
+                  }
+                  return groups.map(({ label, members }) => {
+                    const selected = members.filter((m) => selectedRecipientIds.has(m.userId)).length
+                    const allSelected = selected === members.length
+                    return (
+                      <button key={label} type="button"
+                        onClick={() => {
+                          for (const m of members) {
+                            if (allSelected && selectedRecipientIds.has(m.userId)) toggleRecipient(m.userId)
+                            else if (!allSelected && !selectedRecipientIds.has(m.userId)) toggleRecipient(m.userId)
+                          }
+                        }}
+                        className={`text-[10px] rounded-full px-2.5 py-1 border transition-colors ${
+                          allSelected ? "bg-accent text-white border-accent"
+                            : selected > 0 ? "bg-accent-50 text-accent border-accent-200"
+                            : "bg-white text-surface-500 border-surface-200 hover:border-surface-300"
+                        }`}>
+                        {label} ({selected}/{members.length})
+                      </button>
+                    )
+                  })
+                })()}
               </div>
             )}
           </div>
@@ -557,7 +598,7 @@ export function CommunicationPage() {
                     </button>
                   ))
                 )}
-                <button type="button" onClick={() => { const n = prompt("Template name:"); if (n && newMessage.trim()) smsApi.templates.create(schoolId, { name: n, message: newMessage }).then(() => loadSmsTemplates()).catch(() => {}) }}
+                <button type="button" onClick={() => { setTemplateName(""); setShowSaveTemplate(true) }}
                   disabled={!newMessage.trim()}
                   className="text-[10px] border border-dashed border-surface-300 rounded-full px-2.5 py-1 text-accent hover:bg-accent-50 transition-colors disabled:opacity-40">
                   <Plus size={10} className="inline mr-0.5" />Save
@@ -568,7 +609,7 @@ export function CommunicationPage() {
 
           {/* SMS Message Input and Metrics */}
           <div className="space-y-1.5">
-            <textarea value={newMessage} onChange={(e) => setNewMessage(e.target.value)}
+            <textarea value={newMessage} onChange={(e) => { setNewMessage(e.target.value); emitTyping(true) }}
               placeholder="Compose SMS message..."
               rows={3}
               className="block w-full rounded-lg border border-surface-200 bg-white px-3 py-2 text-sm resize-none focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent" />
@@ -614,6 +655,7 @@ export function CommunicationPage() {
       else next.add(userId)
       return next
     })
+    if (convType === "announcement") setConvType("group")
     if (convError) setConvError("")
   }
 
@@ -628,7 +670,14 @@ export function CommunicationPage() {
         </div>
 
         <div className="flex gap-2">
-          <select value={convType} onChange={(e) => { setConvType(e.target.value as any); setConvError("") }}
+          <select value={convType} onChange={(e) => { 
+            const newType = e.target.value as any
+            setConvType(newType)
+            if (newType === "announcement") {
+              setConvParticipantIds(new Set([...staffMembers.map((s) => s.userId), ...guardianEntries.map((g) => g.userId)]))
+            }
+            setConvError("")
+          }}
             className="block rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-xs flex-1">
             <option value="direct">Direct</option>
             <option value="group">Group</option>
@@ -730,25 +779,41 @@ export function CommunicationPage() {
             ) : (
               conversations.map((c) => {
                 const lm = latestMsg(c)
+                const unread = hasUnread(c, user?.id)
                 return (
-                  <button key={c.id} onClick={() => selectConversation(c)}
-                    className={`w-full flex items-start gap-3 px-4 py-3.5 border-b border-surface-50 last:border-0 text-left hover:bg-surface-50 transition-colors ${
-                      selectedConv?.id === c.id ? "bg-accent-50 border-l-2 border-l-accent" : "border-l-2 border-l-transparent"
-                    }`}>
-                    <div className={`flex h-10 w-10 items-center justify-center rounded-full shrink-0 ${
-                      c.type === "announcement" ? "bg-accent-50 text-accent" : "bg-primary-100 text-primary-600"
-                    }`}>
-                      {c.type === "announcement" ? <Megaphone size={16} /> : <MessageSquare size={16} />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-semibold text-surface-900 truncate">{convName(c)}</p>
-                        <Badge variant={c.type === "announcement" ? "warning" : "info"} className="shrink-0 capitalize text-[9px]">{c.type}</Badge>
+                  <div key={c.id} className="relative group">
+                    <button onClick={() => selectConversation(c)}
+                      className={`w-full flex items-start gap-3 px-4 py-3.5 border-b border-surface-50 last:border-0 text-left hover:bg-surface-50 transition-colors ${
+                        selectedConv?.id === c.id ? "bg-accent-50 border-l-2 border-l-accent" : "border-l-2 border-l-transparent"
+                      } ${unread ? "bg-surface-50/70" : ""}`}>
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-full shrink-0 ${
+                        c.type === "announcement" ? "bg-accent-50 text-accent" : "bg-primary-100 text-primary-600"
+                      }`}>
+                        {c.type === "announcement" ? <Megaphone size={16} /> : <MessageSquare size={16} />}
                       </div>
-                      {lm && <p className="text-xs text-surface-500 truncate mt-0.5">{lm.content}</p>}
-                      <p className="text-[10px] text-surface-400 mt-1">{lm ? timeAgo(lm.createdAt) : formatDate(c.createdAt)}</p>
-                    </div>
-                  </button>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className={`text-sm truncate ${unread ? "font-bold text-surface-950" : "font-semibold text-surface-900"}`}>{convName(c)}</p>
+                          {unread && <span className="h-2 w-2 rounded-full bg-accent shrink-0" />}
+                          <Badge variant={c.type === "announcement" ? "warning" : "info"} className="shrink-0 capitalize text-[9px]">{c.type}</Badge>
+                        </div>
+                        {lm && <p className={`text-xs truncate mt-0.5 ${unread ? "font-semibold text-surface-700" : "text-surface-500"}`}>{lm.content}</p>}
+                        <p className="text-[10px] text-surface-400 mt-1">{lm ? timeAgo(lm.createdAt) : formatDate(c.createdAt)}</p>
+                      </div>
+                    </button>
+                    <button data-menu onClick={(e) => { e.stopPropagation(); setMenuConvId(menuConvId === c.id ? null : c.id) }}
+                      className="absolute top-3 right-2 p-1 rounded-lg opacity-60 hover:opacity-100 hover:bg-surface-200 transition-all text-surface-400">
+                      <MoreVertical size={14} />
+                    </button>
+                    {menuConvId === c.id && (
+                      <div data-menu className="absolute right-2 top-10 z-50 w-40 bg-white rounded-lg shadow-lg border border-surface-100 py-1">
+                        <button onClick={() => handleDeleteConv(c.id)}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs text-danger-600 hover:bg-danger-50 transition-colors">
+                          <Trash2 size={12} /> Delete
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 )
               })
             )}
@@ -794,7 +859,7 @@ export function CommunicationPage() {
               )}
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 bg-[#e5ddd5]"
+              <div className="flex-1 overflow-y-auto overflow-x-hidden px-4 py-3 space-y-1 bg-[#e5ddd5]"
                 style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }}>
                 {messages.length === 0 ? (
                   <div className="flex flex-col items-center justify-center h-full text-center">
@@ -807,10 +872,11 @@ export function CommunicationPage() {
                       const prevMsg = idx > 0 ? messages[idx - 1] : null
                       const isMe = msg.sender?.userId === user?.id || msg.senderMembershipId === membership?.id
                       const showDate = !prevMsg || new Date(msg.createdAt).toDateString() !== new Date(prevMsg.createdAt).toDateString()
-                      const receipts = msg.receipts || []
-                      const failedCount = receipts.filter((r) => r.status === "failed").length
-                      const deliveredCount = receipts.filter((r) => r.status === "delivered" || r.status === "read").length
-                      const sentCount = receipts.filter((r) => r.status === "sent").length
+const receipts = msg.receipts || []
+const failedCount = receipts.filter((r) => r.status === "failed").length
+const deliveredCount = receipts.filter((r) => r.status === "delivered" || r.status === "read").length
+const sentCount = receipts.filter((r) => r.status === "sent").length
+const total = receipts.length
                       return (
                         <div key={msg.id}>
                           {showDate && (
@@ -826,9 +892,16 @@ export function CommunicationPage() {
                             }`}>
                               {isMe && (
                                 <button onClick={() => handleDeleteMsg(msg.id)}
-                                  className="absolute -left-8 top-1/2 -translate-y-1/2 p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-surface-200 transition-all text-surface-400 hover:text-danger-500"
+                                  className="absolute -left-8 top-1/2 -translate-y-1/2 p-1 rounded-full opacity-60 hover:opacity-100 hover:bg-surface-200 transition-all text-surface-400 hover:text-danger-500"
                                   title="Delete message">
                                   <Trash2 size={12} />
+                                </button>
+                              )}
+                              {isMe && msg.channel === "in_app" && Date.now() - new Date(msg.createdAt).getTime() < 30 * 60 * 1000 && editingMsgId !== msg.id && (
+                                <button onClick={() => { setEditingMsgId(msg.id); setEditContent(msg.content || "") }}
+                                  className="absolute -right-8 top-1/2 -translate-y-1/2 p-1 rounded-full opacity-60 hover:opacity-100 hover:bg-surface-200 transition-all text-surface-400 hover:text-accent"
+                                  title="Edit message">
+                                  <Pencil size={12} />
                                 </button>
                               )}
                               {!isMe && (
@@ -841,7 +914,32 @@ export function CommunicationPage() {
                                   <Smartphone size={9} /> SMS
                                 </span>
                               )}
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content?.trim()}</p>
+                              {editingMsgId === msg.id ? (
+                                <div className="space-y-1">
+                                  <textarea value={editContent} onChange={(e) => setEditContent(e.target.value)}
+                                    autoFocus
+                                    rows={2}
+                                    className="w-full rounded border border-accent bg-white px-2 py-1 text-sm resize-none focus:outline-none"
+                                    onKeyDown={(e) => { if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); handleEditMessage(msg.id) } }} />
+                                  <div className="flex gap-1 justify-end">
+                                    <button onClick={() => handleEditMessage(msg.id)} disabled={!editContent.trim()}
+                                      className="text-[10px] bg-accent text-white px-2 py-1 rounded hover:bg-accent-600 disabled:opacity-40 transition-colors">
+                                      <Check size={10} className="inline mr-0.5" />Save
+                                    </button>
+                                    <button onClick={handleEditCancel}
+                                      className="text-[10px] bg-surface-100 text-surface-600 px-2 py-1 rounded hover:bg-surface-200 transition-colors">
+                                      <X size={10} className="inline mr-0.5" />Cancel
+                                    </button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <>
+                                  <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content?.trim()}</p>
+                                  {msg.updatedAt !== msg.createdAt && (
+                                    <span className="text-[9px] text-surface-400 italic">edited</span>
+                                  )}
+                                </>
+                              )}
                               <div className="flex items-center justify-end gap-0.5 mt-0.5">
                                 <span className="text-[10px] text-surface-400">{formatTime(msg.createdAt)}</span>
                                 {(isMe || receipts.length > 0) && <DeliveryIcon msg={msg} />}
@@ -851,7 +949,7 @@ export function CommunicationPage() {
                           {receipts.length > 0 && (
                             <div className={`flex ${isMe ? "justify-end" : "justify-start"} mr-1 mb-1`}>
                               <div className="flex items-center gap-1.5 text-[9px] text-surface-400">
-                                <span>{sentCount}/{receipts.length} sent</span>
+                                {sentCount > 0 && <span>{sentCount} sent</span>}
                                 {deliveredCount > 0 && <span className="text-success-600">{deliveredCount} delivered</span>}
                                 {failedCount > 0 && <span className="text-danger-500">{failedCount} failed</span>}
                               </div>
@@ -865,6 +963,22 @@ export function CommunicationPage() {
                 )}
               </div>
 
+              {typingUsers.size > 0 && (
+                <div className="shrink-0 px-4 py-1.5 border-t border-surface-100 bg-white/80">
+                  <div className="flex items-center gap-2 text-xs text-surface-500">
+                    <div className="typing-dots flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent-300 animate-bounce" style={{ animationDelay: "0ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent-300 animate-bounce" style={{ animationDelay: "150ms" }} />
+                      <span className="w-1.5 h-1.5 rounded-full bg-accent-300 animate-bounce" style={{ animationDelay: "300ms" }} />
+                    </div>
+                    <span>
+                      {Array.from(typingUsers.values()).map((u) => u.displayName).join(", ")}
+                      {typingUsers.size === 1 ? " is typing..." : " are typing..."}
+                    </span>
+                  </div>
+                </div>
+              )}
+
               {/* SMS Compose (when SMS channel is active) */}
               {renderSmsCompose()}
 
@@ -872,7 +986,7 @@ export function CommunicationPage() {
               {messageChannel === "in_app" && (
                 <div className="shrink-0 px-4 py-3 bg-white border-t border-surface-100">
                   <form onSubmit={handleSend} className="flex gap-2 items-end">
-                    <select value={messageChannel} onChange={(e) => setMessageChannel(e.target.value as any)}
+                    <select value={messageChannel} onChange={(e) => { setMessageChannel(e.target.value as any); emitTyping(false) }}
                       className="rounded-lg border border-surface-200 bg-white px-2 py-2.5 text-xs shrink-0">
                       <option value="in_app">In-App</option>
                       <option value="sms">SMS</option>
@@ -880,7 +994,7 @@ export function CommunicationPage() {
                     <div className="flex-1 flex gap-2">
                       <textarea
                         value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
+                        onChange={(e) => { setNewMessage(e.target.value); emitTyping(true) }}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
                             e.preventDefault()
@@ -922,6 +1036,49 @@ export function CommunicationPage() {
           )}
         </div>
       </div>
+
+      <Modal
+        open={showSaveTemplate}
+        onClose={() => setShowSaveTemplate(false)}
+        title="Save as Template"
+        size="sm"
+        footer={
+          <>
+            <button
+              type="button"
+              onClick={() => setShowSaveTemplate(false)}
+              className="inline-flex items-center justify-center rounded-lg border border-surface-300 bg-white px-4 py-2 text-sm font-medium text-surface-700 hover:bg-surface-50 transition-colors"
+            >
+              Cancel
+            </button>
+            <Button
+              type="button"
+              onClick={() => {
+                if (templateName.trim() && newMessage.trim()) {
+                  smsApi.templates.create(schoolId, { name: templateName.trim(), message: newMessage }).then(() => {
+                    loadSmsTemplates()
+                    setShowSaveTemplate(false)
+                    setTemplateName("")
+                  }).catch(() => {})
+                }
+              }}
+              disabled={!templateName.trim() || !newMessage.trim()}
+            >
+              Save
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          <p className="text-sm text-surface-600">Give this message a name to reuse it later.</p>
+          <Input
+            value={templateName}
+            onChange={(e) => setTemplateName(e.target.value)}
+            placeholder="Template name"
+            autoFocus
+          />
+        </div>
+      </Modal>
     </div>
   )
 }

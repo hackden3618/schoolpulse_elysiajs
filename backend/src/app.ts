@@ -23,6 +23,7 @@ import { dashboardRoute } from "@/modules/dashboard/route"
 import { reportsRoute } from "@/modules/reports/route"
 import { notificationsRoute } from "@/modules/notifications/route"
 import { rolesRoute } from "@/modules/roles/route"
+import { schoolSupportRoute, platformSupportRoute } from "@/modules/support/route"
 
 export const app = new Elysia()
   .use(openapi())
@@ -60,3 +61,5 @@ export const app = new Elysia()
   .use(dashboardRoute)
   .use(reportsRoute)
   .use(notificationsRoute)
+  .use(schoolSupportRoute)
+  .use(platformSupportRoute)

@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import {
     LogOut, RefreshCw, CheckCircle, XCircle, AlertCircle,
     Building2, Users, Loader2, Clock, Phone, Mail, MapPin,
-    Search, Plus, X,
+    Search, Plus, X, LifeBuoy,
 } from "lucide-react"
 import { Card, CardContent } from "../../components/ui/Card"
 import { Badge } from "../../components/ui/Badge"
@@ -15,9 +15,10 @@ import { Logo } from "../../components/ui/Logo"
 import { ConfirmModal } from "../../components/ui/Modal"
 import { joinRequestsApi, platformAdminApi, setPlatformToken, getPlatformToken } from "../../lib/api"
 import { UX_MIN_DELAY, withMinDelay } from "../../lib/ux"
+import { SupportPanel } from "./SupportPanel"
 import type { JoinRequest } from "../../types"
 
-type Tab = "requests" | "admins" | "schools"
+type Tab = "requests" | "admins" | "schools" | "support"
 type RequestFilter = "all" | "pending" | "approved" | "rejected"
 
 function timeAgo(dateStr: string): string {
@@ -285,13 +286,13 @@ export function PlatformDashboard() {
 
                 {/* Tabs */}
                 <div className="flex gap-1 rounded-lg bg-primary-50 p-1 border border-primary-100 w-fit mb-6">
-                    {(["requests", "schools", "admins"] as Tab[]).map((t) => (
+                    {(["requests", "schools", "admins", "support"] as Tab[]).map((t) => (
                         <button key={t} onClick={() => setTab(t)}
                             className={`flex items-center gap-1.5 rounded-md px-4 py-2 text-xs font-semibold transition-all capitalize ${tab === t ? "bg-white text-primary-900 shadow-sm" : "text-primary-500 hover:text-primary-700"
                                 }`}
                         >
-                            {t === "requests" ? <Building2 size={14} /> : t === "schools" ? <Building2 size={14} /> : <Users size={14} />}
-                            {t === "requests" ? "Join Requests" : t === "schools" ? "Schools" : "Platform Admins"}
+                            {t === "requests" ? <Building2 size={14} /> : t === "schools" ? <Building2 size={14} /> : t === "admins" ? <Users size={14} /> : <LifeBuoy size={14} />}
+                            {t === "requests" ? "Join Requests" : t === "schools" ? "Schools" : t === "admins" ? "Platform Admins" : "Support Tickets"}
                             {t === "requests" && pendingRequests.length > 0 && (
                                 <span className="ml-1 rounded-full bg-accent px-1.5 py-0.5 text-[9px] font-bold text-white">
                                     {pendingRequests.length}
@@ -463,6 +464,8 @@ export function PlatformDashboard() {
                             </Card>
                         )}
                     </div>
+                ) : tab === "support" ? (
+                    <SupportPanel />
                 ) : (
                     /* Platform Admins Tab */
                     <div className="space-y-6">

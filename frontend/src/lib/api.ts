@@ -25,6 +25,8 @@ import type {
     SmsTemplate,
     SmsSendResult,
     SmsSegmentInfo,
+    SupportTicket,
+    SupportTicketMessage,
 } from "../types"
 
 const API_BASE = "/api/v1"
@@ -225,6 +227,10 @@ export const usersApi = {
             method: "PATCH",
             body: JSON.stringify(data),
         }),
+    delete: (schoolId: string, userId: string) =>
+        request<ApiResponse<{ message: string }>>(`/schools/${schoolId}/users/${userId}`, {
+            method: "DELETE",
+        }),
 }
 
 export const membershipsApi = {
@@ -261,8 +267,8 @@ export const rolesApi = {
  * ========================================================================= */
 
 export const studentsApi = {
-    list: (schoolId: string) =>
-        request<ApiResponse<Student[]>>(`/schools/${schoolId}/students`),
+    list: (schoolId: string, includeArchived?: boolean) =>
+        request<ApiResponse<Student[]>>(`/schools/${schoolId}/students${includeArchived ? "?includeArchived=true" : ""}`),
     my: (schoolId: string) =>
         request<ApiResponse<Student[]>>(`/schools/${schoolId}/students/my`),
     get: (schoolId: string, studentId: string) =>
@@ -307,6 +313,10 @@ export const studentsApi = {
         request<ApiResponse<Student>>(`/schools/${schoolId}/students/${studentId}/archive`, {
             method: "POST",
             body: JSON.stringify(data),
+        }),
+    unarchive: (schoolId: string, studentId: string) =>
+        request<ApiResponse<Student>>(`/schools/${schoolId}/students/${studentId}/unarchive`, {
+            method: "POST",
         }),
     addGuardian: (schoolId: string, studentId: string, data: {
         guardianId: string
@@ -555,10 +565,14 @@ export const conversationsApi = {
         }),
     get: (schoolId: string, conversationId: string) =>
         request<ApiResponse<Conversation>>(`/schools/${schoolId}/conversations/${conversationId}`),
+    delete: (schoolId: string, conversationId: string) =>
+        request<ApiResponse<{ deleted: boolean }>>(`/schools/${schoolId}/conversations/${conversationId}`, {
+            method: "DELETE",
+        }),
     messages: {
         list: (schoolId: string, conversationId: string) =>
             request<ApiResponse<Message[]>>(`/schools/${schoolId}/conversations/${conversationId}/messages`),
-        send: (schoolId: string, conversationId: string, data: { content: string; channel?: string; priority?: string }) =>
+        send: (schoolId: string, conversationId: string, data: { content: string; channel?: string; priority?: string; recipientPhones?: string[] }) =>
             request<ApiResponse<Message>>(`/schools/${schoolId}/conversations/${conversationId}/messages`, {
                 method: "POST",
                 body: JSON.stringify(data),
@@ -566,6 +580,11 @@ export const conversationsApi = {
         delete: (schoolId: string, messageId: string) =>
             request<ApiResponse<{ deleted: boolean }>>(`/schools/${schoolId}/messages/${messageId}`, {
                 method: "DELETE",
+            }),
+        edit: (schoolId: string, messageId: string, data: { content: string }) =>
+            request<ApiResponse<Message>>(`/schools/${schoolId}/messages/${messageId}`, {
+                method: "PATCH",
+                body: JSON.stringify(data),
             }),
     },
 }
@@ -702,5 +721,47 @@ export const platformAdminApi = {
     deleteSchool: (id: string) =>
         platformRequest<ApiResponse<{ deleted: boolean }>>(`/platform/schools/${id}`, {
             method: "DELETE",
+        }),
+    listTickets: (params?: { status?: string; category?: string; q?: string }) => {
+        const query = new URLSearchParams()
+        if (params?.status) query.set("status", params.status)
+        if (params?.category) query.set("category", params.category)
+        if (params?.q) query.set("q", params.q)
+        const qs = query.toString()
+        return platformRequest<ApiResponse<SupportTicket[]>>(`/platform/support/tickets${qs ? `?${qs}` : ""}`)
+    },
+    getTicket: (ticketId: string) =>
+        platformRequest<ApiResponse<SupportTicket>>(`/platform/support/tickets/${ticketId}`),
+    sendTicketMessage: (ticketId: string, data: { content: string }) =>
+        platformRequest<ApiResponse<{ message: SupportTicketMessage; ticket: SupportTicket }>>(`/platform/support/tickets/${ticketId}/messages`, {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
+    updateTicketStatus: (ticketId: string, data: { status: string }) =>
+        platformRequest<ApiResponse<SupportTicket>>(`/platform/support/tickets/${ticketId}/status`, {
+            method: "PATCH",
+            body: JSON.stringify(data),
+        }),
+}
+
+export const supportApi = {
+    listTickets: (schoolId: string, params?: { status?: string; category?: string }) => {
+        const query = new URLSearchParams()
+        if (params?.status) query.set("status", params.status)
+        if (params?.category) query.set("category", params.category)
+        const qs = query.toString()
+        return request<ApiResponse<SupportTicket[]>>(`/schools/${schoolId}/support/tickets${qs ? `?${qs}` : ""}`)
+    },
+    createTicket: (schoolId: string, data: { subject: string; category?: string; message: string }) =>
+        request<ApiResponse<SupportTicket>>(`/schools/${schoolId}/support/tickets`, {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
+    getTicket: (schoolId: string, ticketId: string) =>
+        request<ApiResponse<SupportTicket>>(`/schools/${schoolId}/support/tickets/${ticketId}`),
+    sendMessage: (schoolId: string, ticketId: string, data: { content: string }) =>
+        request<ApiResponse<{ message: SupportTicketMessage; ticket: SupportTicket }>>(`/schools/${schoolId}/support/tickets/${ticketId}/messages`, {
+            method: "POST",
+            body: JSON.stringify(data),
         }),
 }

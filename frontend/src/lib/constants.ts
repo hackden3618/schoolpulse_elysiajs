@@ -11,6 +11,7 @@ import {
   CalendarCheck,
   Shield,
   Building2,
+  LifeBuoy,
 } from "lucide-react"
 
 export interface NavGroup {
@@ -25,7 +26,7 @@ export interface NavItem {
   badge?: number | string
 }
 
-export const navigation: NavGroup[] = [
+const ALL_NAV: NavGroup[] = [
   {
     label: "Main",
     items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
@@ -45,6 +46,7 @@ export const navigation: NavGroup[] = [
     items: [
       { label: "Finance", href: "/finance", icon: DollarSign },
       { label: "Communication", href: "/communication", icon: MessageSquare },
+      { label: "Support", href: "/support", icon: LifeBuoy },
       { label: "Reports", href: "/reports", icon: BarChart3 },
     ],
   },
@@ -56,6 +58,25 @@ export const navigation: NavGroup[] = [
     ],
   },
 ]
+
+const NAV_BY_ROLE: Record<string, string[]> = {
+  Guardian: ["/dashboard", "/communication", "/support"],
+  Teacher: ["/dashboard", "/attendance", "/assessments", "/communication", "/support", "/reports"],
+  Bursar: ["/dashboard", "/finance", "/communication", "/support", "/reports"],
+}
+
+export function getNavigation(roleName?: string): NavGroup[] {
+  const allowed = roleName ? NAV_BY_ROLE[roleName] : undefined
+  if (!allowed) return ALL_NAV
+  return ALL_NAV
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => allowed.includes(item.href)),
+    }))
+    .filter((group) => group.items.length > 0)
+}
+
+export const navigation = ALL_NAV
 
 export const quickActions = [
   { label: "Admit Student", href: "/students/create" },

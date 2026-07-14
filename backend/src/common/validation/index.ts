@@ -16,9 +16,9 @@ const PHONE_FIELDS = new Set(["phone", "phoneNumber", "schoolPhone", "mobile"])
  */
 export function normalizePhone(phone: string): string {
   const cleaned = phone.replace(/[\s\-\(\)]/g, "")
-  if (cleaned.startsWith("+")) return cleaned
-  if (cleaned.startsWith("0")) return "+254" + cleaned.slice(1)
-  if (cleaned.startsWith("254")) return "+" + cleaned
+  if (cleaned.startsWith("+")) return cleaned.slice(1)
+  if (cleaned.startsWith("0")) return "254" + cleaned.slice(1)
+  if (cleaned.startsWith("254")) return cleaned
   return cleaned
 }
 

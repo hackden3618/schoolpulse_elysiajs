@@ -147,7 +147,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
                 {user ? `${user.firstName} ${user.lastName || ""}` : ""}
               </p>
               <p className="text-[10px] text-primary-400 font-semibold uppercase mt-0.5">
-                {activeRole?.name === "guardian" ? "Parent / Guardian" : (activeRole?.name || "")}
+                {activeRole?.name === "Guardian" ? "Parent / Guardian" : (activeRole?.name || "")}
               </p>
             </div>
             <ChevronDown size={12} className="text-primary-400" />

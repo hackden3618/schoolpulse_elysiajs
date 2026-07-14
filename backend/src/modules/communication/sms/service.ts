@@ -126,30 +126,36 @@ export async function deleteSmsTemplate(schoolId: string, templateId: string): P
 
 export async function sendSms(options: SmsOptions): Promise<SmsSendResult> {
   const segmentInfo = calculateGsm7Segments(options.message);
+  const BATCH_SIZE = 20;
 
-  const payload = options.recipients.map((mobile) => ({
+  const normalized = options.recipients.map((mobile) => ({
     mobile: normalizePhone(mobile).replace(/^\+/, ""),
     message: options.message,
   }));
 
-  const providerResults = await sendBulkSms(payload);
+  const allResults: RecipientResult[] = [];
 
-  const results: RecipientResult[] = providerResults.map((r) => ({
-    mobile: r.mobile,
-    success: r.success,
-    messageId: r.messageId,
-    ...(r.success ? {} : { error: r.description }),
-  }));
+  for (let i = 0; i < normalized.length; i += BATCH_SIZE) {
+    const batch = normalized.slice(i, i + BATCH_SIZE);
+    const providerResults = await sendBulkSms(batch);
+    const batchResults: RecipientResult[] = providerResults.map((r) => ({
+      mobile: r.mobile,
+      success: r.success,
+      messageId: r.messageId,
+      ...(r.success ? {} : { error: r.description }),
+    }));
+    allResults.push(...batchResults);
+  }
 
-  const successful = results.filter((r) => r.success).length;
-  const failed = results.length - successful;
+  const successful = allResults.filter((r) => r.success).length;
+  const failed = allResults.length - successful;
 
   return {
-    totalRecipients: results.length,
+    totalRecipients: allResults.length,
     successful,
     failed,
     segmentInfo,
-    results,
+    results: allResults,
   };
 }
 

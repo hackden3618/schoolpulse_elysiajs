@@ -7,6 +7,7 @@ import {
   createStudentController,
   updateStudentController,
   archiveStudentController,
+  unarchiveStudentController,
   linkGuardianController,
   unlinkGuardianController,
   enrollStudentController,
@@ -29,6 +30,7 @@ export const studentRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolI
   .use(authGuard)
   .get("/", getStudentsController, {
     params: t.Object({ schoolId: t.String() }),
+    query: t.Object({ includeArchived: t.Optional(t.String()) }),
     detail: { summary: "List students", tags: ["Students"] },
   })
   .post("/", createStudentController, {
@@ -49,6 +51,10 @@ export const studentRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolI
     params: t.Object({ schoolId: t.String(), studentId: t.String() }),
     body: archiveStudentSchema,
     detail: { summary: "Archive student", tags: ["Students"] },
+  })
+  .post("/:studentId/unarchive", unarchiveStudentController, {
+    params: t.Object({ schoolId: t.String(), studentId: t.String() }),
+    detail: { summary: "Restore archived student", tags: ["Students"] },
   })
   .post("/:studentId/guardians", linkGuardianController, {
     params: t.Object({ schoolId: t.String(), studentId: t.String() }),

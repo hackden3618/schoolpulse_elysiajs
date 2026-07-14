@@ -72,7 +72,7 @@ export function EditUserPage() {
         }
         
         if (user.isGuardian) {
-          const guardianRole = rolesRes.data.find((r: Role) => r.name === "guardian")
+          const guardianRole = rolesRes.data.find((r: Role) => r.name === "Guardian")
           if (guardianRole && !initialRoleIds.includes(guardianRole.id)) {
             initialRoleIds.push(guardianRole.id)
           }
@@ -93,7 +93,7 @@ export function EditUserPage() {
 
   const toggleRole = (roleId: string) => {
     const role = roles.find(r => r.id === roleId)
-    if (role?.name === "guardian" && isGuardian) return // Guardian role is immutable if user is a guardian
+    if (role?.name === "Guardian" && isGuardian) return // Guardian role is immutable if user is a guardian
     
     setSelectedRoleIds((prev) =>
       prev.includes(roleId) ? prev.filter((id) => id !== roleId) : [...prev, roleId]
@@ -266,7 +266,7 @@ export function EditUserPage() {
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                     {roles.map((role) => {
                       const selected = selectedRoleIds.includes(role.id)
-                      const isImmutable = role.name === "guardian" && isGuardian
+                      const isImmutable = role.name === "Guardian" && isGuardian
                       return (
                         <button
                           key={role.id}
@@ -286,7 +286,7 @@ export function EditUserPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <p className={`text-sm font-semibold ${selected ? "text-accent-700" : "text-primary-900"}`}>
-                              {role.name === "guardian" ? "Parent / Guardian" : role.name}
+                              {role.name === "Guardian" ? "Parent / Guardian" : role.name}
                             </p>
                             <p className="text-xs text-primary-400 truncate">{role.description}</p>
                           </div>

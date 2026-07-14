@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { useNavigate, useSearchParams, Link } from "react-router-dom"
+import { useNavigate, useSearchParams, useLocation, Link } from "react-router-dom"
 import { AlertCircle, CheckCircle } from "lucide-react"
 import { authApi } from "../../lib/api"
 import { Logo } from "../../components/ui/Logo"
@@ -8,9 +8,13 @@ import { Input } from "../../components/ui/Input"
 
 export function ResetPasswordPage() {
   const navigate = useNavigate()
+  const location = useLocation()
   const [searchParams] = useSearchParams()
-  const token = searchParams.get("token") || ""
+  const urlToken = searchParams.get("token") || ""
 
+  const loginContext = (location.state as { login?: string } | null)?.login || ""
+
+  const [token, setToken] = useState(urlToken)
   const [password, setPassword] = useState("")
   const [confirmPassword, setConfirmPassword] = useState("")
   const [error, setError] = useState("")
@@ -21,8 +25,8 @@ export function ResetPasswordPage() {
     e.preventDefault()
     setError("")
 
-    if (!token) {
-      setError("Invalid or missing reset token.")
+    if (!token.trim()) {
+      setError("Enter the reset code you received via SMS.")
       return
     }
     if (password.length < 6) {
@@ -36,7 +40,7 @@ export function ResetPasswordPage() {
 
     setLoading(true)
     try {
-      await authApi.resetPassword({ token, password })
+      await authApi.resetPassword({ token: token.trim(), password })
       setSuccess(true)
       setTimeout(() => navigate("/auth/login", { replace: true }), 3000)
     } catch (err) {
@@ -76,7 +80,11 @@ export function ResetPasswordPage() {
         </div>
 
         <h2 className="text-2xl font-bold text-primary-900 tracking-tight">Reset password</h2>
-        <p className="mt-1 text-sm text-primary-500">Enter your new password below.</p>
+        <p className="mt-1 text-sm text-primary-500">
+          {loginContext
+            ? `Enter the code sent to ${loginContext} and your new password.`
+            : "Enter the reset code from your SMS and your new password."}
+        </p>
 
         <form onSubmit={handleSubmit} className="mt-8 space-y-5">
           {error && (
@@ -85,6 +93,15 @@ export function ResetPasswordPage() {
               <span>{error}</span>
             </div>
           )}
+
+          <Input
+            label="Reset Code"
+            type="text"
+            placeholder="Enter the code from your SMS"
+            value={token}
+            onChange={(e) => setToken(e.target.value)}
+            autoFocus
+          />
 
           <Input
             label="New Password"

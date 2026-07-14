@@ -1,10 +1,11 @@
-import { useEffect, useRef, useCallback } from "react"
-import { useAuth } from "./auth-context"
+import { createContext, useContext, useEffect, useRef, useCallback, type ReactNode } from "react"
 import { getAccessToken, getPlatformToken } from "./api"
+import { useAuth } from "./auth-context"
+import { useUnread } from "./unread-context"
 
-type WsEventHandler = (data: any) => void
+export type WsEventHandler = (data: any) => void
 
-interface WsSubscription {
+export interface WsSubscription {
   conversationId: string
   onMessage: WsEventHandler
   onReceiptUpdate: WsEventHandler
@@ -12,7 +13,7 @@ interface WsSubscription {
   onMessageUpdated?: WsEventHandler
 }
 
-interface WsCallbacks {
+export interface WsCallbacks {
   onTicketNew?: WsEventHandler
   onMessageNew?: WsEventHandler
   onTicketUpdated?: WsEventHandler
@@ -20,18 +21,34 @@ interface WsCallbacks {
   onTyping?: WsEventHandler
 }
 
-export function useWebSocket(
-  subscriptions: WsSubscription[] = [],
-  callbacks?: WsCallbacks,
-  platformMode?: boolean
-) {
+interface WsContextType {
+  subscribe: (conversationId: string) => void
+  markRead: (messageId: string, schoolId: string) => void
+  send: (data: unknown) => void
+  registerSubscriptions: (subs: WsSubscription[]) => () => void
+  registerCallbacks: (callbacks: WsCallbacks) => () => void
+}
+
+const WsContext = createContext<WsContextType>({
+  subscribe: () => {},
+  markRead: () => {},
+  send: () => {},
+  registerSubscriptions: () => () => {},
+  registerCallbacks: () => () => {},
+})
+
+export function useWs() {
+  return useContext(WsContext)
+}
+
+export function WsProvider({ children, platformMode, onGlobalMessageNew }: { children: ReactNode; platformMode?: boolean; onGlobalMessageNew?: WsEventHandler }) {
+  const { isAuthenticated } = useAuth()
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
-  const { isAuthenticated } = useAuth()
-  const subsRef = useRef<WsSubscription[]>(subscriptions)
-  subsRef.current = subscriptions
-  const callbacksRef = useRef(callbacks)
-  callbacksRef.current = callbacks
+  const subsRef = useRef<WsSubscription[]>([])
+  const callbacksRef = useRef<WsCallbacks>({})
+  const onGlobalMessageNewRef = useRef(onGlobalMessageNew)
+  onGlobalMessageNewRef.current = onGlobalMessageNew
 
   const connect = useCallback(() => {
     const token = platformMode ? getPlatformToken() : getAccessToken()
@@ -50,49 +67,52 @@ export function useWebSocket(
     ws.onmessage = (event) => {
       try {
         const { event: eventType, data } = JSON.parse(event.data)
+        const subs = subsRef.current
+        const cbs = callbacksRef.current
         switch (eventType) {
           case "message:new":
-            for (const sub of subsRef.current) {
+            onGlobalMessageNewRef.current?.(data)
+            for (const sub of subs) {
               if (sub.conversationId === data.conversationId || data.conversationId === sub.conversationId) {
                 sub.onMessage(data)
               }
             }
             break
           case "receipt:updated":
-            for (const sub of subsRef.current) {
+            for (const sub of subs) {
               if (sub.conversationId === data.conversationId || data.conversationId === sub.conversationId) {
                 sub.onReceiptUpdate(data)
               }
             }
             break
           case "message:deleted":
-            for (const sub of subsRef.current) {
+            for (const sub of subs) {
               if (sub.conversationId === data.conversationId || data.conversationId === sub.conversationId) {
                 sub.onDelete?.(data)
               }
             }
             break
           case "message:updated":
-            for (const sub of subsRef.current) {
+            for (const sub of subs) {
               if (sub.conversationId === data.conversationId || data.conversationId === sub.conversationId) {
                 sub.onMessageUpdated?.(data)
               }
             }
             break
           case "support:ticket:new":
-            callbacksRef.current?.onTicketNew?.(data)
+            cbs.onTicketNew?.(data)
             break
           case "support:message:new":
-            callbacksRef.current?.onMessageNew?.(data)
+            cbs.onMessageNew?.(data)
             break
           case "support:ticket:updated":
-            callbacksRef.current?.onTicketUpdated?.(data)
+            cbs.onTicketUpdated?.(data)
             break
           case "conversation:created":
-            callbacksRef.current?.onConversationCreated?.(data)
+            cbs.onConversationCreated?.(data)
             break
           case "typing:indicator":
-            callbacksRef.current?.onTyping?.(data)
+            cbs.onTyping?.(data)
             break
           default:
             break
@@ -112,7 +132,15 @@ export function useWebSocket(
   }, [])
 
   useEffect(() => {
-    if (!isAuthenticated) return
+    if (!isAuthenticated) {
+      clearTimeout(reconnectTimerRef.current)
+      if (wsRef.current) {
+        wsRef.current.onclose = null
+        wsRef.current.close()
+        wsRef.current = null
+      }
+      return
+    }
     connect()
     return () => {
       clearTimeout(reconnectTimerRef.current)
@@ -136,5 +164,25 @@ export function useWebSocket(
     }
   }, [])
 
-  return { subscribe, markRead, ws: wsRef }
+  const send = useCallback((data: unknown) => {
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify(data))
+    }
+  }, [])
+
+  const registerSubscriptions = useCallback((subs: WsSubscription[]) => {
+    subsRef.current = subs
+    return () => { subsRef.current = [] }
+  }, [])
+
+  const registerCallbacks = useCallback((callbacks: WsCallbacks) => {
+    callbacksRef.current = callbacks
+    return () => { callbacksRef.current = {} }
+  }, [])
+
+  return (
+    <WsContext.Provider value={{ subscribe, markRead, send, registerSubscriptions, registerCallbacks }}>
+      {children}
+    </WsContext.Provider>
+  )
 }

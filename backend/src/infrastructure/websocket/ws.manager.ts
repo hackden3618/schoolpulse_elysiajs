@@ -5,25 +5,32 @@ import type { WsClient } from "./ws.types"
 class WsManager {
   private connections = new Map<string, Set<WsClient>>()
   private conversationSubs = new Map<string, Set<WsClient>>()
+  private adminConnections = new Set<WsClient>()
 
-  authenticate(url: string): { userId: string; schoolId: string } | null {
-    const params = new URLSearchParams(url.includes("?") ? url.split("?")[1] ?? "" : "")
+  authenticate(urlOrSearch: string): { userId: string; schoolId: string; isPlatformAdmin: boolean } | null {
+    const params = new URLSearchParams(urlOrSearch.includes("?") ? urlOrSearch.split("?")[1] ?? "" : urlOrSearch)
     const token = params.get("token")
     if (!token) return null
     try {
-      const payload: JwtPayload = verifyToken(token)
-      return { userId: payload.sub, schoolId: payload.schoolId }
+      const payload: any = verifyToken(token)
+      if (payload.type === "platform") {
+        return { userId: payload.sub, schoolId: "", isPlatformAdmin: true }
+      }
+      return { userId: payload.sub, schoolId: payload.schoolId, isPlatformAdmin: false }
     } catch {
       return null
     }
   }
 
-  register(ws: WebSocket, userId: string, schoolId: string): WsClient {
-    const client: WsClient = { ws, userId, schoolId, subscribedConversations: new Set() }
+  register(ws: WebSocket, userId: string, schoolId: string, isPlatformAdmin: boolean): WsClient {
+    const client: WsClient = { ws, userId, schoolId, isPlatformAdmin, subscribedConversations: new Set() }
     if (!this.connections.has(userId)) {
       this.connections.set(userId, new Set())
     }
     this.connections.get(userId)!.add(client)
+    if (isPlatformAdmin) {
+      this.adminConnections.add(client)
+    }
     return client
   }
 
@@ -37,6 +44,7 @@ class WsManager {
       subs.delete(client)
       if (subs.size === 0) this.conversationSubs.delete(convId)
     }
+    this.adminConnections.delete(client)
   }
 
   subscribe(client: WsClient, conversationId: string) {
@@ -63,6 +71,17 @@ class WsManager {
     }
   }
 
+  broadcastToConversationExcept(conversationId: string, event: string, data: unknown, excludeUserId: string) {
+    const subs = this.conversationSubs.get(conversationId)
+    if (!subs) return
+    const message = JSON.stringify({ event, data })
+    for (const client of subs) {
+      if (client.userId !== excludeUserId && client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(message)
+      }
+    }
+  }
+
   broadcastToUser(userId: string, event: string, data: unknown) {
     const userConns = this.connections.get(userId)
     if (!userConns) return
@@ -81,6 +100,15 @@ class WsManager {
         if (client.schoolId === schoolId && client.ws.readyState === WebSocket.OPEN) {
           client.ws.send(message)
         }
+      }
+    }
+  }
+
+  broadcastToAdmins(event: string, data: unknown) {
+    const message = JSON.stringify({ event, data })
+    for (const client of this.adminConnections) {
+      if (client.ws.readyState === WebSocket.OPEN) {
+        client.ws.send(message)
       }
     }
   }

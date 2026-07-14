@@ -17,5 +17,8 @@ export default defineConfig({
                 ws: true,
             },
         },
+        hmr: {
+            path: "/__vite_hmr",
+        },
     },
 })

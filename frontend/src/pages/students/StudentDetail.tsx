@@ -13,6 +13,7 @@ import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
 import { CardSkeleton } from "../../components/ui/Skeleton"
 import { ErrorBanner } from "../../components/ui/ErrorBanner"
+import { ConfirmModal } from "../../components/ui/Modal"
 import { MpesaPaymentModal } from "../../components/finance/MpesaPaymentModal"
 import { BulkMpesaPaymentModal } from "../../components/finance/BulkMpesaPaymentModal"
 import { EnrollStudentModal } from "./EnrollStudentModal"
@@ -284,10 +285,13 @@ export function StudentDetail() {
   const [editingEnrollment, setEditingEnrollment] = useState<any | null>(null)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showArchiveModal, setShowArchiveModal] = useState(false)
+  const [unarchiving, setUnarchiving] = useState(false)
+  const [showUnarchiveConfirm, setShowUnarchiveConfirm] = useState(false)
   const [showAddGuardianModal, setShowAddGuardianModal] = useState(false)
   const [unlinkingGuardian, setUnlinkingGuardian] = useState<{ guardianId: string; name: string } | null>(null)
 
-  const { school } = useAuth()
+  const { school, activeRole } = useAuth()
+  const isGuardian = activeRole?.name === "Guardian"
 
   const loadData = async () => {
     if (!id || !school) return
@@ -308,6 +312,21 @@ export function StudentDetail() {
   }
 
   useEffect(() => { loadData() }, [id])
+
+  const handleUnarchive = async () => {
+    if (!student) return
+    setUnarchiving(true)
+    setActionError("")
+    try {
+      const res = await studentsApi.unarchive(school!.id, student.id)
+      setStudent(res.data)
+      setShowUnarchiveConfirm(false)
+    } catch (e) {
+      setActionError(e instanceof Error ? e.message : "Failed to restore student")
+    } finally {
+      setUnarchiving(false)
+    }
+  }
 
   if (loading) {
     return (
@@ -347,8 +366,8 @@ export function StudentDetail() {
         description={`Admission No. ${student.admissionNumber}`}
         actions={
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => navigate("/students")}>
-              <ArrowLeft size={16} /> Back to Students
+            <Button variant="secondary" onClick={() => navigate(isGuardian ? "/dashboard" : "/students")}>
+              <ArrowLeft size={16} /> {isGuardian ? "Back to Dashboard" : "Back to Students"}
             </Button>
           </div>
         }
@@ -374,24 +393,36 @@ export function StudentDetail() {
                 <p>DOB: <span className="text-surface-700 font-medium">{new Date(student.dateOfBirth).toLocaleDateString()}</span></p>
                 <p>Admitted: <span className="text-surface-700 font-medium">{new Date(student.admissionDate).toLocaleDateString()}</span></p>
               </div>
-              <div className="mt-6 flex gap-2 justify-center">
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  onClick={() => setShowEditModal(true)}
-                >
-                  Edit Profile
-                </Button>
-                {student.status !== "archived" && (
+              {!isGuardian && (
+                <div className="mt-6 flex gap-2 justify-center">
                   <Button
                     size="sm"
-                    variant="danger"
-                    onClick={() => setShowArchiveModal(true)}
+                    variant="secondary"
+                    onClick={() => setShowEditModal(true)}
                   >
-                    Archive
+                    Edit Profile
                   </Button>
-                )}
-              </div>
+                  {student.status !== "archived" && (
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => setShowArchiveModal(true)}
+                    >
+                      Archive
+                    </Button>
+                  )}
+                  {student.status === "archived" && (
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setShowUnarchiveConfirm(true)}
+                      loading={unarchiving}
+                    >
+                      Restore
+                    </Button>
+                  )}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -462,9 +493,11 @@ export function StudentDetail() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-surface-900">Guardians</h3>
-                <Button size="sm" variant="secondary" onClick={() => setShowAddGuardianModal(true)}>
-                  <Plus size={14} className="mr-1" /> Add Guardian
-                </Button>
+                {!isGuardian && (
+                  <Button size="sm" variant="secondary" onClick={() => setShowAddGuardianModal(true)}>
+                    <Plus size={14} className="mr-1" /> Add Guardian
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -489,6 +522,7 @@ export function StudentDetail() {
                           <Phone size={14} />
                           <span className="text-sm">{g.guardian?.phone || "—"}</span>
                         </div>
+                        {!isGuardian && (
                         <button
                           onClick={() => setUnlinkingGuardian({
                             guardianId: g.guardianId ?? g.id,
@@ -499,6 +533,7 @@ export function StudentDetail() {
                         >
                           <Trash2 size={16} />
                         </button>
+                      )}
                       </div>
                     </div>
                   ))}
@@ -512,9 +547,11 @@ export function StudentDetail() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold text-surface-900">Enrollment History</h3>
-                <Button size="sm" variant="secondary" onClick={() => setShowEnrollModal(true)}>
-                  <Plus size={14} className="mr-1" /> Add Enrollment
-                </Button>
+                {!isGuardian && (
+                  <Button size="sm" variant="secondary" onClick={() => setShowEnrollModal(true)}>
+                    <Plus size={14} className="mr-1" /> Add Enrollment
+                  </Button>
+                )}
               </div>
             </CardHeader>
             <CardContent className="p-0">
@@ -537,7 +574,9 @@ export function StudentDetail() {
                       </div>
                       <div className="flex items-center gap-4">
                         <Badge variant={e.status === "active" ? "success" : "default"}>{e.status}</Badge>
-                        <Button size="sm" variant="secondary" onClick={() => setEditingEnrollment(e)}>Edit</Button>
+                        {!isGuardian && (
+                          <Button size="sm" variant="secondary" onClick={() => setEditingEnrollment(e)}>Edit</Button>
+                        )}
                       </div>
                     </div>
                   ))}
@@ -566,6 +605,18 @@ export function StudentDetail() {
           onArchived={() => setShowArchiveModal(false)}
         />
       )}
+
+      <ConfirmModal
+        open={showUnarchiveConfirm}
+        onClose={() => { if (!unarchiving) setShowUnarchiveConfirm(false) }}
+        onConfirm={handleUnarchive}
+        title="Restore Student"
+        description={student ? `Restore ${student.firstName} ${student.lastName} to active status?` : ""}
+        confirmLabel="Restore"
+        cancelLabel="Cancel"
+        loading={unarchiving}
+        variant="primary"
+      />
 
       {showAddGuardianModal && student && (
         <AddGuardianModal

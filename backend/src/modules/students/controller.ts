@@ -1,8 +1,8 @@
 import { success } from "@/common/responses";
 import * as svc from "./service";
 
-export async function getStudentsController({ params: { schoolId }, set }: any) {
-  const students = await svc.listAllStudents(schoolId);
+export async function getStudentsController({ params: { schoolId }, query }: any) {
+  const students = await svc.listAllStudents(schoolId, query?.includeArchived === "true");
   return success(students, schoolId);
 }
 
@@ -24,6 +24,11 @@ export async function updateStudentController({ params: { schoolId, studentId },
 
 export async function archiveStudentController({ params: { schoolId, studentId }, body, set }: any) {
   const student = await svc.archiveStudent(schoolId, studentId, body);
+  return success(student, schoolId);
+}
+
+export async function unarchiveStudentController({ params: { schoolId, studentId } }: any) {
+  const student = await svc.unarchiveStudent(schoolId, studentId);
   return success(student, schoolId);
 }
 

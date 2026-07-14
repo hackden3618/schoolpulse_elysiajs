@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react"
-import { Link } from "react-router-dom"
+import { Link, useNavigate } from "react-router-dom"
 import { Mail, ArrowLeft, AlertCircle, CheckCircle } from "lucide-react"
 import { authApi } from "../../lib/api"
 import { Logo } from "../../components/ui/Logo"
@@ -7,6 +7,7 @@ import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
 
 export function ForgotPasswordPage() {
+  const navigate = useNavigate()
   const [login, setLogin] = useState("")
   const [error, setError] = useState("")
   const [loading, setLoading] = useState(false)
@@ -58,6 +59,14 @@ export function ForgotPasswordPage() {
             <ArrowLeft size={16} />
             Back to sign in
           </Link>
+          <button
+            onClick={() => {
+              navigate("/auth/reset-password", { state: { login } })
+            }}
+            className="mt-3 block w-full text-center text-sm font-semibold text-accent hover:text-accent-600"
+          >
+            I have a reset code
+          </button>
           <button
             onClick={() => setResult(null)}
             className="mt-3 block w-full text-center text-sm text-primary-500 hover:text-primary-700 underline"

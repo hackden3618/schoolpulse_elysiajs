@@ -403,6 +403,24 @@ enum PlatformAdminStatus {
     @@map("platform_admin_status")
 }
 
+enum SupportCategory {
+    query
+    support
+    feedback
+    other
+
+    @@map("support_category")
+}
+
+enum SupportTicketStatus {
+    open
+    in_progress
+    resolved
+    closed
+
+    @@map("support_ticket_status")
+}
+
 model PlatformAdmin {
     id             String              @id @default(uuid()) @db.Uuid
     firstName      String              @map("first_name")
@@ -451,6 +469,8 @@ model User {
     conversationParticipants ConversationParticipant[]
     receivedMessages         Message[]                 @relation("MessageRecipient")
     messageReceipts          MessageReceipt[]
+    createdSupportTickets    SupportTicket[]
+    supportTicketMessages    SupportTicketMessage[]
 
     @@map("users")
 }
@@ -528,6 +548,7 @@ model School {
     messageTokens            MessageToken[]
     subscriptions            Subscription[]
     smsWallet                SmsWallet?
+    supportTickets           SupportTicket[]
 
     @@unique([schoolName, schoolLevel, schoolPhone, schoolEmail])
 
@@ -1239,6 +1260,51 @@ model MessageReceipt {
     recipientUser User?   @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
 
     @@map("message_receipts")
+}
+
+/**
+ * =========================
+ * SUPPORT DOMAIN
+ * =========================
+ */
+
+model SupportTicket {
+    id        String   @id @default(uuid()) @db.Uuid
+    schoolId  String   @map("school_id") @db.Uuid
+    subject   String
+    category  SupportCategory      @default(support)
+    status    SupportTicketStatus  @default(open)
+    createdBy String   @map("created_by") @db.Uuid
+
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+    deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+    school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+    creator  User   @relation(fields: [createdBy], references: [id])
+
+    messages SupportTicketMessage[]
+
+    @@index([schoolId, status], map: "idx_support_tickets_school_status")
+    @@index([category, status], map: "idx_support_tickets_cat_status")
+    @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+    id        String   @id @default(uuid()) @db.Uuid
+    ticketId  String   @map("ticket_id") @db.Uuid
+    senderId  String   @map("sender_id") @db.Uuid
+    content   String
+    isFromPlatform Boolean @default(false) @map("is_from_platform")
+
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+    ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+    sender User          @relation(fields: [senderId], references: [id])
+
+    @@index([ticketId, createdAt], map: "idx_support_msgs_ticket_created")
+    @@map("support_ticket_messages")
 }
 
 /**

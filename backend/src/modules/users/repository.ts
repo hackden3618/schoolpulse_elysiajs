@@ -107,6 +107,13 @@ export async function removeRolesFromMembership(
   });
 }
 
+export async function deleteMembership(schoolId: string, userId: string) {
+  return prisma.schoolMembership.updateMany({
+    where: { schoolId, userId, deletedAt: null },
+    data: { deletedAt: new Date() },
+  });
+}
+
 export async function findAllRoles() {
   return prisma.role.findMany({ orderBy: { name: "asc" } });
 }
@@ -117,4 +124,45 @@ export async function findRoleById(id: string) {
 
 export async function findRoleByName(name: string) {
   return prisma.role.findUnique({ where: { name } });
+}
+
+export async function searchMembers(schoolId: string, q: string) {
+  const members = await prisma.schoolMembership.findMany({
+    where: {
+      schoolId,
+      deletedAt: null,
+      user: {
+        deletedAt: null,
+        OR: [
+          { firstName: { contains: q, mode: "insensitive" } },
+          { lastName: { contains: q, mode: "insensitive" } },
+          { phone: { contains: q } },
+          { email: { contains: q, mode: "insensitive" } },
+        ],
+      },
+    },
+    include: membershipInclude,
+    take: 20,
+  });
+
+  const guardiansWithStudents = await prisma.studentGuardian.findMany({
+    where: {
+      schoolId,
+      deletedAt: null,
+      guardian: { deletedAt: null },
+      student: { deletedAt: null, status: "active" },
+      OR: [
+        { student: { firstName: { contains: q, mode: "insensitive" } } },
+        { student: { lastName: { contains: q, mode: "insensitive" } } },
+        { student: { admissionNumber: { contains: q, mode: "insensitive" } } },
+      ],
+    },
+    include: {
+      guardian: { select: userSelect },
+      student: { select: { firstName: true, lastName: true, admissionNumber: true } },
+    },
+    take: 20,
+  });
+
+  return { members, guardiansWithStudents };
 }

@@ -35,9 +35,10 @@ const studentInclude = {
   },
 } satisfies Prisma.StudentInclude;
 
-export async function findAllStudents(schoolId: string) {
+export async function findAllStudents(schoolId: string, includeArchived?: boolean) {
+  const statusFilter = includeArchived ? {} : { status: { not: "archived" as const } }
   return prisma.student.findMany({
-    where: { schoolId, deletedAt: null, status: { not: "archived" } },
+    where: { schoolId, deletedAt: null, ...statusFilter },
     include: studentInclude,
     orderBy: { createdAt: "desc" },
   });

@@ -79,6 +79,53 @@ export async function createUser(data: CreateUserInput) {
   return user;
 }
 
+export async function searchMembers(schoolId: string, q: string) {
+  const { members, guardiansWithStudents } = await repo.searchMembers(schoolId, q);
+
+  const userIdSet = new Set<string>()
+  const results: any[] = []
+
+  for (const m of members) {
+    userIdSet.add(m.userId)
+    const roles = m.roles.map((r: any) => r.role?.name).filter(Boolean)
+    results.push({
+      userId: m.userId,
+      name: `${m.user.firstName} ${m.user.lastName || ""}`.trim(),
+      phone: m.user.phone,
+      email: m.user.email,
+      roles,
+      studentInfo: [] as { name: string; admissionNumber: string }[],
+    })
+  }
+
+  for (const sg of guardiansWithStudents) {
+    const uid = sg.guardian.id
+    const studentName = `${sg.student.firstName} ${sg.student.lastName || ""}`.trim()
+    const existing = results.find((r: any) => r.userId === uid)
+    if (existing) {
+      existing.studentInfo.push({
+        name: studentName,
+        admissionNumber: sg.student.admissionNumber,
+      })
+    } else if (!userIdSet.has(uid)) {
+      userIdSet.add(uid)
+      results.push({
+        userId: uid,
+        name: `${sg.guardian.firstName} ${sg.guardian.lastName || ""}`.trim(),
+        phone: sg.guardian.phone,
+        email: sg.guardian.email,
+        roles: ["Guardian"],
+        studentInfo: [{
+          name: studentName,
+          admissionNumber: sg.student.admissionNumber,
+        }],
+      })
+    }
+  }
+
+  return results.slice(0, 30)
+}
+
 export async function updateUser(
   schoolId: string,
   userId: string,
@@ -93,6 +140,15 @@ export async function updateUser(
     throw AppError.forbidden("User does not belong to this school");
   }
   return repo.updateUser(userId, data as any);
+}
+
+export async function deleteUser(schoolId: string, userId: string) {
+  const user = await repo.findUserById(userId)
+  if (!user) throw AppError.notFound("User not found")
+  const membership = await repo.findMembership(schoolId, userId)
+  if (!membership) throw AppError.forbidden("User does not belong to this school")
+  await repo.deleteMembership(schoolId, userId)
+  return { message: "User removed from school" }
 }
 
 export async function listAllMemberships(schoolId: string) {

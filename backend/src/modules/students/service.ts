@@ -3,6 +3,9 @@ import { hashPassword } from "@/common/auth";
 import { normalizePhone } from "@/common/validation";
 import { prisma } from "@/infrastructure/database/prisma";
 import { writeEventOutbox } from "@/infrastructure/events";
+import { sendSingleSms } from "@/infrastructure/messaging/sms/sms.provider";
+import { HOST } from "@/config";
+import crypto from "crypto";
 import * as repo from "./repository";
 import type {
   CreateStudentInput,
@@ -15,8 +18,8 @@ import type {
 import { findUserById, findUserByPhone } from "@/modules/users/repository";
 import { findUserByEmail } from "@/modules/auth/repository";
 
-export async function listAllStudents(schoolId: string) {
-  return repo.findAllStudents(schoolId);
+export async function listAllStudents(schoolId: string, includeArchived?: boolean) {
+  return repo.findAllStudents(schoolId, includeArchived);
 }
 
 export async function listMyStudents(schoolId: string, userId: string) {
@@ -36,6 +39,11 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
       { field: "admissionNumber", issue: "duplicate" },
     ]);
   }
+
+  const school = await prisma.school.findUnique({ where: { id: schoolId }, select: { schoolName: true, schoolCode: true } });
+  if (!school) throw AppError.notFound("School not found");
+
+  const smsJobs: { phone: string; message: string }[] = [];
 
   const student = await prisma.$transaction(async (tx: any) => {
     // 1. Create the student
@@ -68,14 +76,12 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
 
     // 3. Create or find guardians, then link
     if (data.guardians && data.guardians.length > 0) {
-      const defaultHashedPassword = await hashPassword("default_guardian_otp_pass");
-      
-      // We will make the first guardian the primary one
+      const guardianRole = await tx.role.findFirst({ where: { name: "guardian" } });
+
       for (let i = 0; i < data.guardians.length; i++) {
         const g = data.guardians[i]!;
         const isPrimary = i === 0;
 
-        // Check if a user with this phone already exists (regardless of deletedAt status)
         const normalizedGuardianPhone = normalizePhone(g.phone)
         let guardianUser = await tx.user.findFirst({
           where: {
@@ -88,23 +94,31 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
 
         if (guardianUser) {
           if (guardianUser.deletedAt !== null) {
-            // Hard delete the soft-deleted user
             await tx.user.delete({ where: { id: guardianUser.id } });
             guardianUser = null;
           }
         }
 
         if (!guardianUser) {
-          // Find or create the guardian role
-          const guardianRole = await tx.role.findFirst({ where: { name: "guardian" } });
+          const otp = crypto.randomInt(100000, 999999).toString();
+          const hashedOtp = await hashPassword(otp);
           guardianUser = await tx.user.create({
             data: {
               firstName: g.firstName,
               lastName: g.lastName,
-              phone: normalizePhone(g.phone),
+              phone: normalizedGuardianPhone,
               email: g.email ?? null,
-              hashedPassword: defaultHashedPassword, // Guardian logs in via OTP/link, default is set
+              hashedPassword: hashedOtp,
             },
+          });
+          smsJobs.push({
+            phone: normalizedGuardianPhone,
+            message: `Admitted to ${school.schoolName}. Code: ${school.schoolCode}. Pwd: ${otp}. Login ${HOST}`,
+          });
+        } else {
+          smsJobs.push({
+            phone: normalizedGuardianPhone,
+            message: `Student admitted to ${school.schoolName}. Code: ${school.schoolCode}. Login ${HOST}`,
           });
         }
 
@@ -120,11 +134,31 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
             receivesEmail: false,
           },
         });
+
+        // Ensure SchoolMembership with Guardian role exists
+        const existingMembership = await tx.schoolMembership.findUnique({
+          where: { schoolId_userId: { schoolId, userId: guardianUser!.id } },
+        });
+        if (!existingMembership) {
+          const membership = await tx.schoolMembership.create({
+            data: { schoolId, userId: guardianUser!.id, status: "active" },
+          });
+          if (guardianRole) {
+            await tx.schoolMembershipRole.create({
+              data: { membershipId: membership.id, roleId: guardianRole.id },
+            });
+          }
+        }
       }
     }
 
     return newStudent;
   });
+
+  // Send SMS notifications after transaction
+  for (const job of smsJobs) {
+    await sendSingleSms(job.phone, job.message);
+  }
 
   await writeEventOutbox({
     schoolId,
@@ -174,6 +208,27 @@ export async function archiveStudent(
   });
 
   return updated;
+}
+
+export async function unarchiveStudent(schoolId: string, studentId: string) {
+  const student = await repo.findStudentById(schoolId, studentId)
+  if (!student) throw AppError.notFound("Student not found")
+  if (student.status !== "archived") throw AppError.conflict("Student is not archived")
+
+  const updated = await repo.updateStudent(studentId, {
+    status: "active",
+    archiveReason: null,
+  })
+
+  await writeEventOutbox({
+    schoolId,
+    aggregateId: studentId,
+    aggregateType: "student",
+    eventType: "StudentTransferred",
+    payload: { action: "unarchived" },
+  })
+
+  return updated
 }
 
 async function ensureGuardianMembership(schoolId: string, guardianId: string): Promise<void> {
