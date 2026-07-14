@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react"
-import { authApi, setAccessToken, getAccessToken } from "./api"
+import { authApi, setAccessToken, getAccessToken, setPlatformToken } from "./api"
 import type { AuthState, User, Membership, School, Role } from "../types"
 
 interface AuthContextType extends AuthState {
@@ -110,6 +110,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const handler = () => {
       clearAuth()
+      setPlatformToken(null)
+      localStorage.removeItem("schoolpulse:platform")
     }
     window.addEventListener("auth:unauthorized", handler)
     return () => window.removeEventListener("auth:unauthorized", handler)
