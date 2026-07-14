@@ -6,6 +6,10 @@ import { Logo } from "../../components/ui/Logo"
 import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
 import { BrandedHero } from "../../components/ui/BrandedHero"
+import { SchoolSelectModal } from "../../components/auth/SchoolSelectModal"
+import type { Membership, School } from "../../types"
+
+type LoginStage = "idle" | "signing_in" | "finding_memberships"
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -13,7 +17,9 @@ export function LoginPage() {
   const [loginStr, setLoginStr] = useState("")
   const [password, setPassword] = useState("")
   const [error, setError] = useState("")
-  const [loading, setLoading] = useState(false)
+  const [loginStage, setLoginStage] = useState<LoginStage>("idle")
+  const [loginUserIdentifier, setLoginUserIdentifier] = useState("")
+  const [pendingSchools, setPendingSchools] = useState<{ memberships: Membership[]; schools: School[] } | null>(null)
 
   if (isAuthenticated) {
     navigate("/dashboard", { replace: true })
@@ -27,19 +33,41 @@ export function LoginPage() {
       setError("Please enter both email/phone and password.")
       return
     }
-    setLoading(true)
+    setLoginStage("signing_in")
     try {
-      await login(loginStr, password)
-      navigate("/dashboard", { replace: true, state: { promptRoleSwitch: true } })
+      const { allMemberships, allSchools, user } = await login(loginStr, password)
+      const identifier = user?.phone || user?.email || loginStr
+      setLoginUserIdentifier(identifier)
+      setLoginStage("finding_memberships")
+      // Brief tick so React paints the "finding memberships" overlay
+      await new Promise((r) => setTimeout(r, 300))
+      if (allMemberships.length > 1) {
+        setPendingSchools({ memberships: allMemberships, schools: allSchools })
+      } else {
+        navigate("/dashboard", { replace: true, state: { promptRoleSwitch: true } })
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed. Please check your credentials.")
     } finally {
-      setLoading(false)
+      setLoginStage("idle")
     }
   }
 
   return (
     <div className="flex min-h-screen bg-background">
+      {/* Finding memberships overlay */}
+      {loginStage === "finding_memberships" && (
+        <div className="fixed inset-0 z-[100] flex flex-col items-center justify-center bg-white">
+          <div className="flex flex-col items-center gap-4 max-w-sm text-center px-6">
+            <div className="h-10 w-10 animate-spin rounded-full border-[3px] border-accent border-t-transparent" />
+            <p className="text-sm text-primary-600">
+              Finding existing memberships for{" "}
+              <strong className="text-primary-900">{loginUserIdentifier}</strong>
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-1 flex-col justify-center px-4 py-12 sm:px-6 lg:w-1/2 lg:flex-none lg:min-h-screen lg:justify-center lg:px-20 xl:px-24">
         <div className="mx-auto w-full max-w-sm">
           <div className="flex items-center gap-3 mb-10">
@@ -98,8 +126,8 @@ export function LoginPage() {
               </Link>
             </div>
 
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? (
+            <Button type="submit" className="w-full" disabled={loginStage !== "idle"}>
+              {loginStage === "signing_in" ? (
                 <span className="flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
                   Signing in...
@@ -116,6 +144,12 @@ export function LoginPage() {
           <p className="mt-8 text-center text-sm text-primary-400">
             Don't have an account?{" "}
             <Link to="/auth/register" className="font-semibold text-accent hover:text-accent-600">
+              Join a school
+            </Link>
+          </p>
+          <p className="mt-2 text-center text-xs text-primary-300">
+            Registering a new school?{" "}
+            <Link to="/onboarding/register" className="font-semibold text-accent hover:text-accent-600">
               Register your school
             </Link>
           </p>
@@ -133,6 +167,14 @@ export function LoginPage() {
           "99.9% uptime with enterprise-grade security",
         ]}
       />
+
+      {pendingSchools && (
+        <SchoolSelectModal
+          open={!!pendingSchools}
+          memberships={pendingSchools.memberships}
+          schools={pendingSchools.schools}
+        />
+      )}
     </div>
   )
 }

@@ -1,5 +1,6 @@
 import { wsManager } from "./ws.manager"
 import type { WsClient } from "./ws.types"
+import * as notificationsService from "@/modules/notifications/service"
 
 interface WsMessage {
   event: string
@@ -28,6 +29,11 @@ export function handleWsMessage(client: WsClient, raw: string | Buffer) {
     case "unsubscribe":
       if (typeof parsed.data?.conversationId === "string") {
         wsManager.unsubscribe(client, parsed.data.conversationId)
+      }
+      break
+    case "mark_read":
+      if (typeof parsed.data?.messageId === "string" && typeof parsed.data?.schoolId === "string") {
+        notificationsService.markMessageRead(parsed.data.schoolId, parsed.data.messageId, client.userId).catch(() => {})
       }
       break
     case "ping":

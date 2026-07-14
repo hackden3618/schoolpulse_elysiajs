@@ -1,5 +1,5 @@
 import { Elysia, t } from "elysia";
-import { errorHandler } from "@/common/middleware";
+import { errorHandler, authGuard } from "@/common/middleware";
 import { API_PREFIX } from "@/shared/constants";
 import {
   sendSmsController,
@@ -14,6 +14,7 @@ import { sendSmsSchema, segmentInfoSchema, smsTemplateSchema } from "./schema";
 
 export const smsRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/sms` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", () => ({ message: "SMS service is running", status: "ok" }), {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "SMS service status", tags: ["Communication"] },

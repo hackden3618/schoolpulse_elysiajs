@@ -2,7 +2,6 @@ import { Elysia, t } from "elysia"
 import { API_PREFIX } from "@/shared/constants"
 import { errorHandler } from "@/common/middleware"
 import {
-  loginController,
   createAdminController,
   listAdminsController,
   updateAdminController,
@@ -16,7 +15,6 @@ import {
   deleteSchoolController,
 } from "./controller"
 import {
-  platformAdminLoginSchema,
   createPlatformAdminSchema,
   updatePlatformAdminSchema,
   rejectJoinRequestSchema,
@@ -24,15 +22,6 @@ import {
   setupAdminSchema,
 } from "./schema"
 import { platformAuthGuard } from "./platformAuthGuard"
-
-export const platformAdminAuthRoute = new Elysia({
-  prefix: `${API_PREFIX}/platform/auth`,
-})
-  .use(errorHandler)
-  .post("/login", loginController, {
-    body: platformAdminLoginSchema,
-    detail: { summary: "Platform admin login", tags: ["Platform Admin"] },
-  })
 
 export const platformAdminRoute = new Elysia({
   prefix: `${API_PREFIX}/platform/admins`,

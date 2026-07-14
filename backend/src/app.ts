@@ -1,9 +1,10 @@
 import { Elysia } from "elysia"
 import { openapi } from "@elysia/openapi"
-import { errorHandler, authGuard } from "@/common/middleware"
+import { errorHandler } from "@/common/middleware"
 
 import { authRoute, joinRequestRoute, joinRequestListRoute } from "@/modules/auth/route"
-import { platformAdminAuthRoute, platformAdminRoute, platformAdminJoinRequestRoute, platformAdminSchoolRoute, platformSchoolClaimRoute } from "@/modules/platform-admin/routes"
+import { platformAdminAuthRoute } from "@/modules/platform-admin/auth.route"
+import { platformAdminRoute, platformAdminJoinRequestRoute, platformAdminSchoolRoute, platformSchoolClaimRoute } from "@/modules/platform-admin/routes"
 import { schoolRoute } from "@/modules/schools/route"
 import { userRoute, membershipRoute } from "@/modules/users/route"
 import { studentRoute } from "@/modules/students/route"
@@ -37,7 +38,6 @@ export const app = new Elysia()
     detail: { summary: "Readiness check", tags: ["System"] },
   })
   .use(mpesaWebhookRoute)
-  .use(authGuard)
   .use(joinRequestListRoute)
   .use(rolesRoute)
   .use(schoolRoute)

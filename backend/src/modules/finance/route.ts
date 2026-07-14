@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia"
 import { API_PREFIX } from "@/shared/constants"
-import { errorHandler } from "@/common/middleware"
+import { errorHandler, authGuard } from "@/common/middleware"
 import {
   getFeeStructuresController,
   createFeeStructureController,
@@ -33,6 +33,7 @@ export const mpesaWebhookRoute = new Elysia({ prefix: `/mpesa` })
 
 export const financeRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/finance` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/fee-structures", getFeeStructuresController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "List fee structures", tags: ["Finance"] },

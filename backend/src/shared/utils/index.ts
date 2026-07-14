@@ -21,9 +21,5 @@ export function generateRequestId(): string {
   return `req_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function cleanPhone(phone: string): string {
-  return phone.replace(/[\s\-\(\)]/g, "");
-}
-
 export { calculateGsm7Segments, segmentCostTable } from "./gsm7";
 export type { Gsm7SegmentInfo } from "./gsm7";

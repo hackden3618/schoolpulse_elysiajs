@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia"
 import { API_PREFIX } from "@/shared/constants"
-import { errorHandler } from "@/common/middleware"
+import { errorHandler, authGuard } from "@/common/middleware"
 import {
   getReportSummaryController,
   getAttendanceReportController,
@@ -11,6 +11,7 @@ import {
 
 export const reportsRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/reports` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getReportSummaryController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "Available report types with counts", tags: ["Reports"] },

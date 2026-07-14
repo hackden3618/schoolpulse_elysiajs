@@ -7,6 +7,27 @@ import { Button } from "../../components/ui/Button"
 import { Input } from "../../components/ui/Input"
 import { BrandedHero } from "../../components/ui/BrandedHero"
 
+type FieldErrors = {
+  schoolName?: string
+  phone?: string
+  email?: string
+  schoolLevel?: string
+  county?: string
+  town?: string
+}
+
+const validateFields = (name: string, ph: string, level: string, cty: string, twn: string, em: string): FieldErrors => {
+  const e: FieldErrors = {}
+  if (!name.trim()) e.schoolName = "School name is required."
+  if (!ph.trim()) e.phone = "Phone number is required."
+  else if (ph.trim().length < 8) e.phone = "Enter a valid phone number."
+  if (!level) e.schoolLevel = "Select a school level."
+  if (!cty.trim()) e.county = "County is required."
+  if (!twn.trim()) e.town = "Town / City is required."
+  if (em && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(em)) e.email = "Enter a valid email address."
+  return e
+}
+
 export function SchoolRegistrationPage() {
   const navigate = useNavigate()
   const [step, setStep] = useState(1)
@@ -18,16 +39,27 @@ export function SchoolRegistrationPage() {
   const [town, setTown] = useState("")
   const [country, setCountry] = useState("Kenya")
   const [error, setError] = useState("")
+  const [fieldErrors, setFieldErrors] = useState<FieldErrors>({})
   const [loading, setLoading] = useState(false)
   const [submitted, setSubmitted] = useState(false)
+
+  const clearFieldError = (field: keyof FieldErrors) => {
+    if (fieldErrors[field]) setFieldErrors((prev) => ({ ...prev, [field]: undefined }))
+  }
+
+  const handleStep1Continue = () => {
+    const errs = validateFields(schoolName, phone, schoolLevel, county, town, email)
+    setFieldErrors(errs)
+    if (Object.keys(errs).length > 0) return
+    setStep(2)
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
     setError("")
-    if (!schoolName || !phone) {
-      setError("School name and phone are required.")
-      return
-    }
+    const errs = validateFields(schoolName, phone, schoolLevel, county, town, email)
+    setFieldErrors(errs)
+    if (Object.keys(errs).length > 0) return
     setLoading(true)
     try {
       await joinRequestsApi.create({
@@ -103,15 +135,27 @@ export function SchoolRegistrationPage() {
           {step === 1 && (
             <div className="space-y-5">
               <p className="text-sm text-primary-600">Tell us about your school to get started.</p>
-              <Input label="School Name *" placeholder="e.g. St Mary's High School" value={schoolName} onChange={(e) => setSchoolName(e.target.value)} />
-              <Input label="Phone Number *" type="tel" placeholder="e.g. +254712345678" value={phone} onChange={(e) => setPhone(e.target.value)} />
-              <Input label="Email Address" type="email" placeholder="admin@school.sch.ke" value={email} onChange={(e) => setEmail(e.target.value)} />
+              <div>
+                <Input label="School Name *" placeholder="e.g. St Mary's High School" value={schoolName}
+                  onChange={(e) => { setSchoolName(e.target.value); clearFieldError("schoolName") }} />
+                {fieldErrors.schoolName && <p className="mt-1 text-[11px] text-danger-500">{fieldErrors.schoolName}</p>}
+              </div>
+              <div>
+                <Input label="Phone Number *" type="tel" placeholder="e.g. +254712345678" value={phone}
+                  onChange={(e) => { setPhone(e.target.value); clearFieldError("phone") }} />
+                {fieldErrors.phone && <p className="mt-1 text-[11px] text-danger-500">{fieldErrors.phone}</p>}
+              </div>
+              <div>
+                <Input label="Email Address" type="email" placeholder="admin@school.sch.ke" value={email}
+                  onChange={(e) => { setEmail(e.target.value); clearFieldError("email") }} />
+                {fieldErrors.email && <p className="mt-1 text-[11px] text-danger-500">{fieldErrors.email}</p>}
+              </div>
               <div>
                 <label className="mb-1.5 block text-sm font-medium text-primary-700">School Level</label>
                 <select
                   value={schoolLevel}
-                  onChange={(e) => setSchoolLevel(e.target.value)}
-                  className="block w-full rounded-lg border border-primary-300 bg-white px-3 py-2.5 text-sm text-primary-900 placeholder-primary-400 shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent"
+                  onChange={(e) => { setSchoolLevel(e.target.value); clearFieldError("schoolLevel") }}
+                  className={`block w-full rounded-lg border bg-white px-3 py-2.5 text-sm text-primary-900 placeholder-primary-400 shadow-sm focus:border-accent focus:outline-none focus:ring-1 focus:ring-accent ${fieldErrors.schoolLevel ? "border-danger-400" : "border-primary-300"}`}
                 >
                   <option value="">Select school level</option>
                   <option value="pre_primary">Pre-Primary</option>
@@ -121,13 +165,22 @@ export function SchoolRegistrationPage() {
                   <option value="senior_secondary">Senior Secondary</option>
                   <option value="tertiary">Tertiary</option>
                 </select>
+                {fieldErrors.schoolLevel && <p className="mt-1 text-[11px] text-danger-500">{fieldErrors.schoolLevel}</p>}
               </div>
               <div className="grid grid-cols-2 gap-3">
-                <Input label="County *" placeholder="e.g. Nairobi" value={county} onChange={(e) => setCounty(e.target.value)} />
-                <Input label="Town / City" placeholder="e.g. Westlands" value={town} onChange={(e) => setTown(e.target.value)} />
+                <div>
+                  <Input label="County *" placeholder="e.g. Nairobi" value={county}
+                    onChange={(e) => { setCounty(e.target.value); clearFieldError("county") }} />
+                  {fieldErrors.county && <p className="mt-1 text-[11px] text-danger-500">{fieldErrors.county}</p>}
+                </div>
+                <div>
+                  <Input label="Town / City" placeholder="e.g. Westlands" value={town}
+                    onChange={(e) => { setTown(e.target.value); clearFieldError("town") }} />
+                  {fieldErrors.town && <p className="mt-1 text-[11px] text-danger-500">{fieldErrors.town}</p>}
+                </div>
               </div>
               <Input label="Country" placeholder="Kenya" value={country} onChange={(e) => setCountry(e.target.value)} />
-              <Button className="w-full" onClick={() => setStep(2)} disabled={!schoolName || !phone}>
+              <Button className="w-full" onClick={handleStep1Continue}>
                 Continue
               </Button>
             </div>

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, type FormEvent } from "react"
-import { MessageSquare, Send, AlertCircle, RefreshCw, X, Plus, CheckCheck, Check, XCircle, Clock, Megaphone, ArrowLeft, Users, Smartphone, ChevronDown, ChevronRight, UserCheck } from "lucide-react"
+import { MessageSquare, Send, AlertCircle, RefreshCw, X, Plus, CheckCheck, Check, XCircle, Clock, Megaphone, ArrowLeft, Users, Smartphone, ChevronDown, ChevronRight, UserCheck, Trash2 } from "lucide-react"
 import { Card } from "../../components/ui/Card"
 import { Skeleton } from "../../components/ui/Skeleton"
 import { Badge } from "../../components/ui/Badge"
@@ -109,6 +109,7 @@ export function CommunicationPage() {
   const [convType, setConvType] = useState<"direct" | "group" | "announcement">("direct")
   const [convSubject, setConvSubject] = useState("")
   const [convParticipantIds, setConvParticipantIds] = useState<Set<string>>(new Set())
+  const [convError, setConvError] = useState("")
   const [creatingConv, setCreatingConv] = useState(false)
 
   const onNewMessage = useCallback((msg: Message) => {
@@ -126,8 +127,12 @@ export function CommunicationPage() {
     setMessages((prev) => prev.map((m) => m.id === msg.id ? msg : m))
   }, [])
 
+  const onDeleteMessage = useCallback((data: { messageId: string }) => {
+    setMessages((prev) => prev.filter((m) => m.id !== data.messageId))
+  }, [])
+
   const wsSubs = selectedConv
-    ? [{ conversationId: selectedConv.id, onMessage: onNewMessage, onReceiptUpdate }]
+    ? [{ conversationId: selectedConv.id, onMessage: onNewMessage, onReceiptUpdate, onDelete: onDeleteMessage }]
     : []
 
   const { subscribe } = useWebSocket(wsSubs)
@@ -227,6 +232,15 @@ export function CommunicationPage() {
     }
   }, [messageChannel, schoolId, selectedConv?.id])
 
+  const handleDeleteMsg = async (msgId: string) => {
+    try {
+      await conversationsApi.messages.delete(schoolId, msgId)
+      setMessages((prev) => prev.filter((m) => m.id !== msgId))
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete message")
+    }
+  }
+
   const selectConversation = async (conv: Conversation) => {
     setSelectedConv(conv)
     setMessageChannel("in_app")
@@ -243,7 +257,9 @@ export function CommunicationPage() {
 
   const handleSend = async (e: FormEvent) => {
     e.preventDefault()
-    if (!newMessage.trim() || !selectedConv) return
+    setError("")
+    const content = newMessage.trim()
+    if (!content || !selectedConv) return
     setSending(true)
     try {
       if (messageChannel === "sms") {
@@ -262,12 +278,31 @@ export function CommunicationPage() {
           setSending(false)
           return
         }
-        await smsApi.send(schoolId, { recipients: recipientPhones, message: newMessage })
+        const res = await smsApi.send(schoolId, { recipients: recipientPhones, message: content })
+        // Optimistically add the SMS send result as a message in the conversation
+        if (selectedConv) {
+          const smsMsg: Message = {
+            id: `sms_${Date.now()}`,
+            schoolId,
+            conversationId: selectedConv.id,
+            channel: "sms",
+            messageType: "text",
+            content,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            sender: { userId: user?.id ?? "", membershipId: membership?.id },
+          }
+          setMessages((prev) => (prev.some((m) => m.id === smsMsg.id) ? prev : [...prev, smsMsg]))
+        }
       } else {
-        await conversationsApi.messages.send(schoolId, selectedConv.id, {
-          content: newMessage,
+        const res = await conversationsApi.messages.send(schoolId, selectedConv.id, {
+          content,
           channel: messageChannel,
         })
+        // Add the returned message directly to state
+        if (res?.data) {
+          setMessages((prev) => (prev.some((m) => m.id === res.data.id) ? prev : [...prev, res.data]))
+        }
       }
       setNewMessage("")
     } catch (e) {
@@ -279,16 +314,28 @@ export function CommunicationPage() {
 
   const handleCreateConv = async (e: FormEvent) => {
     e.preventDefault()
-    if (!convSubject && convType !== "direct") return
+    setConvError("")
+
+    if (!convSubject && convType !== "direct") {
+      setConvError("Subject is required for group and announcement conversations.")
+      return
+    }
+
+    if (convParticipantIds.size === 0) {
+      setConvError("Select at least one recipient.")
+      return
+    }
+
     setCreatingConv(true)
     try {
       const res = await conversationsApi.create(schoolId, {
         type: convType,
         subject: convSubject || undefined,
-        participantIds: convParticipantIds.size > 0 ? Array.from(convParticipantIds) : undefined,
+        participantIds: Array.from(convParticipantIds),
       })
       setShowNewConv(false)
       setConvType("direct"); setConvSubject(""); setConvParticipantIds(new Set())
+      setConvError("")
       setSelectedConv(res.data)
       setMessages([])
       subscribe(res.data.id)
@@ -367,7 +414,7 @@ export function CommunicationPage() {
     if (messageChannel !== "sms" || !selectedConv) return null
 
     return (
-      <div className="shrink-0 border-t border-surface-100 bg-white">
+      <form onSubmit={handleSend} className="shrink-0 border-t border-surface-100 bg-white">
         <div className="px-4 py-3 space-y-3 max-h-[50vh] overflow-y-auto">
           {/* Recipient Selector */}
           <div>
@@ -386,22 +433,55 @@ export function CommunicationPage() {
               <Skeleton className="h-16" />
             ) : (
               <div className="space-y-1.5 max-h-32 overflow-y-auto border border-surface-100 rounded-lg p-2">
-                {/* Staff */}
+                {/* Staff grouped by role */}
                 {staffMembers.length > 0 && (
                   <div>
                     <div className="flex items-center justify-between px-1 py-0.5">
                       <span className="text-[10px] font-semibold text-surface-600">Staff ({staffMembers.length})</span>
                       <span className="text-[9px] text-surface-400">{staffMembers.filter((s) => selectedRecipientIds.has(s.userId)).length}/{staffMembers.length}</span>
                     </div>
-                    {staffMembers.map((s) => (
-                      <label key={s.userId} className="flex items-center gap-2 px-2 py-0.5 rounded hover:bg-surface-50 cursor-pointer">
-                        <input type="checkbox" checked={selectedRecipientIds.has(s.userId)}
-                          onChange={() => toggleRecipient(s.userId)}
-                          className="h-3 w-3 rounded border-surface-300 text-accent focus:ring-accent" />
-                        <span className="text-xs text-surface-700 truncate flex-1">{s.name}</span>
-                        <span className="text-[9px] text-surface-400">{s.phone}</span>
-                      </label>
-                    ))}
+                    {(() => {
+                      const roleGroups = new Map<string, typeof staffMembers>()
+                      for (const s of staffMembers) {
+                        const roles = s.role ? s.role.split(",").map((r) => r.trim()).filter(Boolean) : ["Staff"]
+                        for (const role of roles) {
+                          if (!roleGroups.has(role)) roleGroups.set(role, [])
+                          roleGroups.get(role)!.push(s)
+                        }
+                      }
+                      return Array.from(roleGroups.entries()).map(([role, members]) => {
+                        const roleSelected = members.filter((m) => selectedRecipientIds.has(m.userId)).length
+                        const allSelected = roleSelected === members.length
+                        return (
+                          <div key={role} className="mb-1">
+                            <div className="flex items-center gap-1.5 px-1 py-0.5">
+                              <button type="button" onClick={() => {
+                                for (const m of members) {
+                                  if (allSelected && selectedRecipientIds.has(m.userId)) toggleRecipient(m.userId)
+                                  else if (!allSelected && !selectedRecipientIds.has(m.userId)) toggleRecipient(m.userId)
+                                }
+                              }}
+                                className={`text-[9px] rounded-full px-2 py-0.5 border transition-colors ${
+                                  allSelected ? "bg-accent text-white border-accent"
+                                    : roleSelected > 0 ? "bg-accent-50 text-accent border-accent-200"
+                                    : "bg-white text-surface-500 border-surface-200 hover:border-surface-300"
+                                }`}>
+                                {role} {roleSelected}/{members.length}
+                              </button>
+                            </div>
+                            {members.map((s) => (
+                              <label key={s.userId} className="flex items-center gap-2 px-2 py-0.5 rounded hover:bg-surface-50 cursor-pointer">
+                                <input type="checkbox" checked={selectedRecipientIds.has(s.userId)}
+                                  onChange={() => toggleRecipient(s.userId)}
+                                  className="h-3 w-3 rounded border-surface-300 text-accent focus:ring-accent" />
+                                <span className="text-xs text-surface-700 truncate flex-1">{s.name}</span>
+                                <span className="text-[9px] text-surface-400">{s.phone}</span>
+                              </label>
+                            ))}
+                          </div>
+                        )
+                      })
+                    })()}
                   </div>
                 )}
 
@@ -523,8 +603,18 @@ export function CommunicationPage() {
             </button>
           </div>
         </div>
-      </div>
+      </form>
     )
+  }
+
+  const toggleConvParticipant = (userId: string) => {
+    setConvParticipantIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(userId)) next.delete(userId)
+      else next.add(userId)
+      return next
+    })
+    if (convError) setConvError("")
   }
 
   const renderNewConvDialog = () => (
@@ -532,12 +622,13 @@ export function CommunicationPage() {
       <form onSubmit={handleCreateConv} className="p-3 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-xs font-semibold text-surface-700">New Conversation</span>
-          <button type="button" onClick={() => setShowNewConv(false)} className="p-1 rounded hover:bg-surface-100">
+          <button type="button" onClick={() => { setShowNewConv(false); setConvError("") }} className="p-1 rounded hover:bg-surface-100">
             <X size={14} className="text-surface-400" />
           </button>
         </div>
+
         <div className="flex gap-2">
-          <select value={convType} onChange={(e) => setConvType(e.target.value as any)}
+          <select value={convType} onChange={(e) => { setConvType(e.target.value as any); setConvError("") }}
             className="block rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-xs flex-1">
             <option value="direct">Direct</option>
             <option value="group">Group</option>
@@ -545,8 +636,51 @@ export function CommunicationPage() {
           </select>
           <Button size="sm" type="submit" disabled={creatingConv}>{creatingConv ? "..." : "Create"}</Button>
         </div>
-        <input type="text" value={convSubject} onChange={(e) => setConvSubject(e.target.value)}
-          placeholder="Subject (required for group/announcement)..." className="block w-full rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-xs" />
+
+        <input type="text" value={convSubject} onChange={(e) => { setConvSubject(e.target.value); if (convError) setConvError("") }}
+          placeholder="Subject (required for group/announcement)..."
+          className="block w-full rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-xs" />
+
+        {/* Participant Selector */}
+        <div>
+          <div className="flex items-center justify-between mb-1">
+            <span className="text-[10px] font-semibold text-surface-600">
+              Recipients ({convParticipantIds.size})
+            </span>
+            {recipientsLoading && <span className="text-[9px] text-surface-400">Loading...</span>}
+          </div>
+          {staffMembers.length === 0 && guardianEntries.length === 0 && !recipientsLoading ? (
+            <p className="text-[10px] text-surface-400 py-1">No recipients available.</p>
+          ) : (
+            <div className="max-h-32 overflow-y-auto space-y-0.5 border border-surface-100 rounded-lg p-1.5">
+              {staffMembers.map((s) => (
+                <label key={s.userId} className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-surface-50 cursor-pointer">
+                  <input type="checkbox" checked={convParticipantIds.has(s.userId)}
+                    onChange={() => toggleConvParticipant(s.userId)}
+                    className="h-3 w-3 rounded border-surface-300 text-accent focus:ring-accent" />
+                  <span className="text-[10px] text-surface-700 truncate flex-1">{s.name}</span>
+                  <span className="text-[9px] text-surface-400 shrink-0">{s.role?.split(",")[0]}</span>
+                </label>
+              ))}
+              {guardianEntries.map((g) => (
+                <label key={g.userId} className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-surface-50 cursor-pointer">
+                  <input type="checkbox" checked={convParticipantIds.has(g.userId)}
+                    onChange={() => toggleConvParticipant(g.userId)}
+                    className="h-3 w-3 rounded border-surface-300 text-accent focus:ring-accent" />
+                  <span className="text-[10px] text-surface-700 truncate flex-1">{g.name}</span>
+                  <span className="text-[9px] text-surface-400 capitalize shrink-0">{g.relationship}</span>
+                </label>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {convError && (
+          <div className="flex items-center gap-1.5 rounded bg-danger-50 border border-danger-100 px-2.5 py-1.5">
+            <AlertCircle size={12} className="text-danger-500 shrink-0" />
+            <span className="text-[10px] text-danger-700">{convError}</span>
+          </div>
+        )}
       </form>
     </div>
   )
@@ -558,7 +692,15 @@ export function CommunicationPage() {
         <div className={`${showMobileChat ? "hidden" : "flex"} lg:flex flex-col w-full lg:w-80 xl:w-96 shrink-0 min-h-0 border-r border-surface-100 bg-white`}>
           <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b border-surface-100">
             <h2 className="text-sm font-semibold text-surface-900">Chats</h2>
-            <button onClick={() => setShowNewConv(!showNewConv)}
+            <button onClick={() => {
+              if (!showNewConv) {
+                setConvError("")
+                setConvParticipantIds(new Set())
+                setConvSubject("")
+                if (staffMembers.length === 0 && guardianEntries.length === 0) loadRecipients()
+              }
+              setShowNewConv(true)
+            }}
               className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-medium text-accent hover:bg-accent-50 transition-colors">
               <Plus size={14} /> New
             </button>
@@ -640,6 +782,17 @@ export function CommunicationPage() {
                 </button>
               </div>
 
+              {/* Error banner */}
+              {error && (
+                <div className="shrink-0 flex items-center gap-2 bg-danger-50 border-b border-danger-100 px-4 py-2 text-xs text-danger-700">
+                  <AlertCircle size={12} className="shrink-0" />
+                  <span>{error}</span>
+                  <button onClick={() => setError("")} className="ml-auto p-0.5 rounded hover:bg-danger-100">
+                    <X size={12} />
+                  </button>
+                </div>
+              )}
+
               {/* Messages */}
               <div className="flex-1 overflow-y-auto px-4 py-3 space-y-1 bg-[#e5ddd5]"
                 style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg width=\'60\' height=\'60\' viewBox=\'0 0 60 60\' xmlns=\'http://www.w3.org/2000/svg\'%3E%3Cg fill=\'none\' fill-rule=\'evenodd\'%3E%3Cg fill=\'%23ffffff\' fill-opacity=\'0.4\'%3E%3Cpath d=\'M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z\'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")' }}>
@@ -667,10 +820,17 @@ export function CommunicationPage() {
                               </span>
                             </div>
                           )}
-                          <div className={`flex ${isMe ? "justify-end" : "justify-start"} mb-1`}>
-                            <div className={`max-w-[75%] min-w-[120px] rounded-lg px-3 py-2 ${
+                          <div className={`flex ${isMe ? "justify-end" : "justify-start"} mb-1 group`}>
+                            <div className={`relative max-w-[75%] min-w-[120px] rounded-lg px-3 py-2 ${
                               isMe ? "bg-[#d9fdd3] text-surface-900" : "bg-white text-surface-900 shadow-sm"
                             }`}>
+                              {isMe && (
+                                <button onClick={() => handleDeleteMsg(msg.id)}
+                                  className="absolute -left-8 top-1/2 -translate-y-1/2 p-1 rounded-full opacity-0 group-hover:opacity-100 hover:bg-surface-200 transition-all text-surface-400 hover:text-danger-500"
+                                  title="Delete message">
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
                               {!isMe && (
                                 <p className="text-[10px] font-semibold mb-0.5 text-accent">
                                   {msg.sender?.user?.firstName} {msg.sender?.user?.lastName}
@@ -681,15 +841,15 @@ export function CommunicationPage() {
                                   <Smartphone size={9} /> SMS
                                 </span>
                               )}
-                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content}</p>
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.content?.trim()}</p>
                               <div className="flex items-center justify-end gap-0.5 mt-0.5">
                                 <span className="text-[10px] text-surface-400">{formatTime(msg.createdAt)}</span>
-                                {isMe && <DeliveryIcon msg={msg} />}
+                                {(isMe || receipts.length > 0) && <DeliveryIcon msg={msg} />}
                               </div>
                             </div>
                           </div>
-                          {isMe && receipts.length > 0 && (
-                            <div className="flex justify-end mr-1 mb-1">
+                          {receipts.length > 0 && (
+                            <div className={`flex ${isMe ? "justify-end" : "justify-start"} mr-1 mb-1`}>
                               <div className="flex items-center gap-1.5 text-[9px] text-surface-400">
                                 <span>{sentCount}/{receipts.length} sent</span>
                                 {deliveredCount > 0 && <span className="text-success-600">{deliveredCount} delivered</span>}

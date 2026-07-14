@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia"
 import { API_PREFIX } from "@/shared/constants"
-import { errorHandler } from "@/common/middleware"
+import { errorHandler, authGuard } from "@/common/middleware"
 import {
   getConversationsController,
   createConversationController,
@@ -8,11 +8,13 @@ import {
   getMessagesController,
   sendMessageController,
   markMessageReadController,
+  deleteMessageController,
 } from "./controller"
 import { createConversationSchema, sendMessageSchema } from "./schema"
 
 export const notificationsRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/conversations", getConversationsController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "List conversations", tags: ["Notifications"] },
@@ -38,4 +40,8 @@ export const notificationsRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:s
   .post("/messages/:messageId/read", markMessageReadController, {
     params: t.Object({ schoolId: t.String(), messageId: t.String() }),
     detail: { summary: "Mark message as read", tags: ["Notifications"] },
+  })
+  .delete("/messages/:messageId", deleteMessageController, {
+    params: t.Object({ schoolId: t.String(), messageId: t.String() }),
+    detail: { summary: "Delete (soft) a message", tags: ["Notifications"] },
   })

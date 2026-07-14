@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { API_PREFIX } from "@/shared/constants";
-import { errorHandler } from "@/common/middleware";
+import { errorHandler, authGuard } from "@/common/middleware";
 import {
   getSchoolsController,
   getSchoolController,
@@ -17,6 +17,7 @@ import {
 
 export const schoolRoute = new Elysia({ prefix: `${API_PREFIX}/schools` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getSchoolsController, {
     detail: { summary: "List all schools", tags: ["Schools"] },
   })

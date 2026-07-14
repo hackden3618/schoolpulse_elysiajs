@@ -5,6 +5,7 @@ import { AppShell } from "./components/shell/AppShell"
 import { LoginPage } from "./pages/auth/LoginPage"
 import { ForgotPasswordPage } from "./pages/auth/ForgotPasswordPage"
 import { ResetPasswordPage } from "./pages/auth/ResetPasswordPage"
+import { RegisterPage } from "./pages/auth/RegisterPage"
 import { SchoolRegistrationPage } from "./pages/onboarding/SchoolRegistrationPage"
 import { SchoolSetupPage } from "./pages/onboarding/SchoolSetupPage"
 import { OnboardingCompletePage } from "./pages/onboarding/OnboardingCompletePage"
@@ -33,7 +34,7 @@ export function App() {
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/auth/reset-password" element={<ResetPasswordPage />} />
-        <Route path="/auth/register" element={<SchoolRegistrationPage />} />
+        <Route path="/auth/register" element={<RegisterPage />} />
         <Route path="/onboarding/register" element={<SchoolRegistrationPage />} />
         <Route path="/setup" element={<SchoolSetupPage />} />
         <Route path="/onboarding/setup" element={<SchoolSetupPage />} />

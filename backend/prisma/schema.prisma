@@ -366,21 +366,21 @@ model Subscription {
 }
 
 model JoinRequest {
-    id            String            @id @default(uuid()) @db.Uuid
-    schoolName    String            @map("school_name")
-    phone         String
-    email         String?
-    schoolLevel   SchoolLevel?      @map("school_level")
-    county        String?
-    country       String?           @default("Kenya")
-    town          String?
-    requestedAt   DateTime          @default(now()) @map("requested_at") @db.Timestamptz(6)
-    requestedBy   String            @map("requested_by")
-    status        JoinRequestStatus @default(pending_review)
-    processedBy   String?           @map("processed_by")
-    processedAt   DateTime?         @map("processed_at") @db.Timestamptz(6)
-    oneTimeCode   String?           @map("one_time_code")
-    deletedAt     DateTime?         @map("deleted_at") @db.Timestamptz(6)
+    id          String            @id @default(uuid()) @db.Uuid
+    schoolName  String            @map("school_name")
+    phone       String
+    email       String?
+    schoolLevel SchoolLevel?      @map("school_level")
+    county      String?
+    country     String?           @default("Kenya")
+    town        String?
+    requestedAt DateTime          @default(now()) @map("requested_at") @db.Timestamptz(6)
+    requestedBy String            @map("requested_by")
+    status      JoinRequestStatus @default(pending_review)
+    processedBy String?           @map("processed_by")
+    processedAt DateTime?         @map("processed_at") @db.Timestamptz(6)
+    oneTimeCode String?           @map("one_time_code")
+    deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz(6)
 
     @@unique([schoolName, phone])
     @@map("join_requests")
@@ -474,8 +474,8 @@ model School {
     schoolCode String @unique @map("school_code")
     schoolName String @unique @map("school_name")
 
-    schoolPhone   String  @unique @map("school_phone")
-    schoolEmail   String? @unique @map("school_email")
+    schoolPhone   String  @map("school_phone")
+    schoolEmail   String? @map("school_email")
     schoolWebsite String? @map("school_website")
     schoolAddress String? @map("school_address")
     schoolLogo    String? @map("school_logo")
@@ -528,6 +528,8 @@ model School {
     messageTokens            MessageToken[]
     subscriptions            Subscription[]
     smsWallet                SmsWallet?
+
+    @@unique([schoolName, schoolLevel, schoolPhone, schoolEmail])
 
     @@map("schools")
 }
@@ -1246,12 +1248,12 @@ model MessageReceipt {
  */
 
 model PasswordResetToken {
-    id        String   @id @default(uuid()) @db.Uuid
-    userId    String   @map("user_id") @db.Uuid
-    tokenHash String   @map("token_hash")
-    expiresAt DateTime @map("expires_at") @db.Timestamptz(6)
+    id        String    @id @default(uuid()) @db.Uuid
+    userId    String    @map("user_id") @db.Uuid
+    tokenHash String    @map("token_hash")
+    expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
     usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
-    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
     user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 

@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia"
 import { API_PREFIX } from "@/shared/constants"
-import { errorHandler } from "@/common/middleware"
+import { errorHandler, authGuard } from "@/common/middleware"
 import {
   getExamsController,
   getExamController,
@@ -21,6 +21,7 @@ import {
 
 export const examRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/exams` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getExamsController, {
     params: t.Object({ schoolId: t.String() }),
     query: t.Object({ termId: t.Optional(t.String()) }),
@@ -47,6 +48,7 @@ export const examRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/e
 
 export const assessmentRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/assessments` })
   .use(errorHandler)
+  .use(authGuard)
   .post("/", createAssessmentController, {
     params: t.Object({ schoolId: t.String() }),
     body: createAssessmentSchema,

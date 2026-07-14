@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { API_PREFIX } from "@/shared/constants";
-import { errorHandler } from "@/common/middleware";
+import { errorHandler, authGuard } from "@/common/middleware";
 import {
   getUsersController,
   getUserController,
@@ -21,6 +21,7 @@ import {
 
 const userRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/users` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getUsersController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "List users in school", tags: ["Users"] },
@@ -42,6 +43,7 @@ const userRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/users` }
 
 const membershipRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/memberships` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getMembershipsController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "List memberships", tags: ["Memberships"] },

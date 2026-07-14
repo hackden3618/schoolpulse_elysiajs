@@ -2,7 +2,7 @@ import crypto from "crypto";
 import { AppError } from "@/common/errors";
 import { normalizePhone } from "@/common/validation";
 import { sendBulkSms, checkBalance as checkBalanceProvider } from "@/infrastructure/messaging/sms/sms.provider";
-import { calculateGsm7Segments, cleanPhone } from "@/shared/utils";
+import { calculateGsm7Segments } from "@/shared/utils";
 import type { Gsm7SegmentInfo } from "@/shared/utils";
 import * as schoolRepo from "@/modules/schools/repository";
 
@@ -128,7 +128,7 @@ export async function sendSms(options: SmsOptions): Promise<SmsSendResult> {
   const segmentInfo = calculateGsm7Segments(options.message);
 
   const payload = options.recipients.map((mobile) => ({
-    mobile: normalizePhone(cleanPhone(mobile)).replace(/^\+/, ""),
+    mobile: normalizePhone(mobile).replace(/^\+/, ""),
     message: options.message,
   }));
 

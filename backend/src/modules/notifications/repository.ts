@@ -68,3 +68,25 @@ export async function findMessageById(schoolId: string, messageId: string) {
 export async function createMessage(data: any) {
   return prisma.message.create({ data, include: messageInclude })
 }
+
+export async function softDeleteMessage(messageId: string, schoolId: string) {
+  return prisma.message.update({
+    where: { id: messageId, schoolId },
+    data: { deletedAt: new Date() },
+  })
+}
+
+export async function softDeleteConversation(conversationId: string, schoolId: string) {
+  return prisma.conversation.update({
+    where: { id: conversationId, schoolId },
+    data: { deletedAt: new Date() },
+  })
+}
+
+export async function updateMessage(messageId: string, schoolId: string, data: { content: string }) {
+  return prisma.message.update({
+    where: { id: messageId, schoolId },
+    data,
+    include: messageInclude,
+  })
+}

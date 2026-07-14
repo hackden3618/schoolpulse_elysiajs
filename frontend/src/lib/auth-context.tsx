@@ -3,7 +3,7 @@ import { authApi, setAccessToken, getAccessToken } from "./api"
 import type { AuthState, User, Membership, School, Role } from "../types"
 
 interface AuthContextType extends AuthState {
-  login: (login: string, password: string) => Promise<void>
+  login: (login: string, password: string) => Promise<{ allMemberships: Membership[], allSchools: School[], user: User }>
   logout: () => Promise<void>
   refreshAuth: () => Promise<void>
   switchSchool: (membershipId: string) => Promise<void>
@@ -98,22 +98,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  const mountTime = useRef(Date.now())
-
   useEffect(() => {
     const stored = loadStoredAuth()
-    const elapsed = Date.now() - mountTime.current
-    const remaining = Math.max(0, 1000 - elapsed)
-
-    const timer = setTimeout(() => {
-      if (stored) {
-        applyAuth(stored)
-      } else {
-        setState((s) => ({ ...s, isLoading: false }))
-      }
-    }, remaining)
-
-    return () => clearTimeout(timer)
+    if (stored) {
+      applyAuth(stored)
+    } else {
+      setState((s) => ({ ...s, isLoading: false }))
+    }
   }, [applyAuth])
 
   useEffect(() => {
@@ -128,13 +119,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const res = await authApi.login({ login: loginStr, password })
     const { accessToken, refreshToken, user, membership, school, memberships, schools } = res.data
 
+    const allMemberships = memberships || [membership]
+    const allSchools = schools || [school]
+
     const stored: StoredAuth = {
       accessToken, refreshToken, user, membership, school,
-      allMemberships: memberships || [membership],
-      allSchools: schools || [school],
+      allMemberships,
+      allSchools,
     }
     storeAuth(stored)
     applyAuth(stored)
+
+    return { allMemberships, allSchools, user }
   }, [applyAuth])
 
   const logout = useCallback(async () => {

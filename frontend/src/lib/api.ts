@@ -36,13 +36,25 @@ export function setAccessToken(token: string | null) {
 }
 
 export function getAccessToken(): string | null {
+    if (!accessToken) {
+        try {
+            const raw = localStorage.getItem("schoolpulse:auth")
+            if (raw) {
+                const parsed = JSON.parse(raw)
+                if (parsed?.accessToken) {
+                    accessToken = parsed.accessToken
+                }
+            }
+        } catch { /* ignore */ }
+    }
     return accessToken
 }
 
 function getAuthHeaders(): Record<string, string> {
     const headers: Record<string, string> = { "Content-Type": "application/json" }
-    if (accessToken) {
-        headers["Authorization"] = `Bearer ${accessToken}`
+    const token = getAccessToken()
+    if (token) {
+        headers["Authorization"] = `Bearer ${token}`
     }
     return headers
 }
@@ -107,6 +119,14 @@ export const authApi = {
             method: "POST",
             body: JSON.stringify(data),
         }),
+    register: (data: {
+        firstName: string; secondName?: string; lastName: string;
+        phone: string; email?: string; password: string; schoolCode?: string;
+    }) =>
+        request<ApiResponse<LoginResponse>>("/auth/register", {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
     listMemberships: () =>
         request<ApiResponse<{ memberships: Membership[]; schools: School[] }>>("/auth/memberships"),
     switchSchool: (data: { membershipId?: string; schoolId?: string }) =>
@@ -122,7 +142,7 @@ export const authApi = {
 
 export const joinRequestsApi = {
     create: (data: { schoolName: string; phone: string; email?: string; schoolLevel?: string; county?: string; country?: string; town?: string }) =>
-        request<ApiResponse<JoinRequest>>("/join-requests", {
+        publicRequest<ApiResponse<JoinRequest>>("/join-requests", {
             method: "POST",
             body: JSON.stringify(data),
         }),
@@ -166,16 +186,16 @@ export const schoolsApi = {
             method: "PATCH",
             body: JSON.stringify(data),
         }),
-  verifyOtp: (data: { schoolCode: string; oneTimeCode: string }) =>
-    request<ApiResponse<{ setupToken: string; schoolName: string; schoolCode: string }>>("/schools/verify-otp", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
-  setupAdmin: (data: { setupToken: string; firstName: string; lastName: string; phone: string; email?: string }) =>
-    request<ApiResponse<{ message: string; accessToken: string; user: { id: string; firstName: string; lastName: string; phone: string }; schoolCode: string; onboardingRequired: boolean }>>("/schools/setup-admin", {
-      method: "POST",
-      body: JSON.stringify(data),
-    }),
+    verifyOtp: (data: { schoolCode: string; oneTimeCode: string }) =>
+        request<ApiResponse<{ setupToken: string; schoolName: string; schoolCode: string }>>("/schools/verify-otp", {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
+    setupAdmin: (data: { setupToken: string; firstName: string; lastName: string; phone: string; email?: string }) =>
+        request<ApiResponse<{ message: string; accessToken: string; user: { id: string; firstName: string; lastName: string; phone: string }; schoolCode: string; onboardingRequired: boolean }>>("/schools/setup-admin", {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
 }
 
 /* =========================================================================
@@ -543,6 +563,10 @@ export const conversationsApi = {
                 method: "POST",
                 body: JSON.stringify(data),
             }),
+        delete: (schoolId: string, messageId: string) =>
+            request<ApiResponse<{ deleted: boolean }>>(`/schools/${schoolId}/messages/${messageId}`, {
+                method: "DELETE",
+            }),
     },
 }
 
@@ -636,9 +660,24 @@ async function platformRequest<T>(path: string, options?: RequestInit): Promise<
     return apiFetch(path, getPlatformHeaders, options)
 }
 
+async function publicRequest<T>(path: string, options?: RequestInit): Promise<T> {
+    const headers: Record<string, string> = { "Content-Type": "application/json" }
+    const url = `${API_BASE}${path}`
+    const res = await fetch(url, {
+        ...options,
+        headers: { ...headers, ...options?.headers },
+    })
+    if (!res.ok) {
+        const body = await res.json().catch(() => ({}))
+        const message = body?.error?.message || `Request failed: ${res.status}`
+        throw new Error(message)
+    }
+    return res.json() as Promise<T>
+}
+
 export const platformAdminApi = {
     login: (data: { email: string; password: string }) =>
-        platformRequest<ApiResponse<{ accessToken: string; admin: any }>>("/platform/auth/login", {
+        publicRequest<ApiResponse<{ accessToken: string; admin: any }>>("/platform/auth/login", {
             method: "POST",
             body: JSON.stringify(data),
         }),

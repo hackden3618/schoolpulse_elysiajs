@@ -20,30 +20,22 @@ import { HOST } from "@/config"
 
 const BASE = process.env.SERVER_HOST
 
-function buildRoles(membership: any, isGuardianInSchool: boolean) {
-    const roles = membership ? membership.roles.map((r: any) => ({
+function buildRoles(membership: any) {
+    return membership ? membership.roles.map((r: any) => ({
         id: r.role.id,
         name: r.role.name,
         description: r.role.description
     })) : [];
-    if (isGuardianInSchool) {
-        roles.push({
-            id: "guardian-virtual-role",
-            name: "guardian",
-            description: "Parent / Guardian"
-        });
-    }
-    return roles;
 }
 
 function buildMembershipResponse(membership: any, schoolId: string, userId: string, roles: any[]) {
     return {
-        id: membership ? membership.id : `virtual-${schoolId}`,
+        id: membership.id,
         schoolId,
         userId,
-        status: membership ? membership.status : "active",
-        joinedAt: membership ? membership.joinedAt : new Date(),
-        user: membership?.user ?? { id: userId },
+        status: membership.status,
+        joinedAt: membership.joinedAt,
+        user: membership.user ?? { id: userId },
         roles,
     };
 }
@@ -56,6 +48,31 @@ const schoolSelect = {
     timezone: true, settings: true,
 } as const;
 
+async function ensureGuardianMemberships(userId: string, guardianLinks: any[], memberships: any[]): Promise<any[]> {
+    let updated = memberships
+    for (const link of guardianLinks) {
+        const membership = updated.find((m: any) => m.schoolId === link.student.schoolId)
+        if (!membership) {
+            const newMembership = await prisma.schoolMembership.create({
+                data: {
+                    schoolId: link.student.schoolId,
+                    userId,
+                    status: "active",
+                },
+            })
+            const guardianRole = await repo.findRoleByName("Guardian")
+            if (guardianRole) {
+                await prisma.schoolMembershipRole.create({
+                    data: { membershipId: newMembership.id, roleId: guardianRole.id },
+                })
+            }
+            updated = await repo.findMembershipsByUserId(userId)
+            break
+        }
+    }
+    return updated
+}
+
 export async function login(data: LoginInput) {
     const loginStr = normalizePhone(data.login)
     const user = await repo.findUserByPhone(loginStr) ?? await repo.findUserByEmail(loginStr)
@@ -65,43 +82,40 @@ export async function login(data: LoginInput) {
 
     await verifyPasswordOrThrow(data.password, user.hashedPassword)
 
-    const allMemberships = await repo.findMembershipsByUserId(user.id)
+    let allMemberships = await repo.findMembershipsByUserId(user.id)
     const guardianLinks = await prisma.studentGuardian.findMany({
         where: { guardianId: user.id },
         include: { student: { select: { schoolId: true } } }
     })
 
-    if (allMemberships.length === 0 && guardianLinks.length === 0) {
+    // Backfill memberships for existing guardians who don't have one yet
+    if (guardianLinks.length > 0) {
+        allMemberships = await ensureGuardianMemberships(user.id, guardianLinks, allMemberships)
+    }
+
+    if (allMemberships.length === 0) {
         throw AppError.forbidden("No active school membership found")
     }
 
-    let schoolId: string;
     let activeMembership: any = null;
-    let isGuardianInSchool = false;
 
     if (data.membershipId) {
         activeMembership = allMemberships.find((m: any) => m.id === data.membershipId) ?? null;
     }
-    if (!activeMembership && allMemberships.length > 0) {
+    if (!activeMembership) {
         activeMembership = allMemberships[0];
     }
 
-    if (activeMembership) {
-        schoolId = activeMembership.schoolId;
-        isGuardianInSchool = guardianLinks.some((g: any) => g.student.schoolId === schoolId);
-    } else {
-        schoolId = guardianLinks[0]!.student.schoolId;
-        isGuardianInSchool = true;
-    }
+    const schoolId = activeMembership.schoolId;
 
     const school = await prisma.school.findUnique({
         where: { id: schoolId },
         select: schoolSelect,
     })
 
-    const roles = buildRoles(activeMembership, isGuardianInSchool);
+    const roles = buildRoles(activeMembership);
     const roleNames = roles.map((r: any) => r.name)
-    const accessToken = signToken({ sub: user.id, schoolId, membershipId: activeMembership?.id ?? null, roles: roleNames })
+    const accessToken = signToken({ sub: user.id, schoolId, membershipId: activeMembership.id, roles: roleNames })
 
     const { hashedPassword: _, ...safeUser } = user
 
@@ -112,7 +126,7 @@ export async function login(data: LoginInput) {
         membership: buildMembershipResponse(activeMembership, schoolId, user.id, roles),
         school,
         memberships: allMemberships.map((m: any) => {
-            const mRoles = buildRoles(m, guardianLinks.some((g: any) => g.student.schoolId === m.schoolId));
+            const mRoles = buildRoles(m);
             return buildMembershipResponse(m, m.schoolId, user.id, mRoles);
         }),
         schools: allMemberships.map((m: any) => m.school),
@@ -120,15 +134,18 @@ export async function login(data: LoginInput) {
 }
 
 export async function listMemberships(userId: string) {
-    const allMemberships = await repo.findMembershipsByUserId(userId)
+    let allMemberships = await repo.findMembershipsByUserId(userId)
     const guardianLinks = await prisma.studentGuardian.findMany({
         where: { guardianId: userId },
         include: { student: { select: { schoolId: true } } }
     })
 
+    if (guardianLinks.length > 0) {
+        allMemberships = await ensureGuardianMemberships(userId, guardianLinks, allMemberships)
+    }
+
     const memberships = allMemberships.map((m: any) => {
-        const isGuardian = guardianLinks.some((g: any) => g.student.schoolId === m.schoolId);
-        const roles = buildRoles(m, isGuardian);
+        const roles = buildRoles(m);
         return buildMembershipResponse(m, m.schoolId, userId, roles);
     });
 
@@ -155,13 +172,7 @@ export async function switchSchool(userId: string, data: { membershipId?: string
         throw AppError.forbidden("No active membership found for the target school");
     }
 
-    const guardianLinks = await prisma.studentGuardian.findMany({
-        where: { guardianId: userId },
-        include: { student: { select: { schoolId: true } } }
-    })
-
-    const isGuardianInSchool = guardianLinks.some((g: any) => g.student.schoolId === membership.schoolId);
-    const roles = buildRoles(membership, isGuardianInSchool);
+    const roles = buildRoles(membership);
     const roleNames = roles.map((r: any) => r.name);
     const accessToken = signToken({ sub: userId, schoolId: membership.schoolId, membershipId: membership.id, roles: roleNames });
 
@@ -181,8 +192,43 @@ export async function switchSchool(userId: string, data: { membershipId?: string
 export async function register(data: RegisterInput) {
     data.phone = normalizePhone(data.phone)
     const existing = await repo.findUserByPhone(data.phone)
+
     if (existing) {
-        throw AppError.conflict("Phone number is already registered", [{ field: "phone", issue: "duplicate" }])
+        if (!data.schoolCode) {
+            throw AppError.conflict("Phone number is already registered", [{ field: "phone", issue: "duplicate" }])
+        }
+
+        const school = await repo.findSchoolByCode(data.schoolCode)
+        if (!school) {
+            throw AppError.notFound("School not found with the provided code")
+        }
+
+        const existingMembership = await repo.findMembershipBySchoolAndUser(school.id, existing.id)
+        if (existingMembership) {
+            throw AppError.conflict("You are already a member of this school")
+        }
+
+        await prisma.$transaction(async (tx: any) => {
+            const membership = await tx.schoolMembership.create({
+                data: { school: { connect: { id: school.id } }, user: { connect: { id: existing.id } } },
+            })
+            const parentRole = await repo.findRoleByName("Parent")
+            if (parentRole) {
+                await tx.schoolMembershipRole.create({
+                    data: { membershipId: membership.id, roleId: parentRole.id },
+                })
+            }
+        })
+
+        await writeEventOutbox({
+            schoolId: school.id,
+            aggregateId: existing.id,
+            aggregateType: "user",
+            eventType: "MembershipCreated",
+            payload: { phone: existing.phone, schoolCode: data.schoolCode, method: "register_existing" },
+        })
+
+        return login({ login: data.phone, password: data.password })
     }
 
     const hashed = await hashPassword(data.password)

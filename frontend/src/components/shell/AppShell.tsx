@@ -64,7 +64,7 @@ export function AppShell({ children }: AppShellProps) {
         }} />
         
         <main className="flex-1 overflow-y-auto px-4 pt-6 pb-24 sm:px-8 md:px-10 lg:py-6">
-          <div className="mx-auto max-w-[1600px]">
+          <div className="mx-auto max-w-[1600px] h-full">
             {children}
           </div>
         </main>

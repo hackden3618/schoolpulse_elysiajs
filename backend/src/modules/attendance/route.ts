@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia"
 import { API_PREFIX } from "@/shared/constants"
-import { errorHandler } from "@/common/middleware"
+import { errorHandler, authGuard } from "@/common/middleware"
 import {
   getSessionsController,
   getSessionController,
@@ -12,6 +12,7 @@ import { createSessionSchema, updateRecordSchema } from "./schema"
 
 export const attendanceRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/attendance` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/sessions", getSessionsController, {
     params: t.Object({ schoolId: t.String() }),
     query: t.Object({

@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { API_PREFIX } from "@/shared/constants";
-import { errorHandler } from "@/common/middleware";
+import { errorHandler, authGuard } from "@/common/middleware";
 import {
   getAcademicYearsController,
   getAcademicYearController,
@@ -32,6 +32,7 @@ import {
 
 const academicYearRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/academic-years` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getAcademicYearsController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "List academic years", tags: ["Academic"] },
@@ -53,6 +54,7 @@ const academicYearRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/
 
 const termRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/terms` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getTermsController, {
     params: t.Object({ schoolId: t.String() }),
     query: t.Optional(t.Object({ academicYearId: t.Optional(t.String()) })),
@@ -75,6 +77,7 @@ const termRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/terms` }
 
 const classRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/classes` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getClassesController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "List classes", tags: ["Academic"] },
@@ -87,6 +90,7 @@ const classRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/classes
 
 const classInstanceRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/class-instances` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getClassInstancesController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "List class instances", tags: ["Academic"] },
@@ -104,6 +108,7 @@ const classInstanceRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId
 
 const subjectRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/subjects` })
   .use(errorHandler)
+  .use(authGuard)
   .get("/", getSubjectsController, {
     params: t.Object({ schoolId: t.String() }),
     detail: { summary: "List subjects", tags: ["Academic"] },

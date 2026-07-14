@@ -3,11 +3,13 @@ import jwt from "jsonwebtoken"
 
 const SECRET = process.env.JWT_SECRET || "schoolpulse-dev-fallback-secret"
 
+const _guardSource = new Error().stack;
 export function platformAuthGuard(app: any): any {
   return app.derive(({ request, headers }: any) => {
     const authHeader =
       headers["authorization"] || request?.headers?.get("Authorization")
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      console.error("[AUTH_GUARD_TRIGGERED] Path:", new Error().stack);
       throw AppError.unauthenticated("Missing or invalid Authorization header")
     }
 

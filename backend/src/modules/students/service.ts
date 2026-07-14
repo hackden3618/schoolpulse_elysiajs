@@ -1,5 +1,6 @@
 import { AppError } from "@/common/errors";
 import { hashPassword } from "@/common/auth";
+import { normalizePhone } from "@/common/validation";
 import { prisma } from "@/infrastructure/database/prisma";
 import { writeEventOutbox } from "@/infrastructure/events";
 import * as repo from "./repository";
@@ -75,10 +76,11 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
         const isPrimary = i === 0;
 
         // Check if a user with this phone already exists (regardless of deletedAt status)
+        const normalizedGuardianPhone = normalizePhone(g.phone)
         let guardianUser = await tx.user.findFirst({
           where: {
             OR: [
-              { phone: g.phone },
+              { phone: normalizedGuardianPhone },
               ...(g.email ? [{ email: g.email }] : [])
             ]
           }
@@ -99,7 +101,7 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
             data: {
               firstName: g.firstName,
               lastName: g.lastName,
-              phone: g.phone,
+              phone: normalizePhone(g.phone),
               email: g.email ?? null,
               hashedPassword: defaultHashedPassword, // Guardian logs in via OTP/link, default is set
             },
@@ -174,6 +176,34 @@ export async function archiveStudent(
   return updated;
 }
 
+async function ensureGuardianMembership(schoolId: string, guardianId: string): Promise<void> {
+  const existing = await prisma.schoolMembership.findFirst({
+    where: { schoolId, userId: guardianId, deletedAt: null },
+    include: { roles: { include: { role: true } } },
+  })
+  if (!existing) {
+    const membership = await prisma.schoolMembership.create({
+      data: { schoolId, userId: guardianId, status: "active" },
+    })
+    const guardianRole = await prisma.role.findUnique({ where: { name: "Guardian" } })
+    if (guardianRole) {
+      await prisma.schoolMembershipRole.create({
+        data: { membershipId: membership.id, roleId: guardianRole.id },
+      })
+    }
+  } else {
+    const hasGuardianRole = existing.roles.some((r: any) => r.role.name === "Guardian")
+    if (!hasGuardianRole) {
+      const guardianRole = await prisma.role.findUnique({ where: { name: "Guardian" } })
+      if (guardianRole) {
+        await prisma.schoolMembershipRole.create({
+          data: { membershipId: existing.id, roleId: guardianRole.id },
+        })
+      }
+    }
+  }
+}
+
 export async function linkGuardian(
   schoolId: string,
   studentId: string,
@@ -206,6 +236,8 @@ export async function linkGuardian(
     receivesSms: data.receivesSms ?? true,
     receivesEmail: data.receivesEmail ?? false,
   });
+
+  await ensureGuardianMembership(schoolId, data.guardianId);
 
   await writeEventOutbox({
     schoolId,
@@ -349,11 +381,12 @@ export async function addGuardianByDetails(
   const student = await repo.findStudentById(schoolId, studentId);
   if (!student) throw AppError.notFound("Student not found");
 
-  // Look up by phone first, then by email — whichever finds the existing user wins
+  // Look up by normalized phone first, then by email
+  const normalizedDataPhone = normalizePhone(data.phone)
   let guardianUser = await prisma.user.findFirst({
     where: {
       OR: [
-        { phone: data.phone },
+        { phone: normalizedDataPhone },
         ...(data.email ? [{ email: data.email }] : [])
       ]
     }
@@ -373,7 +406,7 @@ export async function addGuardianByDetails(
       data: {
         firstName: data.firstName,
         lastName: data.lastName,
-        phone: data.phone,
+        phone: normalizedDataPhone,
         email: data.email ?? null,
         hashedPassword: defaultHashedPassword,
       },
@@ -402,6 +435,8 @@ export async function addGuardianByDetails(
     receivesSms: true,
     receivesEmail: false,
   });
+
+  await ensureGuardianMembership(schoolId, guardianUser.id);
 
   await writeEventOutbox({
     schoolId,

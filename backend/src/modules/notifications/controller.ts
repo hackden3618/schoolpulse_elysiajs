@@ -32,3 +32,18 @@ export async function markMessageReadController({ params: { schoolId, messageId 
   const result = await svc.markMessageRead(schoolId, messageId, authUser.userId)
   return success(result, schoolId)
 }
+
+export async function deleteMessageController({ params: { schoolId, messageId }, authUser, set }: any) {
+  const result = await svc.deleteMessage(schoolId, messageId, authUser.userId)
+  return success(result, schoolId)
+}
+
+export async function deleteConversationController({ params: { schoolId, conversationId }, authUser, set }: any) {
+  const result = await svc.deleteConversation(schoolId, conversationId, authUser.userId)
+  return success(result, schoolId)
+}
+
+export async function editMessageController({ params: { schoolId, messageId }, body, authUser, set }: any) {
+  const result = await svc.editMessage(schoolId, messageId, authUser.userId, body.content)
+  return success(result, schoolId)
+}

@@ -8,6 +8,7 @@ interface WsSubscription {
   conversationId: string
   onMessage: WsEventHandler
   onReceiptUpdate: WsEventHandler
+  onDelete?: WsEventHandler
 }
 
 export function useWebSocket(subscriptions: WsSubscription[] = []) {
@@ -46,6 +47,13 @@ export function useWebSocket(subscriptions: WsSubscription[] = []) {
             for (const sub of subsRef.current) {
               if (sub.conversationId === data.conversationId || data.conversationId === sub.conversationId) {
                 sub.onReceiptUpdate(data)
+              }
+            }
+            break
+          case "message:deleted":
+            for (const sub of subsRef.current) {
+              if (sub.conversationId === data.conversationId || data.conversationId === sub.conversationId) {
+                sub.onDelete?.(data)
               }
             }
             break

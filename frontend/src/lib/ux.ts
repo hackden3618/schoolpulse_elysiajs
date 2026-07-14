@@ -1,4 +1,4 @@
-export const UX_MIN_DELAY = 500
+export const UX_MIN_DELAY = 200
 
 export async function withMinDelay<T>(
   promise: Promise<T>,
@@ -15,12 +15,13 @@ export async function withMinDelay<T>(
 }
 
 /**
- * Normalise a Kenyan phone number to the international format required
- * by the Safaricom Daraja API (e.g. "0712345678" → "254712345678").
+ * Normalise a Kenyan phone number to E.164 international format
+ * (e.g. "0712345678" → "+254712345678").
  */
 export function normalizePhone(phone: string): string {
-  return phone
-    .trim()
-    .replace(/^\+/, "")   // strip leading +
-    .replace(/^0/, "254") // replace leading 0 with country code
+  const cleaned = phone.trim()
+  if (cleaned.startsWith("+")) return cleaned
+  if (cleaned.startsWith("0")) return "+254" + cleaned.slice(1)
+  if (cleaned.startsWith("254")) return "+" + cleaned
+  return cleaned
 }
