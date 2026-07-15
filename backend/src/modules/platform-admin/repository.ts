@@ -111,3 +111,10 @@ export async function softDeleteSchool(id: string) {
     data: { deletedAt: new Date() },
   })
 }
+
+export async function softDelete(id: string) {
+  return prisma.platformAdmin.update({
+    where: { id },
+    data: { deletedAt: new Date() },
+  })
+}

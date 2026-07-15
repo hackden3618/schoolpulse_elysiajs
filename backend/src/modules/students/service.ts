@@ -94,8 +94,23 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
 
         if (guardianUser) {
           if (guardianUser.deletedAt !== null) {
-            await tx.user.delete({ where: { id: guardianUser.id } });
-            guardianUser = null;
+            const otp = crypto.randomInt(100000, 999999).toString();
+            const hashedOtp = await hashPassword(otp);
+            guardianUser = await tx.user.update({
+              where: { id: guardianUser.id },
+              data: {
+                deletedAt: null,
+                firstName: g.firstName,
+                lastName: g.lastName,
+                phone: normalizedGuardianPhone,
+                email: g.email ?? null,
+                hashedPassword: hashedOtp,
+              },
+            });
+            smsJobs.push({
+              phone: normalizedGuardianPhone,
+              message: `Admitted to ${school.schoolName}. Code: ${school.schoolCode}. Pwd: ${otp}. Login ${HOST}`,
+            });
           }
         }
 
@@ -276,9 +291,15 @@ export async function linkGuardian(
 
   if (existingLink) {
     if (existingLink.deletedAt !== null) {
-      await prisma.studentGuardian.delete({
-        where: { studentId_guardianId: { studentId, guardianId: data.guardianId } }
+      await prisma.studentGuardian.update({
+        where: { id: existingLink.id },
+        data: {
+          deletedAt: null,
+          relationship: data.relationship ?? existingLink.relationship,
+          isPrimary: data.isPrimary ?? existingLink.isPrimary,
+        },
       });
+      return existingLink;
     } else {
       throw AppError.conflict("This guardian is already linked to the student.");
     }
@@ -350,26 +371,37 @@ export async function enrollStudent(
 
   if (existingEnrollment) {
     if (existingEnrollment.deletedAt !== null) {
-      // Hard delete the soft-deleted enrollment
-      await prisma.enrollment.delete({ where: { id: existingEnrollment.id } });
+      await prisma.enrollment.update({
+        where: { id: existingEnrollment.id },
+        data: { deletedAt: null },
+      });
     } else {
       throw AppError.conflict("Student is already enrolled in this class for this academic year.");
     }
   }
 
-  const enrollment = await prisma.enrollment.create({
-    data: {
-      school: { connect: { id: schoolId } },
-      student: { connect: { id: studentId } },
-      classInstance: { connect: { id: data.classInstanceId } },
-      academicYear: { connect: { id: data.academicYearId } },
-      ...(data.termId ? { term: { connect: { id: data.termId } } } : {}),
-    },
-    include: {
-      classInstance: { include: { class: true } },
-      academicYear: true,
-    },
-  });
+  const enrollment = existingEnrollment
+    ? await prisma.enrollment.findUnique({
+        where: { id: existingEnrollment.id },
+        include: {
+          classInstance: { include: { class: true } },
+          academicYear: true,
+          term: true,
+        },
+      })
+    : await prisma.enrollment.create({
+        data: {
+          school: { connect: { id: schoolId } },
+          student: { connect: { id: studentId } },
+          classInstance: { connect: { id: data.classInstanceId } },
+          academicYear: { connect: { id: data.academicYearId } },
+          ...(data.termId ? { term: { connect: { id: data.termId } } } : {}),
+        },
+        include: {
+          classInstance: { include: { class: true } },
+          academicYear: true,
+        },
+      });
 
   await writeEventOutbox({
     schoolId,
@@ -388,7 +420,7 @@ export async function updateEnrollment(
   enrollmentId: string,
   data: UpdateEnrollmentInput
 ) {
-  const enrollment = await prisma.enrollment.findUnique({
+  const enrollment = await prisma.enrollment.findFirst({
     where: { id: enrollmentId, schoolId, studentId },
   });
   if (!enrollment) throw AppError.notFound("Enrollment not found");
@@ -449,13 +481,18 @@ export async function addGuardianByDetails(
 
   if (guardianUser) {
     if (guardianUser.deletedAt !== null) {
-      // Hard delete the soft-deleted user
-      await prisma.user.delete({ where: { id: guardianUser.id } });
-      guardianUser = null;
+      guardianUser = await prisma.user.update({
+        where: { id: guardianUser.id },
+        data: {
+          deletedAt: null,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: normalizedDataPhone,
+          email: data.email ?? null,
+        },
+      });
     }
-  }
-
-  if (!guardianUser) {
+  } else {
     const defaultHashedPassword = await hashPassword("default_guardian_otp_pass");
     guardianUser = await prisma.user.create({
       data: {
@@ -475,9 +512,15 @@ export async function addGuardianByDetails(
 
   if (existingLink) {
     if (existingLink.deletedAt !== null) {
-      await prisma.studentGuardian.delete({
-        where: { studentId_guardianId: { studentId, guardianId: guardianUser.id } }
+      await prisma.studentGuardian.update({
+        where: { id: existingLink.id },
+        data: {
+          deletedAt: null,
+          relationship: data.relationship ?? existingLink.relationship,
+          isPrimary: data.isPrimary ?? existingLink.isPrimary,
+        },
       });
+      return existingLink;
     } else {
       throw AppError.conflict("This guardian is already linked to the student.");
     }

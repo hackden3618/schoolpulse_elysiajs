@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom"
 import {
     LogOut, RefreshCw, CheckCircle, XCircle, AlertCircle,
     Building2, Users, Loader2, Clock, Phone, Mail, MapPin,
-    Search, Plus, X, LifeBuoy,
+    Search, Plus, X, LifeBuoy, Trash2,
 } from "lucide-react"
 import { Card, CardContent } from "../../components/ui/Card"
 import { Badge } from "../../components/ui/Badge"
@@ -74,8 +74,10 @@ export function PlatformDashboard() {
     const [adminPhone, setAdminPhone] = useState("")
     const [adminRole, setAdminRole] = useState("staff")
     const [saving, setSaving] = useState(false)
-    const [deleting, setDeleting] = useState<string | null>(null)
-    const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [deletingAdmin, setDeletingAdmin] = useState<string | null>(null)
+  const [adminDeleteConfirmId, setAdminDeleteConfirmId] = useState<string | null>(null)
 
     useEffect(() => {
         const stored = localStorage.getItem("schoolpulse:platform")
@@ -194,7 +196,21 @@ export function PlatformDashboard() {
         }
     }
 
-    const handleLogout = () => {
+    const handleDeleteAdmin = async (id: string) => {
+    setDeletingAdmin(id)
+    setError("")
+    try {
+      await withMinDelay(platformAdminApi.deleteAdmin(id))
+      setPlatformAdmins((prev) => prev.filter((a) => a.id !== id))
+      setAdminDeleteConfirmId(null)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to delete admin")
+    } finally {
+      setDeletingAdmin(null)
+    }
+  }
+
+  const handleLogout = () => {
         setPlatformToken(null)
         localStorage.removeItem("schoolpulse:platform")
         navigate("/platform/login")
@@ -532,6 +548,19 @@ export function PlatformDashboard() {
                                                 )
                                             },
                                             { key: "created", header: "Created", render: (a: any) => new Date(a.createdAt).toLocaleDateString() },
+                                            {
+                                                key: "actions", header: "", render: (a: any) => (
+                                                    admin.role === "super_admin" && a.id !== admin.id ? (
+                                                        <button
+                                                            onClick={() => setAdminDeleteConfirmId(a.id)}
+                                                            className="text-red-500 hover:text-red-700 transition-colors"
+                                                            title="Delete admin"
+                                                        >
+                                                            <Trash2 size={16} />
+                                                        </button>
+                                                    ) : null
+                                                )
+                                            },
                                         ]}
                                         data={platformAdmins}
                                     />
@@ -551,6 +580,16 @@ export function PlatformDashboard() {
                 confirmLabel="Delete School"
                 variant="danger"
                 loading={deleting !== null}
+            />
+            <ConfirmModal
+                open={adminDeleteConfirmId !== null}
+                onClose={() => setAdminDeleteConfirmId(null)}
+                onConfirm={() => handleDeleteAdmin(adminDeleteConfirmId!)}
+                title="Delete admin?"
+                description="This permanently removes this platform admin. They will lose access immediately."
+                confirmLabel="Delete Admin"
+                variant="danger"
+                loading={deletingAdmin !== null}
             />
         </div>
     )

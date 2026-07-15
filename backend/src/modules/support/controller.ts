@@ -15,13 +15,13 @@ export async function listSchoolTicketsController({ params: { schoolId }, query,
   return success(tickets, schoolId)
 }
 
-export async function getTicketController({ params: { ticketId } }: any) {
-  const ticket = await svc.getTicket(ticketId)
+export async function getTicketController({ params: { ticketId }, authUser }: any) {
+  const ticket = await svc.getTicket(ticketId, authUser)
   return success(ticket, ticket.schoolId)
 }
 
-export async function sendTicketMessageController({ params: { ticketId }, body, authUser }: any) {
-  const result = await svc.sendMessage(ticketId, authUser?.userId, body, false)
+export async function sendTicketMessageController({ params: { schoolId, ticketId }, body, authUser }: any) {
+  const result = await svc.sendMessage(ticketId, authUser?.userId, body, false, schoolId)
   return success(result, result.ticket?.schoolId)
 }
 

@@ -6,6 +6,7 @@ import { writeEventOutbox } from "@/infrastructure/events"
 import { sendSingleSms } from "@/infrastructure/messaging/sms/sms.provider"
 import { signToken } from "@/shared/jwt"
 import { normalizePhone } from "@/common/validation"
+import { DURATION } from "@/shared/constants"
 import { extractInitials, generateSchoolCode } from "@/modules/schools/service"
 import * as repo from "./repository"
 import type {
@@ -299,7 +300,7 @@ export async function forgotPassword(data: ForgotPasswordInput) {
 
     const rawToken = crypto.randomBytes(32).toString("hex")
     const tokenHash = crypto.createHash("sha256").update(rawToken).digest("hex")
-    const expiresAt = new Date(Date.now() + 60 * 60 * 1000)
+    const expiresAt = new Date(Date.now() + DURATION.ONE_HOUR_MS)
 
     await repo.createPasswordResetToken({ userId: user.id, tokenHash, expiresAt })
 

@@ -126,7 +126,6 @@ export function CommunicationPage() {
   const [recipientsLoading, setRecipientsLoading] = useState(false)
 
   const messagesEndRef = useRef<HTMLDivElement>(null)
-  const initializedRef = useRef(false)
   const selectedConvRef = useRef<Conversation | null>(null)
   useEffect(() => { selectedConvRef.current = selectedConv }, [selectedConv])
 
@@ -326,11 +325,9 @@ export function CommunicationPage() {
   }
 
   useEffect(() => {
-    if (!initializedRef.current) {
-      initializedRef.current = true
-      loadConversations()
-      loadSmsTemplates()
-    }
+    if (!schoolId) return
+    loadConversations()
+    loadSmsTemplates()
   }, [schoolId])
 
   useEffect(() => {

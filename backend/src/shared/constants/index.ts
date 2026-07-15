@@ -31,3 +31,10 @@ export const ROLES = {
   RECEPTION: "Reception",
   PARENT: "Parent",
 } as const;
+
+export const DURATION = {
+  ONE_MINUTE_MS: 60 * 1000,
+  THIRTY_MINUTES_MS: 30 * 60 * 1000,
+  ONE_HOUR_MS: 60 * 60 * 1000,
+  ONE_DAY_MS: 24 * 60 * 60 * 1000,
+} as const;

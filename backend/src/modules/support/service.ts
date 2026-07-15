@@ -56,16 +56,21 @@ export async function listSchoolTickets(
     where: { schoolId, userId: authUser.userId, deletedAt: null },
   })
   if (!membership) throw AppError.forbidden("You are not a member of this school")
-  return repo.findTicketsBySchool(schoolId, filters)
+  return repo.findTicketsBySchool(schoolId, { ...filters, createdBy: authUser.userId })
 }
 
 export async function listAllTickets(filters?: ListTicketsQuery) {
   return repo.findAllTickets(filters)
 }
 
-export async function getTicket(ticketId: string) {
+export async function getTicket(ticketId: string, authUser?: { userId?: string }) {
   const ticket = await repo.findTicketById(ticketId)
   if (!ticket) throw AppError.notFound("Support ticket not found")
+
+  if (authUser?.userId && ticket.createdBy !== authUser.userId) {
+    throw AppError.forbidden("You can only view your own tickets")
+  }
+
   return ticket
 }
 
@@ -73,10 +78,15 @@ export async function sendMessage(
   ticketId: string,
   senderId: string,
   data: SendTicketMessageInput,
-  isFromPlatform: boolean
+  isFromPlatform: boolean,
+  schoolId?: string
 ) {
   const ticket = await repo.findTicketById(ticketId)
   if (!ticket) throw AppError.notFound("Support ticket not found")
+
+  if (schoolId && ticket.schoolId !== schoolId) {
+    throw AppError.forbidden("Ticket does not belong to this school")
+  }
 
   let resolvedSenderId = senderId
 
@@ -86,13 +96,11 @@ export async function sendMessage(
     })
     if (!platformAdmin) throw AppError.unauthenticated("Platform admin not found")
 
-    let user = platformAdmin.email
-      ? await prisma.user.findFirst({ where: { email: platformAdmin.email, deletedAt: null } })
-      : null
-
-    if (!user && platformAdmin.email) {
-      user = await prisma.user.create({
-        data: {
+    if (platformAdmin.email) {
+      const user = await prisma.user.upsert({
+        where: { email: platformAdmin.email },
+        update: { firstName: platformAdmin.firstName, lastName: platformAdmin.lastName },
+        create: {
           firstName: platformAdmin.firstName,
           lastName: platformAdmin.lastName,
           email: platformAdmin.email,
@@ -100,13 +108,24 @@ export async function sendMessage(
           status: "active",
         },
       })
+      resolvedSenderId = user.id
+    } else {
+      const user = await prisma.user.findFirst({ where: { phone: platformAdmin.phone, deletedAt: null } })
+      if (!user) {
+        throw AppError.unauthenticated(
+          "Platform admin has no email set. Please set an email to send support messages."
+        )
+      }
+      resolvedSenderId = user.id
     }
-
-    if (!user) throw AppError.unauthenticated("Could not resolve user for platform admin")
-    resolvedSenderId = user.id
   } else {
     const user = await prisma.user.findFirst({ where: { id: senderId, deletedAt: null } })
     if (!user) throw AppError.unauthenticated("User not found")
+
+    const membership = await prisma.schoolMembership.findFirst({
+      where: { schoolId: ticket.schoolId, userId: senderId, deletedAt: null },
+    })
+    if (!membership) throw AppError.forbidden("You are not a member of the school owning this ticket")
   }
 
   const msg = await repo.createMessage({

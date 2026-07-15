@@ -15,7 +15,7 @@ export const createSchoolSchema = t.Object({
   currency: t.Optional(t.String({ minLength: 3, maxLength: 3, default: "KES" })),
   timezone: t.Optional(t.String({ minLength: 3, maxLength: 100, default: "Africa/Nairobi" })),
   schoolLevel: t.Optional(
-    t.UnionEnum(["pre_primary", "primary", "junior_secondary", "senior_secondary", "mixed"])
+    t.UnionEnum(["pre_primary", "primary", "hybrid_pri_jsecondary", "junior_secondary", "senior_secondary", "tertiary"])
   ),
 });
 
@@ -33,7 +33,7 @@ export const updateSchoolSchema = t.Object({
   currency: t.Optional(t.String({ minLength: 3, maxLength: 3 })),
   timezone: t.Optional(t.String({ minLength: 3, maxLength: 100 })),
   schoolLevel: t.Optional(
-    t.UnionEnum(["pre_primary", "primary", "junior_secondary", "senior_secondary", "mixed"])
+    t.UnionEnum(["pre_primary", "primary", "hybrid_pri_jsecondary", "junior_secondary", "senior_secondary", "tertiary"])
   ),
   settings: t.Optional(t.Object({})),
 });

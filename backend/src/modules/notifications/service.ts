@@ -4,8 +4,19 @@ import { writeEventOutbox } from "@/infrastructure/events"
 import { wsManager } from "@/infrastructure/websocket"
 import { sendSms } from "@/modules/communication/sms/service"
 import { normalizePhone } from "@/common/validation"
+import { DURATION } from "@/shared/constants"
 import * as repo from "./repository"
 import type { CreateConversationInput, SendMessageInput } from "./schema"
+
+function isParticipant(conv: { participants: { userId: string | null }[] }, userId: string): boolean {
+  return conv.participants.some((p) => p.userId === userId)
+}
+
+function assertParticipant(conv: { participants: { userId: string | null }[] }, userId: string) {
+  if (!isParticipant(conv, userId)) {
+    throw AppError.forbidden("You are not a participant in this conversation")
+  }
+}
 
 export async function listConversations(schoolId: string, authUser: { userId?: string }) {
   return repo.findConversations(schoolId, authUser.userId)
@@ -26,7 +37,6 @@ export async function createConversation(schoolId: string, authUser: { userId?: 
       participants.push({ schoolId, conversationId: conv.id, userId: authUser.userId, participantType: "member" })
     }
 
-    // Announcements include ALL active school members automatically
     if (data.type === "announcement") {
       const allMembers = await tx.schoolMembership.findMany({
         where: { schoolId, deletedAt: null, user: { deletedAt: null } },
@@ -38,8 +48,15 @@ export async function createConversation(schoolId: string, authUser: { userId?: 
         }
       }
     } else if (data.participantIds) {
+      const validMemberships = await tx.schoolMembership.findMany({
+        where: { schoolId, userId: { in: data.participantIds }, deletedAt: null },
+        select: { userId: true },
+      })
+      const validUserIds = new Set(validMemberships.map((m: any) => m.userId))
       for (const userId of data.participantIds) {
-        participants.push({ schoolId, conversationId: conv.id, userId, participantType: "member" })
+        if (validUserIds.has(userId)) {
+          participants.push({ schoolId, conversationId: conv.id, userId, participantType: "member" })
+        }
       }
     }
     await tx.conversationParticipant.createMany({ data: participants })
@@ -62,15 +79,17 @@ export async function createConversation(schoolId: string, authUser: { userId?: 
   return result
 }
 
-export async function getConversation(schoolId: string, conversationId: string) {
+export async function getConversation(schoolId: string, conversationId: string, userId?: string) {
   const conv = await repo.findConversationById(schoolId, conversationId)
   if (!conv) throw AppError.notFound("Conversation not found")
+  if (userId) assertParticipant(conv, userId)
   return conv
 }
 
-export async function listMessages(schoolId: string, conversationId: string) {
+export async function listMessages(schoolId: string, conversationId: string, userId?: string) {
   const conv = await repo.findConversationById(schoolId, conversationId)
   if (!conv) throw AppError.notFound("Conversation not found")
+  if (userId) assertParticipant(conv, userId)
   return repo.findMessages(schoolId, conversationId)
 }
 
@@ -81,10 +100,10 @@ function normalizeMobileForSms(mobile: string) {
 export async function sendMessage(schoolId: string, conversationId: string, authUser: { membershipId?: string; userId?: string }, data: SendMessageInput) {
   const conv = await repo.findConversationById(schoolId, conversationId)
   if (!conv) throw AppError.notFound("Conversation not found")
+  if (authUser.userId) assertParticipant(conv, authUser.userId)
 
   let receipts: any[] = []
   if (data.channel === "sms") {
-    // For SMS, receipts track per-recipient delivery from the provider
     const recipients = data.recipientPhones && data.recipientPhones.length > 0
       ? data.recipientPhones.map((p: string) => normalizeMobileForSms(p))
       : Array.from(
@@ -105,9 +124,9 @@ export async function sendMessage(schoolId: string, conversationId: string, auth
     for (const participant of conv.participants) {
       const phone = participant.user?.phone ?? participant.membership?.user?.phone
       if (!phone) continue
-      const userId = participant.user?.id ?? participant.membership?.user?.id
-      if (!userId) continue
-      userByPhone.set(normalizeMobileForSms(phone), userId)
+      const uid = participant.user?.id ?? participant.membership?.user?.id
+      if (!uid) continue
+      userByPhone.set(normalizeMobileForSms(phone), uid)
     }
 
     receipts = smsResult.results.map((result) => ({
@@ -120,12 +139,17 @@ export async function sendMessage(schoolId: string, conversationId: string, auth
   }
 
   if (data.channel !== "sms" && authUser.userId) {
-    receipts.push({
-      schoolId,
-      recipientUserId: authUser.userId,
-      status: "sent",
-      channel: "in_app",
-    })
+    for (const p of conv.participants) {
+      const uid = p.user?.id ?? p.membership?.user?.id
+      if (uid && uid !== authUser.userId) {
+        receipts.push({
+          schoolId,
+          recipientUserId: uid,
+          status: "sent",
+          channel: "in_app",
+        })
+      }
+    }
   }
 
   const message = await repo.createMessage({
@@ -148,10 +172,8 @@ export async function sendMessage(schoolId: string, conversationId: string, auth
     payload: { conversationId, channel: data.channel ?? "in_app" },
   })
 
-  // Broadcast to the conversation (subscribers get real-time update)
   wsManager.broadcastToConversation(conversationId, "message:new", message)
 
-  // Announcement messages also broadcast to the whole school
   if (conv.type === "announcement") {
     wsManager.broadcastToSchool(schoolId, "message:new", message)
   }
@@ -163,8 +185,7 @@ export async function deleteConversation(schoolId: string, conversationId: strin
   const conv = await repo.findConversationById(schoolId, conversationId)
   if (!conv) throw AppError.notFound("Conversation not found")
 
-  const isParticipant = conv.participants.some((p) => p.userId === userId)
-  if (!isParticipant) throw AppError.forbidden("You are not a participant in this conversation")
+  assertParticipant(conv, userId)
 
   await repo.softDeleteConversation(conversationId, schoolId)
 
@@ -185,9 +206,8 @@ export async function editMessage(schoolId: string, messageId: string, userId: s
     throw AppError.badRequest("Only in-app messages can be edited")
   }
 
-  const thirtyMinutes = 30 * 60 * 1000
   const age = Date.now() - new Date(message.createdAt).getTime()
-  if (age > thirtyMinutes) {
+  if (age > DURATION.THIRTY_MINUTES_MS) {
     throw AppError.badRequest("Messages can only be edited within 30 minutes of sending")
   }
 
@@ -213,6 +233,12 @@ export async function deleteMessage(schoolId: string, messageId: string, userId:
 }
 
 export async function markMessageRead(schoolId: string, messageId: string, userId: string) {
+  const message = await repo.findMessageById(schoolId, messageId)
+  if (!message) throw AppError.notFound("Message not found")
+
+  const conv = await repo.findConversationById(schoolId, message.conversationId!)
+  if (conv) assertParticipant(conv, userId)
+
   const existing = await prisma.messageReceipt.findFirst({
     where: { messageId, schoolId, recipientUserId: userId },
   })
@@ -236,10 +262,7 @@ export async function markMessageRead(schoolId: string, messageId: string, userI
     })
   }
 
-  const message = await repo.findMessageById(schoolId, messageId)
-  if (message) {
-    wsManager.broadcastToConversation(message.conversationId!, "receipt:updated", message)
-  }
+  wsManager.broadcastToConversation(message.conversationId!, "receipt:updated", message)
 
   return { success: true }
 }

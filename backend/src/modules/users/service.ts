@@ -48,7 +48,20 @@ export async function createUser(data: CreateUserInput) {
 
   if (existing) {
     if (existing.deletedAt !== null) {
-      await prisma.user.delete({ where: { id: existing.id } });
+      const pw = data.password
+        ? await hashPassword(data.password)
+        : existing.hashedPassword;
+      return prisma.user.update({
+        where: { id: existing.id },
+        data: {
+          deletedAt: null,
+          firstName: data.firstName,
+          lastName: data.lastName,
+          phone: data.phone,
+          email: data.email,
+          hashedPassword: pw,
+        },
+      });
     } else {
       throw AppError.conflict("Phone number or email is already registered", [
         { field: "phone", issue: "duplicate" },

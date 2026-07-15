@@ -22,6 +22,11 @@ export async function updateAdminController({ params, body, set }: any) {
   return success(result)
 }
 
+export async function deleteAdminController({ params, set }: any) {
+  const result = await svc.deleteAdmin(params.id)
+  return success(result)
+}
+
 export async function resetPasswordController({ params, set }: any) {
   const result = await svc.resetPassword(params.id)
   return success(result)

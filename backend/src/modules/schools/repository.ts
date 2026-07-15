@@ -28,13 +28,13 @@ export async function findSchoolById(id: string) {
 
 export async function findSchoolByCode(code: string) {
   return prisma.school.findFirst({
-    where: { schoolCode: code, deletedAt: null },
+    where: { schoolCode: code },
   });
 }
 
 export async function findSchoolsByCodePrefix(prefix: string) {
   return prisma.school.findMany({
-    where: { schoolCode: { startsWith: prefix }, deletedAt: null },
+    where: { schoolCode: { startsWith: prefix } },
     select: { schoolCode: true },
     orderBy: { schoolCode: "desc" },
     take: 1,

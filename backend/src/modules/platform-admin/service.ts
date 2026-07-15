@@ -136,6 +136,18 @@ export async function listSchools() {
     return repo.findAllSchools()
 }
 
+export async function deleteAdmin(id: string) {
+    const admin = await repo.findById(id)
+    if (!admin) {
+        throw AppError.notFound("Platform admin not found")
+    }
+    if (admin.role === "super_admin") {
+        throw AppError.forbidden("Cannot delete a super admin")
+    }
+    await repo.softDelete(id)
+    return { deleted: true }
+}
+
 export async function deleteSchool(id: string) {
     const school = await repo.findSchoolById(id)
     if (!school) {
@@ -206,7 +218,7 @@ export async function approveJoinRequest(id: string, processedBy: string) {
                     county,
                     town,
                     country: joinRequest.country || "Kenya",
-                    schoolLevel: (joinRequest.schoolLevel ?? "mixed") as any,
+                    schoolLevel: joinRequest.schoolLevel ?? "hybrid_pri_jsecondary",
                 },
             })
 

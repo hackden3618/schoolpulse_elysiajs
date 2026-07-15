@@ -42,7 +42,7 @@ export function useWs() {
 }
 
 export function WsProvider({ children, platformMode, onGlobalMessageNew }: { children: ReactNode; platformMode?: boolean; onGlobalMessageNew?: WsEventHandler }) {
-  const { isAuthenticated } = useAuth()
+  const { isAuthenticated, school } = useAuth()
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   const subsRef = useRef<WsSubscription[]>([])
@@ -150,7 +150,7 @@ export function WsProvider({ children, platformMode, onGlobalMessageNew }: { chi
         wsRef.current = null
       }
     }
-  }, [isAuthenticated, connect])
+  }, [isAuthenticated, school?.id, connect])
 
   const subscribe = useCallback((conversationId: string) => {
     if (wsRef.current?.readyState === WebSocket.OPEN) {

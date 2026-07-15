@@ -5,6 +5,7 @@ import {
   createAdminController,
   listAdminsController,
   updateAdminController,
+  deleteAdminController,
   resetPasswordController,
   approveJoinRequestController,
   rejectJoinRequestController,
@@ -39,6 +40,10 @@ export const platformAdminRoute = new Elysia({
     body: updatePlatformAdminSchema,
     params: t.Object({ id: t.String({ format: "uuid" }) }),
     detail: { summary: "Update platform admin", tags: ["Platform Admin"] },
+  })
+  .delete("/:id", deleteAdminController, {
+    params: t.Object({ id: t.String({ format: "uuid" }) }),
+    detail: { summary: "Soft-delete a platform admin", tags: ["Platform Admin"] },
   })
   .post("/:id/reset-password", resetPasswordController, {
     params: t.Object({ id: t.String({ format: "uuid" }) }),

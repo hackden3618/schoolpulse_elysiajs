@@ -66,7 +66,7 @@ export async function createSchool(data: CreateSchoolInput) {
     country: data.country ?? "Kenya",
     currency: data.currency ?? "KES",
     timezone: data.timezone ?? "Africa/Nairobi",
-    schoolLevel: (data.schoolLevel ?? "mixed") as any,
+    schoolLevel: data.schoolLevel ?? "hybrid_pri_jsecondary",
   });
 
   await writeEventOutbox({

@@ -712,6 +712,10 @@ export const platformAdminApi = {
             method: "PATCH",
             body: JSON.stringify(data),
         }),
+    deleteAdmin: (id: string) =>
+        platformRequest<ApiResponse<{ deleted: boolean }>>(`/platform/admins/${id}`, {
+            method: "DELETE",
+        }),
     resetPassword: (id: string) =>
         platformRequest<ApiResponse<{ temporaryPassword: string }>>(`/platform/admins/${id}/reset-password`, {
             method: "POST",

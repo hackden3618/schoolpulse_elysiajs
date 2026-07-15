@@ -12,13 +12,13 @@ export async function createConversationController({ params: { schoolId }, body,
   return success(result, schoolId)
 }
 
-export async function getConversationController({ params: { schoolId, conversationId }, set }: any) {
-  const result = await svc.getConversation(schoolId, conversationId)
+export async function getConversationController({ params: { schoolId, conversationId }, authUser, set }: any) {
+  const result = await svc.getConversation(schoolId, conversationId, authUser.userId)
   return success(result, schoolId)
 }
 
-export async function getMessagesController({ params: { schoolId, conversationId }, set }: any) {
-  const result = await svc.listMessages(schoolId, conversationId)
+export async function getMessagesController({ params: { schoolId, conversationId }, authUser, set }: any) {
+  const result = await svc.listMessages(schoolId, conversationId, authUser.userId)
   return success(result, schoolId)
 }
 

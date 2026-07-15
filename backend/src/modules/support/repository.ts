@@ -30,11 +30,12 @@ export async function createTicket(data: {
 
 export async function findTicketsBySchool(
   schoolId: string,
-  filters?: { status?: string; category?: string }
+  filters?: { status?: string; category?: string; createdBy?: string }
 ) {
   const where: any = { schoolId, deletedAt: null }
   if (filters?.status) where.status = filters.status
   if (filters?.category) where.category = filters.category
+  if (filters?.createdBy) where.createdBy = filters.createdBy
   return prisma.supportTicket.findMany({
     where,
     include: ticketInclude,
