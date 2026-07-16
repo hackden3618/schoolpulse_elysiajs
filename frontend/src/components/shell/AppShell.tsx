@@ -66,7 +66,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
               setSidebarCollapsed(!sidebarCollapsed)
             }
           }} />
-          <main className="flex-1 overflow-y-auto px-4 pt-6 pb-28 sm:px-8 md:px-10 lg:py-6">
+          <main className="flex-1 overflow-y-auto px-4 pt-6 pb-36 sm:px-8 md:px-10 lg:py-6 lg:pb-6">
             <div className="mx-auto max-w-[1600px] h-full">
               {children}
             </div>

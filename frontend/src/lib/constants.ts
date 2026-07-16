@@ -12,6 +12,7 @@ import {
   Shield,
   Building2,
   LifeBuoy,
+  Wallet,
 } from "lucide-react"
 
 export interface NavGroup {
@@ -29,7 +30,10 @@ export interface NavItem {
 const ALL_NAV: NavGroup[] = [
   {
     label: "Main",
-    items: [{ label: "Dashboard", href: "/dashboard", icon: LayoutDashboard }],
+    items: [
+      { label: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
+      { label: "Fee Payments", href: "/payments", icon: Wallet },
+    ],
   },
   {
     label: "Management",
@@ -60,7 +64,7 @@ const ALL_NAV: NavGroup[] = [
 ]
 
 const NAV_BY_ROLE: Record<string, string[]> = {
-  Guardian: ["/dashboard", "/communication", "/support"],
+  Guardian: ["/dashboard", "/payments", "/communication", "/support"],
   Teacher: ["/dashboard", "/attendance", "/assessments", "/communication", "/support", "/reports"],
   Bursar: ["/dashboard", "/finance", "/communication", "/support", "/reports"],
 }
@@ -80,6 +84,7 @@ export const navigation = ALL_NAV
 
 export const quickActions = [
   { label: "Admit Student", href: "/students/create" },
+  { label: "Bulk Import", href: "/students/import" },
   { label: "Record Payment", href: "/finance/payments" },
   { label: "Mark Attendance", href: "/attendance" },
   { label: "Create Invoice", href: "/finance/invoices" },

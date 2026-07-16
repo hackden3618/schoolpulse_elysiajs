@@ -75,13 +75,13 @@ export function GuardianDashboard() {
                 <p className="text-xs text-primary-500">School communication</p>
               </div>
             </div>
-            <div className="rounded-xl border border-primary-100/60 bg-white shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all" onClick={() => navigate(`/students/${students[0]?.id}`)}>
+            <div className="rounded-xl border border-primary-100/60 bg-white shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all" onClick={() => navigate("/payments")}>
               <div className="rounded-lg bg-info-50 p-2.5 text-info-600">
                 <DollarSign size={20} />
               </div>
               <div>
                 <p className="text-sm font-semibold text-primary-900">Fee Balance</p>
-                <p className="text-xs text-primary-500">View statements</p>
+                <p className="text-xs text-primary-500">Pay via M-Pesa</p>
               </div>
             </div>
             <div className="rounded-xl border border-primary-100/60 bg-white shadow-sm p-4 flex items-center gap-3 cursor-pointer hover:shadow-md transition-all" onClick={() => navigate("/support")}>

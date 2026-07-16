@@ -71,8 +71,15 @@ export const mpesaCallbackSchema = t.Object({
   }),
 })
 
+export const generateBulkInvoicesSchema = t.Object({
+  classId: uuidString(true),
+  termId: uuidString(true),
+  feeStructureId: uuidString(true),
+})
+
 export type CreateFeeStructureInput = typeof createFeeStructureSchema.static
 export type GenerateInvoiceInput = typeof generateInvoiceSchema.static
+export type GenerateBulkInvoicesInput = typeof generateBulkInvoicesSchema.static
 export type RecordPaymentInput = typeof recordPaymentSchema.static
 export type ReversePaymentInput = typeof reversePaymentSchema.static
 export type InitiateMpesaPaymentInput = typeof initiateMpesaPaymentSchema.static

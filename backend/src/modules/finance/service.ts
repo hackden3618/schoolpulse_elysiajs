@@ -8,6 +8,7 @@ import { FinanceEvents } from "./events"
 import type {
   CreateFeeStructureInput,
   GenerateInvoiceInput,
+  GenerateBulkInvoicesInput,
   RecordPaymentInput,
   InitiateMpesaPaymentInput,
   InitiateBulkMpesaPaymentInput,
@@ -22,6 +23,11 @@ export async function listFeeStructures(schoolId: string) {
 export async function createFeeStructure(schoolId: string, data: CreateFeeStructureInput) {
   const term = await repo.findTermById(schoolId, data.termId)
   FinancePolicy.canCreateFeeStructure(term)
+
+  if (data.classId) {
+    const classInstance = await repo.findClassById(schoolId, data.classId)
+    FinancePolicy.canCreateFeeStructureForClass(classInstance)
+  }
 
   const structure = await repo.createFeeStructure({
     schoolId,
@@ -60,7 +66,59 @@ export async function generateInvoice(schoolId: string, data: GenerateInvoiceInp
   return FinanceMapper.toInvoiceDTO(invoice)
 }
 
+export async function generateBulkInvoices(schoolId: string, data: GenerateBulkInvoicesInput) {
+  const feeStructure = await repo.findFeeStructureById(schoolId, data.feeStructureId)
+  FinancePolicy.canGenerateInvoice({ status: "active" }, feeStructure)
+
+  const enrollments = await repo.findActiveStudentsByClassId(schoolId, data.classId)
+  if (enrollments.length === 0) {
+    throw AppError.notFound("No active students found in this class")
+  }
+
+  const totalAmount = feeStructure!.feeItems.reduce((sum: number, item: any) => sum + Number(item.amount), 0)
+  const results: any[] = []
+  const errors: { studentId: string; reason: string }[] = []
+
+  for (const enrollment of enrollments) {
+    const student = enrollment.student
+    if (!student || student.status !== "active") {
+      errors.push({ studentId: student?.id ?? "unknown", reason: "Student not active" })
+      continue
+    }
+
+    const existing = await repo.findExistingInvoice(schoolId, student.id, data.termId, data.feeStructureId)
+    if (existing) {
+      errors.push({ studentId: student.id, reason: "Invoice already exists for this term/student" })
+      continue
+    }
+
+    const invoice = await repo.createInvoice({
+      schoolId,
+      studentId: student.id,
+      enrollmentId: enrollment.id,
+      termId: data.termId,
+      feeStructureId: data.feeStructureId,
+      totalAmount,
+      paidAmount: 0,
+      balance: totalAmount,
+      status: "issued",
+    })
+
+    await FinanceEvents.invoiceGenerated(schoolId, invoice.id, { studentId: student.id, amount: totalAmount })
+    results.push(FinanceMapper.toInvoiceDTO(invoice))
+  }
+
+  return { generated: results.length, total: enrollments.length, errors, invoices: results }
+}
+
 export async function listInvoices(schoolId: string, studentId?: string) {
+  const invoices = await repo.findInvoices(schoolId, studentId)
+  return invoices.map(FinanceMapper.toInvoiceDTO)
+}
+
+export async function listGuardianInvoices(schoolId: string, studentId: string, userId: string) {
+  const link = await repo.findGuardianStudentLink(schoolId, studentId, userId)
+  FinancePolicy.canViewGuardianInvoices(link)
   const invoices = await repo.findInvoices(schoolId, studentId)
   return invoices.map(FinanceMapper.toInvoiceDTO)
 }
@@ -135,9 +193,13 @@ export async function listPayments(schoolId: string, studentId?: string) {
   return payments.map(FinanceMapper.toPaymentDTO)
 }
 
-export async function initiateMpesaPayment(schoolId: string, data: InitiateMpesaPaymentInput) {
+export async function initiateMpesaPayment(schoolId: string, data: InitiateMpesaPaymentInput, authUser?: any) {
   const invoice = await repo.findInvoiceById(schoolId, data.invoiceId)
   FinancePolicy.canPayInvoice(invoice, data.amount)
+
+  if (authUser) {
+    await FinancePolicy.assertGuardianOwnsStudent(schoolId, invoice!.studentId, authUser)
+  }
 
   const student = invoice!.student
   const accountReference = student.admissionNumber.substring(0, 12)
@@ -182,7 +244,11 @@ export async function initiateMpesaPayment(schoolId: string, data: InitiateMpesa
   return { checkoutRequestId: darajaResponse.CheckoutRequestID, paymentId: pendingPayment.id }
 }
 
-export async function initiateBulkMpesaPayment(schoolId: string, data: InitiateBulkMpesaPaymentInput) {
+export async function initiateBulkMpesaPayment(schoolId: string, data: InitiateBulkMpesaPaymentInput, authUser?: any) {
+  if (authUser) {
+    await FinancePolicy.assertGuardianOwnsStudent(schoolId, data.studentId, authUser)
+  }
+
   const accountReference = "BULK_PAY".substring(0, 12)
   const transactionDesc = `Bulk Fee Pmt`.substring(0, 13)
 

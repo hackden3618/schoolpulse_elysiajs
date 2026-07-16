@@ -264,7 +264,7 @@ export function EditUserPage() {
                   <ErrorBanner message={rolesError} />
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {roles.map((role) => {
+                    {roles.filter((r) => r.name !== "Guardian" || isGuardian).map((role) => {
                       const selected = selectedRoleIds.includes(role.id)
                       const isImmutable = role.name === "Guardian" && isGuardian
                       return (

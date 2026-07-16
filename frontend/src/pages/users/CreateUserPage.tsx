@@ -184,7 +184,7 @@ export function CreateUserPage() {
                   <ErrorBanner message={rolesError} />
                 ) : (
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {roles.map((role) => {
+                    {roles.filter((r) => r.name !== "Guardian").map((role) => {
                       const selected = selectedRoleIds.includes(role.id)
                       return (
                         <button

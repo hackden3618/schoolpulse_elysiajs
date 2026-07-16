@@ -14,7 +14,14 @@ export async function getSummary(schoolId: string) {
   ] = await Promise.all([
     prisma.student.count({ where: { schoolId, deletedAt: null } }),
     prisma.student.count({ where: { schoolId, deletedAt: null, status: "active" } }),
-    prisma.schoolMembership.count({ where: { schoolId, deletedAt: null, status: "active" } }),
+    prisma.schoolMembership.count({
+      where: {
+        schoolId,
+        deletedAt: null,
+        status: "active",
+        NOT: { roles: { every: { role: { name: "Guardian" } } } },
+      },
+    }),
     prisma.classInstance.count({ where: { schoolId, deletedAt: null, isCurrent: true } }),
     prisma.academicYear.findFirst({ where: { schoolId, deletedAt: null, active: true } }),
     prisma.term.findFirst({ where: { schoolId, deletedAt: null, active: true } }),

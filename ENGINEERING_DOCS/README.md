@@ -22,6 +22,7 @@ The binary Word files in this directory are treated as legacy drafts. The Markdo
 | `SchoolPulse_Engineering_Spec_v1.1.0.md` | Backend, frontend, QA, DevOps | Architecture, modules, domain model, REST API, events, security, coding standards, deployment, testing, and implementation rules. |
 | `SchoolPulse_SRS_v1.1.0.md` | Product, engineering, QA | Testable functional and non-functional requirements for the v1.1.0 product boundary. |
 | `MODEL_PLAN.md` | Backend, database | Enum-first modeling notes and Prisma design decisions to apply before implementation. |
+| `FUTURE_IMPROVEMENTS_v1.2.0.md` | Everyone, engineering | Candidate backlog deferred from the v1.1.0 freeze (guardian payments page, `can_pay` enforcement, receipt polish). |
 | `POSTGRESQL_CODE_TO_BE_COMPLETED.sql` | Backend, database, DevOps | Target PostgreSQL schema for v1.1.0, including enums, tables, constraints, indexes, soft deletes, and event outbox. |
 
 ## Current Codebase Snapshot

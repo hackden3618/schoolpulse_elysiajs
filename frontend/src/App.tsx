@@ -21,6 +21,7 @@ const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default:
 const StudentList = lazy(() => import("./pages/students/StudentList").then((m) => ({ default: m.StudentList })))
 const StudentDetail = lazy(() => import("./pages/students/StudentDetail").then((m) => ({ default: m.StudentDetail })))
 const CreateStudent = lazy(() => import("./pages/students/CreateStudent").then((m) => ({ default: m.CreateStudent })))
+const BulkImportPage = lazy(() => import("./pages/students/BulkImportPage").then((m) => ({ default: m.BulkImportPage })))
 const AttendancePage = lazy(() => import("./pages/attendance/AttendancePage").then((m) => ({ default: m.AttendancePage })))
 const FinancePage = lazy(() => import("./pages/finance/FinancePage").then((m) => ({ default: m.FinancePage })))
 const AcademicsPage = lazy(() => import("./pages/academics/AcademicsPage").then((m) => ({ default: m.AcademicsPage })))
@@ -28,10 +29,12 @@ const ExamsPage = lazy(() => import("./pages/exams/ExamsPage").then((m) => ({ de
 const CommunicationPage = lazy(() => import("./pages/communication/CommunicationPage").then((m) => ({ default: m.CommunicationPage })))
 const SupportPage = lazy(() => import("./pages/support/SupportPage").then((m) => ({ default: m.SupportPage })))
 const ReportsPage = lazy(() => import("./pages/reports/ReportsPage").then((m) => ({ default: m.ReportsPage })))
+const GuardianPaymentsPage = lazy(() => import("./pages/guardian/GuardianPaymentsPage").then((m) => ({ default: m.GuardianPaymentsPage })))
 const SettingsPage = lazy(() => import("./pages/settings/SettingsPage").then((m) => ({ default: m.SettingsPage })))
 const UserListPage = lazy(() => import("./pages/users/UserListPage").then((m) => ({ default: m.UserListPage })))
 const CreateUserPage = lazy(() => import("./pages/users/CreateUserPage").then((m) => ({ default: m.CreateUserPage })))
 const EditUserPage = lazy(() => import("./pages/users/EditUserPage").then((m) => ({ default: m.EditUserPage })))
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage").then((m) => ({ default: m.NotFoundPage })))
 
 export function App() {
   return (
@@ -50,9 +53,11 @@ export function App() {
         {/* Platform Admin routes */}
         <Route path="/platform/login" element={<PlatformLoginPage />} />
         <Route path="/platform/dashboard" element={
-          <Suspense fallback={<LoadingScreen />}>
-            <PlatformDashboard />
-          </Suspense>
+          <RequireAuth>
+            <Suspense fallback={<LoadingScreen />}>
+              <PlatformDashboard />
+            </Suspense>
+          </RequireAuth>
         } />
 
         {/* App routes (lazy-loaded inside AppShell) */}
@@ -66,6 +71,8 @@ export function App() {
                     <Route path="/dashboard" element={<Dashboard />} />
                     <Route path="/students" element={<RoleGuard><StudentList /></RoleGuard>} />
                     <Route path="/students/create" element={<RoleGuard><CreateStudent /></RoleGuard>} />
+                    <Route path="/students/import" element={<RoleGuard><BulkImportPage /></RoleGuard>} />
+                    <Route path="/students/imports" element={<Navigate to="/students/import" replace />} />
                     <Route path="/students/:id" element={<RoleGuard><StudentDetail /></RoleGuard>} />
                     <Route path="/users" element={<RoleGuard><UserListPage /></RoleGuard>} />
                     <Route path="/users/create" element={<RoleGuard><CreateUserPage /></RoleGuard>} />
@@ -75,11 +82,13 @@ export function App() {
                     <Route path="/academics" element={<RoleGuard><AcademicsPage /></RoleGuard>} />
                     <Route path="/exams" element={<RoleGuard><ExamsPage /></RoleGuard>} />
                     <Route path="/assessments" element={<RoleGuard><ExamsPage /></RoleGuard>} />
-                    <Route path="/communication" element={<CommunicationPage />} />
-                    <Route path="/support" element={<SupportPage />} />
+                    <Route path="/payments" element={<RoleGuard><GuardianPaymentsPage /></RoleGuard>} />
+                    <Route path="/communication" element={<RoleGuard><CommunicationPage /></RoleGuard>} />
+                    <Route path="/support" element={<RoleGuard><SupportPage /></RoleGuard>} />
                     <Route path="/reports" element={<RoleGuard><ReportsPage /></RoleGuard>} />
                     <Route path="/settings" element={<RoleGuard><SettingsPage /></RoleGuard>} />
                     <Route path="/settings/system" element={<RoleGuard><SettingsPage /></RoleGuard>} />
+                    <Route path="*" element={<NotFoundPage />} />
                   </Routes>
                 </Suspense>
               </AppShell>

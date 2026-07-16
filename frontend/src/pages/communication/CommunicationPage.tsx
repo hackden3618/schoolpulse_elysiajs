@@ -254,7 +254,7 @@ export function CommunicationPage() {
     try {
       const res = await withMinDelay(conversationsApi.list(schoolId))
       setConversations(res.data)
-      reset()
+      resetUnread()
       const count = countUnread(res.data, user?.id)
       if (count > 0) increment(count)
     } catch (e) {

@@ -471,6 +471,7 @@ model User {
     messageReceipts          MessageReceipt[]
     createdSupportTickets    SupportTicket[]
     supportTicketMessages    SupportTicketMessage[]
+    createdImportSessions    ImportSession[]
 
     @@map("users")
 }
@@ -549,6 +550,7 @@ model School {
     subscriptions            Subscription[]
     smsWallet                SmsWallet?
     supportTickets           SupportTicket[]
+    importSessions           ImportSession[]
 
     @@unique([schoolName, schoolLevel, schoolPhone, schoolEmail])
 
@@ -810,6 +812,57 @@ model Enrollment {
     @@unique([studentId, classInstanceId, academicYearId])
     @@index([schoolId, status], map: "idx_enrollments_school_status")
     @@map("enrollments")
+}
+
+/**
+ * =========================
+ * BULK IMPORT / DATA MIGRATION DOMAIN
+ * =========================
+ */
+
+model ImportSession {
+    id             String   @id @default(uuid()) @db.Uuid
+    schoolId       String   @map("school_id") @db.Uuid
+    createdByUserId String  @map("created_by_user_id") @db.Uuid
+
+    fileName         String @map("file_name")
+    fileSize         Int    @map("file_size")
+    fileType         String @map("file_type")
+    status           String @default("created")
+    strategy         String @default("skip")
+    batchSize        Int    @default(100)
+
+    totalRows     Int @default(0) @map("total_rows")
+    validRows     Int @default(0) @map("valid_rows")
+    errorRows     Int @default(0) @map("error_rows")
+    warningRows   Int @default(0) @map("warning_rows")
+    importedRows  Int @default(0) @map("imported_rows")
+    skippedRows   Int @default(0) @map("skipped_rows")
+
+    columns        Json? @default("[]")
+    columnMapping  Json? @map("column_mapping")
+    previewData    Json? @map("preview_data")
+    summary        Json? @default("{}")
+    errorReport    Json? @map("error_report")
+
+    checksum         String?  @map("checksum")
+    uploadedFilePath String?  @map("uploaded_file_path")
+    originalFileName String?  @map("original_file_name")
+
+    progress  Int    @default(0)
+    stage     String @default("created")
+
+    startedAt   DateTime? @map("started_at") @db.Timestamptz(6)
+    completedAt DateTime? @map("completed_at") @db.Timestamptz(6)
+
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    school        School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+    createdByUser User   @relation(fields: [createdByUserId], references: [id])
+
+    @@index([schoolId, status])
+    @@map("import_sessions")
 }
 
 /**

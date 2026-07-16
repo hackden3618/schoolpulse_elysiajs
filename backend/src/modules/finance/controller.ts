@@ -18,6 +18,12 @@ export async function generateInvoiceController({ params: { schoolId }, body, se
   return success(result, schoolId)
 }
 
+export async function generateBulkInvoicesController({ params: { schoolId }, body, set }: any) {
+  set.status = 201
+  const result = await svc.generateBulkInvoices(schoolId, body)
+  return success(result, schoolId)
+}
+
 export async function getInvoicesController({ params: { schoolId }, query: { studentId }, set }: any) {
   const result = await svc.listInvoices(schoolId, studentId)
   return success(result, schoolId)
@@ -25,6 +31,11 @@ export async function getInvoicesController({ params: { schoolId }, query: { stu
 
 export async function getInvoiceController({ params: { schoolId, invoiceId }, set }: any) {
   const result = await svc.getInvoice(schoolId, invoiceId)
+  return success(result, schoolId)
+}
+
+export async function getGuardianInvoicesController({ params: { schoolId, studentId }, authUser, set }: any) {
+  const result = await svc.listGuardianInvoices(schoolId, studentId, authUser.userId)
   return success(result, schoolId)
 }
 
@@ -39,15 +50,15 @@ export async function getPaymentsController({ params: { schoolId }, query: { stu
   return success(result, schoolId)
 }
 
-export async function initiateMpesaPaymentController({ params: { schoolId }, body, set }: any) {
+export async function initiateMpesaPaymentController({ params: { schoolId }, body, authUser, set }: any) {
   set.status = 201
-  const result = await svc.initiateMpesaPayment(schoolId, body)
+  const result = await svc.initiateMpesaPayment(schoolId, body, authUser)
   return success(result, schoolId)
 }
 
-export async function initiateBulkMpesaPaymentController({ params: { schoolId }, body, set }: any) {
+export async function initiateBulkMpesaPaymentController({ params: { schoolId }, body, authUser, set }: any) {
   set.status = 201
-  const result = await svc.initiateBulkMpesaPayment(schoolId, body)
+  const result = await svc.initiateBulkMpesaPayment(schoolId, body, authUser)
   return success(result, schoolId)
 }
 

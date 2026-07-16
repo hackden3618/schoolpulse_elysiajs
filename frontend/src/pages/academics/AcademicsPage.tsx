@@ -33,6 +33,10 @@ function AcademicYearsSection({ schoolId, activeYearId: _ }: { schoolId: string;
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editStartDate, setEditStartDate] = useState("")
+  const [editEndDate, setEditEndDate] = useState("")
 
   const load = async () => {
     setLoading(true)
@@ -77,6 +81,36 @@ function AcademicYearsSection({ schoolId, activeYearId: _ }: { schoolId: string;
     }
   }
 
+  const handleStartEdit = (y: AcademicYear) => {
+    setEditingId(y.id)
+    setEditName(y.name)
+    setEditStartDate(y.startDate.slice(0, 10))
+    setEditEndDate(y.endDate.slice(0, 10))
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditName(""); setEditStartDate(""); setEditEndDate("")
+  }
+
+  const handleUpdate = async (id: string) => {
+    if (!editName || !editStartDate || !editEndDate) return
+    setSaving(true)
+    try {
+      await withMinDelay(academicApi.years.update(schoolId, id, {
+        name: editName,
+        startDate: editStartDate,
+        endDate: editEndDate,
+      }))
+      handleCancelEdit()
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) return <TableSkeleton rows={3} cols={4} />
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
@@ -109,28 +143,47 @@ function AcademicYearsSection({ schoolId, activeYearId: _ }: { schoolId: string;
         <EmptyState title="No academic years" description="Create your first academic year to get started." />
       ) : (
         <div className="space-y-2">
-          {years.map((y) => (
-            <div key={y.id} className="flex items-center justify-between rounded-lg border border-surface-200 bg-white px-4 py-3">
-              <div className="flex items-center gap-3">
-                <CalendarDays size={16} className="text-primary-400" />
-                <div>
-                  <p className="text-sm font-semibold text-primary-900">{y.name}</p>
-                  <p className="text-xs text-primary-400">{new Date(y.startDate).toLocaleDateString()} — {new Date(y.endDate).toLocaleDateString()}</p>
+          {years.map((y) =>
+            editingId === y.id ? (
+              <div key={y.id} className="rounded-lg border border-accent/40 bg-amber-50/30 px-4 py-3">
+                <div className="flex items-end gap-3">
+                  <Input label="Year Name" value={editName} onChange={(e) => setEditName(e.target.value)} className="flex-1" />
+                  <Input label="Start" type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
+                  <Input label="End" type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} />
+                  <div className="flex gap-2 pb-1">
+                    <Button size="sm" type="button" disabled={saving} onClick={() => handleUpdate(y.id)}>
+                      {saving ? "Saving..." : "Save"}
+                    </Button>
+                    <Button size="sm" variant="secondary" type="button" onClick={handleCancelEdit}><X size={14} /></Button>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {y.active ? (
-                  <Badge variant="success">
-                    <Check size={10} className="mr-1" /> Active
-                  </Badge>
-                ) : (
-                  <Button size="sm" variant="secondary" onClick={() => handleActivate(y.id)}>
-                    Activate
+            ) : (
+              <div key={y.id} className="flex items-center justify-between rounded-lg border border-surface-200 bg-white px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <CalendarDays size={16} className="text-primary-400" />
+                  <div>
+                    <p className="text-sm font-semibold text-primary-900">{y.name}</p>
+                    <p className="text-xs text-primary-400">{new Date(y.startDate).toLocaleDateString()} — {new Date(y.endDate).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => handleStartEdit(y)}>
+                    Edit
                   </Button>
-                )}
+                  {y.active ? (
+                    <Badge variant="success">
+                      <Check size={10} className="mr-1" /> Active
+                    </Badge>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => handleActivate(y.id)}>
+                      Activate
+                    </Button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          )}
         </div>
       )}
     </div>
@@ -151,6 +204,11 @@ function TermsSection({ schoolId }: { schoolId: string }) {
   const [startDate, setStartDate] = useState("")
   const [endDate, setEndDate] = useState("")
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+  const [editStartDate, setEditStartDate] = useState("")
+  const [editEndDate, setEditEndDate] = useState("")
+  const [editAcademicYearId, setEditAcademicYearId] = useState("")
 
   const load = async () => {
     setLoading(true)
@@ -199,6 +257,37 @@ function TermsSection({ schoolId }: { schoolId: string }) {
     }
   }
 
+  const handleStartEdit = (t: Term) => {
+    setEditingId(t.id)
+    setEditName(t.name)
+    setEditStartDate(t.startDate.slice(0, 10))
+    setEditEndDate(t.endDate.slice(0, 10))
+    setEditAcademicYearId(t.academicYearId)
+  }
+
+  const handleCancelEdit = () => {
+    setEditingId(null)
+    setEditName(""); setEditStartDate(""); setEditEndDate(""); setEditAcademicYearId("")
+  }
+
+  const handleUpdate = async (id: string) => {
+    if (!editName || !editStartDate || !editEndDate || !editAcademicYearId) return
+    setSaving(true)
+    try {
+      await withMinDelay(academicApi.terms.update(schoolId, id, {
+        name: editName,
+        startDate: editStartDate,
+        endDate: editEndDate,
+      }))
+      handleCancelEdit()
+      await load()
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to update")
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) return <TableSkeleton rows={3} cols={4} />
   if (error) return <ErrorBanner message={error} onRetry={load} />
 
@@ -239,24 +328,49 @@ function TermsSection({ schoolId }: { schoolId: string }) {
         <EmptyState title="No terms" description="Create terms linked to an academic year." />
       ) : (
         <div className="space-y-2">
-          {terms.map((t) => (
-            <div key={t.id} className="flex items-center justify-between rounded-lg border border-surface-200 bg-white px-4 py-3">
-              <div className="flex items-center gap-3">
-                <BookOpen size={16} className="text-primary-400" />
-                <div>
-                  <p className="text-sm font-semibold text-primary-900">{t.name}</p>
-                  <p className="text-xs text-primary-400">{new Date(t.startDate).toLocaleDateString()} — {new Date(t.endDate).toLocaleDateString()}</p>
+          {terms.map((t) =>
+            editingId === t.id ? (
+              <div key={t.id} className="rounded-lg border border-accent/40 bg-amber-50/30 px-4 py-3">
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+                  <Input label="Term Name" value={editName} onChange={(e) => setEditName(e.target.value)} />
+                  <div className="space-y-1">
+                    <label className="block text-sm font-medium text-surface-700">Academic Year</label>
+                    <select value={editAcademicYearId} onChange={(e) => setEditAcademicYearId(e.target.value)}
+                      className="block w-full rounded-lg border border-surface-300 bg-white px-3 py-2 text-sm text-surface-900 focus:border-primary-500 focus:ring-1 focus:ring-primary-500">
+                      <option value="">Select year...</option>
+                      {years.map((y) => <option key={y.id} value={y.id}>{y.name}</option>)}
+                    </select>
+                  </div>
+                  <Input label="Start" type="date" value={editStartDate} onChange={(e) => setEditStartDate(e.target.value)} />
+                  <Input label="End" type="date" value={editEndDate} onChange={(e) => setEditEndDate(e.target.value)} />
+                  <div className="flex gap-2 pb-1 items-end">
+                    <Button size="sm" type="button" disabled={saving} onClick={() => handleUpdate(t.id)}>
+                      {saving ? "Saving..." : "Save"}
+                    </Button>
+                    <Button size="sm" variant="secondary" type="button" onClick={handleCancelEdit}><X size={14} /></Button>
+                  </div>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {t.active ? (
-                  <Badge variant="success"><Check size={10} className="mr-1" /> Active</Badge>
-                ) : (
-                  <Button size="sm" variant="secondary" onClick={() => handleActivate(t.id)}>Activate</Button>
-                )}
+            ) : (
+              <div key={t.id} className="flex items-center justify-between rounded-lg border border-surface-200 bg-white px-4 py-3">
+                <div className="flex items-center gap-3">
+                  <BookOpen size={16} className="text-primary-400" />
+                  <div>
+                    <p className="text-sm font-semibold text-primary-900">{t.name}</p>
+                    <p className="text-xs text-primary-400">{new Date(t.startDate).toLocaleDateString()} — {new Date(t.endDate).toLocaleDateString()}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => handleStartEdit(t)}>Edit</Button>
+                  {t.active ? (
+                    <Badge variant="success"><Check size={10} className="mr-1" /> Active</Badge>
+                  ) : (
+                    <Button size="sm" variant="secondary" onClick={() => handleActivate(t.id)}>Activate</Button>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          )}
         </div>
       )}
     </div>

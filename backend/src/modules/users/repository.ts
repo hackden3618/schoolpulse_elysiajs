@@ -80,7 +80,7 @@ export async function findMembershipById(id: string) {
 
 export async function findAllMemberships(schoolId: string) {
   return prisma.schoolMembership.findMany({
-    where: { schoolId, deletedAt: null },
+    where: { schoolId, deletedAt: null, NOT: { roles: { every: { role: { name: "Guardian" } } } } },
     include: membershipInclude,
     orderBy: { joinedAt: "desc" },
   });

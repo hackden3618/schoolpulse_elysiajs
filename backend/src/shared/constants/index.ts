@@ -30,6 +30,7 @@ export const ROLES = {
   ADMISSIONS: "Admissions",
   RECEPTION: "Reception",
   PARENT: "Parent",
+  GUARDIAN: "Guardian",
 } as const;
 
 export const DURATION = {

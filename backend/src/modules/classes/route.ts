@@ -1,6 +1,7 @@
 import { Elysia, t } from "elysia";
 import { API_PREFIX } from "@/shared/constants";
 import { errorHandler, authGuard } from "@/common/middleware";
+import { checkPermission } from "@/common/middleware/permissionGuard";
 import {
   getAcademicYearsController,
   getAcademicYearController,
@@ -33,91 +34,113 @@ import {
 const academicYearRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/academic-years` })
   .use(errorHandler)
   .use(authGuard)
-  .get("/", getAcademicYearsController, {
-    params: t.Object({ schoolId: t.String() }),
-    detail: { summary: "List academic years", tags: ["Academic"] },
-  })
-  .post("/", createAcademicYearController, {
-    params: t.Object({ schoolId: t.String() }),
-    body: createAcademicYearSchema,
-    detail: { summary: "Create academic year", tags: ["Academic"] },
-  })
-  .patch("/:academicYearId", updateAcademicYearController, {
-    params: t.Object({ schoolId: t.String(), academicYearId: t.String() }),
-    body: updateAcademicYearSchema,
-    detail: { summary: "Update academic year", tags: ["Academic"] },
-  })
-  .post("/:academicYearId/activate", activateAcademicYearController, {
-    params: t.Object({ schoolId: t.String(), academicYearId: t.String() }),
-    detail: { summary: "Activate academic year", tags: ["Academic"] },
-  });
+  .guard({ beforeHandle: [checkPermission("school:read")] }, (app) => app
+    .get("/", getAcademicYearsController, {
+      params: t.Object({ schoolId: t.String() }),
+      detail: { summary: "List academic years", tags: ["Academic"] },
+    })
+  )
+  .guard({ beforeHandle: [checkPermission("academic-year:write")] }, (app) => app
+    .post("/", createAcademicYearController, {
+      params: t.Object({ schoolId: t.String() }),
+      body: createAcademicYearSchema,
+      detail: { summary: "Create academic year", tags: ["Academic"] },
+    })
+    .patch("/:academicYearId", updateAcademicYearController, {
+      params: t.Object({ schoolId: t.String(), academicYearId: t.String() }),
+      body: updateAcademicYearSchema,
+      detail: { summary: "Update academic year", tags: ["Academic"] },
+    })
+    .post("/:academicYearId/activate", activateAcademicYearController, {
+      params: t.Object({ schoolId: t.String(), academicYearId: t.String() }),
+      detail: { summary: "Activate academic year", tags: ["Academic"] },
+    })
+  );
 
 const termRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/terms` })
   .use(errorHandler)
   .use(authGuard)
-  .get("/", getTermsController, {
-    params: t.Object({ schoolId: t.String() }),
-    query: t.Optional(t.Object({ academicYearId: t.Optional(t.String()) })),
-    detail: { summary: "List terms", tags: ["Academic"] },
-  })
-  .post("/", createTermController, {
-    params: t.Object({ schoolId: t.String() }),
-    body: createTermSchema,
-    detail: { summary: "Create term", tags: ["Academic"] },
-  })
-  .patch("/:termId", updateTermController, {
-    params: t.Object({ schoolId: t.String(), termId: t.String() }),
-    body: updateTermSchema,
-    detail: { summary: "Update term", tags: ["Academic"] },
-  })
-  .post("/:termId/activate", activateTermController, {
-    params: t.Object({ schoolId: t.String(), termId: t.String() }),
-    detail: { summary: "Activate term", tags: ["Academic"] },
-  });
+  .guard({ beforeHandle: [checkPermission("school:read")] }, (app) => app
+    .get("/", getTermsController, {
+      params: t.Object({ schoolId: t.String() }),
+      query: t.Optional(t.Object({ academicYearId: t.Optional(t.String()) })),
+      detail: { summary: "List terms", tags: ["Academic"] },
+    })
+  )
+  .guard({ beforeHandle: [checkPermission("term:write")] }, (app) => app
+    .post("/", createTermController, {
+      params: t.Object({ schoolId: t.String() }),
+      body: createTermSchema,
+      detail: { summary: "Create term", tags: ["Academic"] },
+    })
+    .patch("/:termId", updateTermController, {
+      params: t.Object({ schoolId: t.String(), termId: t.String() }),
+      body: updateTermSchema,
+      detail: { summary: "Update term", tags: ["Academic"] },
+    })
+    .post("/:termId/activate", activateTermController, {
+      params: t.Object({ schoolId: t.String(), termId: t.String() }),
+      detail: { summary: "Activate term", tags: ["Academic"] },
+    })
+  );
 
 const classRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/classes` })
   .use(errorHandler)
   .use(authGuard)
-  .get("/", getClassesController, {
-    params: t.Object({ schoolId: t.String() }),
-    detail: { summary: "List classes", tags: ["Academic"] },
-  })
-  .post("/", createClassController, {
-    params: t.Object({ schoolId: t.String() }),
-    body: createClassSchema,
-    detail: { summary: "Create class", tags: ["Academic"] },
-  });
+  .guard({ beforeHandle: [checkPermission("school:read")] }, (app) => app
+    .get("/", getClassesController, {
+      params: t.Object({ schoolId: t.String() }),
+      detail: { summary: "List classes", tags: ["Academic"] },
+    })
+  )
+  .guard({ beforeHandle: [checkPermission("class:write")] }, (app) => app
+    .post("/", createClassController, {
+      params: t.Object({ schoolId: t.String() }),
+      body: createClassSchema,
+      detail: { summary: "Create class", tags: ["Academic"] },
+    })
+  );
 
 const classInstanceRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/class-instances` })
   .use(errorHandler)
   .use(authGuard)
-  .get("/", getClassInstancesController, {
-    params: t.Object({ schoolId: t.String() }),
-    detail: { summary: "List class instances", tags: ["Academic"] },
-  })
-  .post("/", createClassInstanceController, {
-    params: t.Object({ schoolId: t.String() }),
-    body: createClassInstanceSchema,
-    detail: { summary: "Create class instance", tags: ["Academic"] },
-  })
-  .put("/:classInstanceId/subjects", assignSubjectsController, {
-    params: t.Object({ schoolId: t.String(), classInstanceId: t.String() }),
-    body: assignSubjectsSchema,
-    detail: { summary: "Assign subjects and teachers", tags: ["Academic"] },
-  });
+  .guard({ beforeHandle: [checkPermission("school:read")] }, (app) => app
+    .get("/", getClassInstancesController, {
+      params: t.Object({ schoolId: t.String() }),
+      detail: { summary: "List class instances", tags: ["Academic"] },
+    })
+  )
+  .guard({ beforeHandle: [checkPermission("class-instance:write")] }, (app) => app
+    .post("/", createClassInstanceController, {
+      params: t.Object({ schoolId: t.String() }),
+      body: createClassInstanceSchema,
+      detail: { summary: "Create class instance", tags: ["Academic"] },
+    })
+  )
+  .guard({ beforeHandle: [checkPermission("teacher:assign")] }, (app) => app
+    .put("/:classInstanceId/subjects", assignSubjectsController, {
+      params: t.Object({ schoolId: t.String(), classInstanceId: t.String() }),
+      body: assignSubjectsSchema,
+      detail: { summary: "Assign subjects and teachers", tags: ["Academic"] },
+    })
+  );
 
 const subjectRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/subjects` })
   .use(errorHandler)
   .use(authGuard)
-  .get("/", getSubjectsController, {
-    params: t.Object({ schoolId: t.String() }),
-    detail: { summary: "List subjects", tags: ["Academic"] },
-  })
-  .post("/", createSubjectController, {
-    params: t.Object({ schoolId: t.String() }),
-    body: createSubjectSchema,
-    detail: { summary: "Create subject", tags: ["Academic"] },
-  });
+  .guard({ beforeHandle: [checkPermission("school:read")] }, (app) => app
+    .get("/", getSubjectsController, {
+      params: t.Object({ schoolId: t.String() }),
+      detail: { summary: "List subjects", tags: ["Academic"] },
+    })
+  )
+  .guard({ beforeHandle: [checkPermission("subject:write")] }, (app) => app
+    .post("/", createSubjectController, {
+      params: t.Object({ schoolId: t.String() }),
+      body: createSubjectSchema,
+      detail: { summary: "Create subject", tags: ["Academic"] },
+    })
+  );
 
 export {
   academicYearRoute,

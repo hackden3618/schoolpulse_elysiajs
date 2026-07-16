@@ -1,5 +1,7 @@
 import { ROLES } from "@/shared/constants";
 
+export const GUARDIAN_ROLE_NAME = "Guardian"
+
 export type Permission =
   | "school:read"
   | "school:write"
@@ -33,6 +35,7 @@ export type Permission =
   | "payment:record"
   | "payment:reverse"
   | "finance:report"
+  | "finance:guardian_view"
   | "communication:write"
   | "announcement:send"
   | "audit:read"
@@ -140,6 +143,14 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   ],
   [ROLES.PARENT]: [
     "student:read",
+    "finance:guardian_view",
+    "payment:record",
+    "communication:write",
+  ],
+  [ROLES.GUARDIAN]: [
+    "student:read",
+    "finance:guardian_view",
+    "payment:record",
     "communication:write",
   ],
 };

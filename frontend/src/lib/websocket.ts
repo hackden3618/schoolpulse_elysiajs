@@ -18,6 +18,7 @@ interface WsCallbacks {
   onTicketUpdated?: WsEventHandler
   onConversationCreated?: WsEventHandler
   onTyping?: WsEventHandler
+  onImportProgress?: WsEventHandler
 }
 
 export function useWebSocket(
@@ -93,6 +94,9 @@ export function useWebSocket(
             break
           case "typing:indicator":
             callbacksRef.current?.onTyping?.(data)
+            break
+          case "import:progress":
+            callbacksRef.current?.onImportProgress?.(data)
             break
           default:
             break

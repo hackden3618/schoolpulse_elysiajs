@@ -558,3 +558,115 @@ export interface StudentReport {
   byGender: { gender: string | null; count: number }[]
   byClass: { classId: string; className: string; count: number }[]
 }
+
+export type ImportStatus =
+  | "created"
+  | "parsing"
+  | "validating"
+  | "resolving_guardians"
+  | "resolving_enrollments"
+  | "preview"
+  | "importing"
+  | "completed"
+  | "failed"
+  | "cancelled"
+
+export type ImportStrategy = "skip" | "replace" | "update"
+export type RowStatus = "valid" | "warning" | "error" | "skipped"
+
+export interface ImportProgress {
+  stage: ImportStatus
+  progress: number
+  current: number
+  total: number
+  message: string
+  estimatedTimeRemaining?: number
+}
+
+export interface ColumnMapping {
+  source: string
+  target: string
+  confidence: number
+  manual: boolean
+}
+
+export interface ValidationError {
+  field: string
+  message: string
+  suggestedFix?: string
+}
+
+export interface ResolvedGuardianInfo {
+  guardianId?: string
+  firstName: string
+  lastName: string
+  phone: string
+  email?: string
+  relationship: string
+  isPrimary: boolean
+  isExisting: boolean
+}
+
+export interface ResolvedEnrollmentInfo {
+  classInstanceId?: string
+  classInstanceName?: string
+  academicYearId?: string
+  academicYearName?: string
+  termId?: string
+  termName?: string
+}
+
+export interface ValidatedRow {
+  rowNumber: number
+  data: Record<string, string | undefined>
+  status: RowStatus
+  errors: ValidationError[]
+  warnings: ValidationError[]
+  guardianInfo?: ResolvedGuardianInfo
+  enrollmentInfo?: ResolvedEnrollmentInfo
+}
+
+export interface PreviewSummary {
+  totalRows: number
+  validStudents: number
+  warnings: number
+  errors: number
+  duplicateGuardians: number
+  newGuardians: number
+  existingGuardians: number
+  studentsToImport: number
+  studentsSkipped: number
+}
+
+export interface PreviewData {
+  summary: PreviewSummary
+  rows: ValidatedRow[]
+}
+
+export interface ImportSession {
+  id: string
+  schoolId: string
+  createdByUserId: string
+  fileName: string
+  fileSize: number
+  fileType: string
+  status: ImportStatus | string
+  strategy: ImportStrategy | string
+  batchSize: number
+  totalRows: number
+  validRows: number
+  errorRows: number
+  warningRows: number
+  importedRows: number
+  skippedRows: number
+  columns: string[]
+  columnMapping: ColumnMapping[] | null
+  previewData: ValidatedRow[] | null
+  summary: PreviewSummary | null
+  progress: number
+  stage: string
+  startedAt: string | null
+  completedAt: string | null
+  createdAt: string
+  updatedAt: string
+}

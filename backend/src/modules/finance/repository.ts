@@ -57,6 +57,10 @@ export async function findTermById(schoolId: string, termId: string) {
   return prisma.term.findFirst({ where: { id: termId, schoolId, deletedAt: null } })
 }
 
+export async function findClassById(schoolId: string, classId: string) {
+  return prisma.class.findFirst({ where: { id: classId, schoolId, deletedAt: null } })
+}
+
 export async function findStudentById(schoolId: string, studentId: string) {
   return prisma.student.findFirst({ where: { id: studentId, schoolId, deletedAt: null } })
 }
@@ -75,6 +79,12 @@ export async function findInvoices(schoolId: string, studentId?: string) {
   const where: any = { schoolId, deletedAt: null }
   if (studentId) where.studentId = studentId
   return prisma.invoice.findMany({ where, include: invoiceInclude, orderBy: { createdAt: "desc" } })
+}
+
+export async function findGuardianStudentLink(schoolId: string, studentId: string, userId: string) {
+  return prisma.studentGuardian.findFirst({
+    where: { schoolId, studentId, guardianId: userId, deletedAt: null },
+  })
 }
 
 export async function findInvoiceById(schoolId: string, invoiceId: string) {
@@ -109,5 +119,38 @@ export async function findPendingPaymentByCheckoutRequestId(checkoutRequestId: s
       method: "mpesa_stk",
     },
     include: paymentInclude,
+  })
+}
+
+export async function findActiveStudentsByClassId(schoolId: string, classInstanceId: string) {
+  return prisma.enrollment.findMany({
+    where: {
+      schoolId,
+      classInstanceId,
+      status: "active",
+      deletedAt: null,
+      student: { deletedAt: null },
+    },
+    include: {
+      student: {
+        select: { id: true, admissionNumber: true, firstName: true, lastName: true, status: true },
+      },
+      term: true,
+      academicYear: true,
+      classInstance: true,
+    },
+  })
+}
+
+export async function findExistingInvoice(schoolId: string, studentId: string, termId: string, feeStructureId: string) {
+  return prisma.invoice.findFirst({
+    where: {
+      schoolId,
+      studentId,
+      termId,
+      feeStructureId,
+      deletedAt: null,
+      status: { notIn: ["cancelled", "written_off"] },
+    },
   })
 }

@@ -1,4 +1,5 @@
 import { AppError } from "@/common/errors"
+import * as repo from "./repository"
 
 export class FinancePolicy {
   /**
@@ -7,6 +8,27 @@ export class FinancePolicy {
   static canCreateFeeStructure(term: any) {
     if (!term) throw AppError.notFound("Term not found")
     if (!term.active) throw AppError.validation("Cannot create fee structure for an inactive term")
+  }
+
+  static canCreateFeeStructureForClass(classInstance: any) {
+    if (!classInstance) throw AppError.notFound("Class not found")
+  }
+
+  static canViewGuardianInvoices(link: any) {
+    if (!link) throw AppError.forbidden("You are not linked to this student")
+  }
+
+  /**
+   * For guardian/parent callers, enforce that the student is linked to them
+   * before allowing an M-Pesa payment. Staff roles (holding finance:report)
+   * are not restricted to a single student.
+   */
+  static async assertGuardianOwnsStudent(schoolId: string, studentId: string, authUser: any) {
+    const roles: string[] = authUser?.roles ?? []
+    const isGuardian = roles.includes("Guardian") || roles.includes("Parent")
+    if (!isGuardian) return
+    const link = await repo.findGuardianStudentLink(schoolId, studentId, authUser.userId)
+    if (!link) throw AppError.forbidden("You are not linked to this student")
   }
 
   /**

@@ -76,7 +76,7 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
 
     // 3. Create or find guardians, then link
     if (data.guardians && data.guardians.length > 0) {
-      const guardianRole = await tx.role.findFirst({ where: { name: "guardian" } });
+      const guardianRole = await tx.role.findFirst({ where: { name: "Guardian" } });
 
       for (let i = 0; i < data.guardians.length; i++) {
         const g = data.guardians[i]!;
@@ -150,9 +150,9 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
           },
         });
 
-        // Ensure SchoolMembership with Guardian role exists
-        const existingMembership = await tx.schoolMembership.findUnique({
-          where: { schoolId_userId: { schoolId, userId: guardianUser!.id } },
+        const existingMembership = await tx.schoolMembership.findFirst({
+          where: { schoolId, userId: guardianUser!.id, deletedAt: null },
+          include: { roles: { include: { role: true } } },
         });
         if (!existingMembership) {
           const membership = await tx.schoolMembership.create({
@@ -161,6 +161,13 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
           if (guardianRole) {
             await tx.schoolMembershipRole.create({
               data: { membershipId: membership.id, roleId: guardianRole.id },
+            });
+          }
+        } else if (guardianRole) {
+          const hasGuardianRole = existingMembership.roles.some((r: any) => r.role.name === "Guardian");
+          if (!hasGuardianRole) {
+            await tx.schoolMembershipRole.create({
+              data: { membershipId: existingMembership.id, roleId: guardianRole.id },
             });
           }
         }

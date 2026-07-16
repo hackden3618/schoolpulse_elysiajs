@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../../lib/auth-context"
-import { Plus, Search, AlertCircle, Loader2, RefreshCw, Eye, EyeOff } from "lucide-react"
+import { Plus, Search, AlertCircle, Loader2, RefreshCw, Eye, EyeOff, Upload } from "lucide-react"
 import { studentsApi } from "../../lib/api"
 import { PageHeader } from "../../components/shell/PageHeader"
 import { Card, CardContent } from "../../components/ui/Card"
@@ -64,10 +64,16 @@ export function StudentList() {
           title="Students"
           description="Manage admissions, enrollment and student records."
           actions={
-            <Button onClick={() => navigate("/students/create")}>
-              <Plus size={16} />
-              Admit Student
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => navigate("/students/import")}>
+                <Upload size={16} />
+                Import Students
+              </Button>
+              <Button onClick={() => navigate("/students/create")}>
+                <Plus size={16} />
+                Admit Student
+              </Button>
+            </div>
           }
         />
         <Card>
@@ -85,16 +91,22 @@ export function StudentList() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Students"
-        description="Manage admissions, enrollment and student records."
-        actions={
-          <Button onClick={() => navigate("/students/create")}>
-            <Plus size={16} />
-            Admit Student
-          </Button>
-        }
-      />
+        <PageHeader
+          title="Students"
+          description="Manage admissions, enrollment and student records."
+          actions={
+            <div className="flex gap-2">
+              <Button variant="secondary" onClick={() => navigate("/students/import")}>
+                <Upload size={16} />
+                Import Students
+              </Button>
+              <Button onClick={() => navigate("/students/create")}>
+                <Plus size={16} />
+                Admit Student
+              </Button>
+            </div>
+          }
+        />
 
       <Card>
         <CardContent className="p-0">
@@ -111,7 +123,7 @@ export function StudentList() {
               </div>
               <Button
                 size="sm"
-                variant={includeArchived ? "default" : "secondary"}
+                variant={includeArchived ? "primary" : "secondary"}
                 onClick={() => setIncludeArchived(!includeArchived)}
                 title={includeArchived ? "Hide archived" : "Show archived"}
               >

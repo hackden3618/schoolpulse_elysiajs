@@ -27,6 +27,12 @@ import type {
     SmsSegmentInfo,
     SupportTicket,
     SupportTicketMessage,
+    ImportSession,
+    ImportProgress,
+    PreviewSummary,
+    PreviewData,
+    ValidatedRow,
+    ColumnMapping,
 } from "../types"
 
 const API_BASE = "/api/v1"
@@ -397,6 +403,11 @@ export const academicApi = {
                 method: "POST",
                 body: JSON.stringify(data),
             }),
+        update: (schoolId: string, id: string, data: { name?: string; startDate?: string; endDate?: string }) =>
+            request<ApiResponse<Term>>(`/schools/${schoolId}/terms/${id}`, {
+                method: "PATCH",
+                body: JSON.stringify(data),
+            }),
         activate: (schoolId: string, id: string) =>
             request<ApiResponse<Term>>(`/schools/${schoolId}/terms/${id}/activate`, { method: "POST" }),
     },
@@ -520,8 +531,15 @@ export const financeApi = {
             const qs = studentId ? `?studentId=${studentId}` : ""
             return request<ApiResponse<Invoice[]>>(`/schools/${schoolId}/finance/invoices${qs}`)
         },
+        guardianList: (schoolId: string, studentId: string) =>
+            request<ApiResponse<Invoice[]>>(`/schools/${schoolId}/finance/invoices/guardian/${studentId}`),
         generate: (schoolId: string, data: { studentId: string; feeStructureId: string; termId: string; enrollmentId?: string }) =>
             request<ApiResponse<Invoice>>(`/schools/${schoolId}/finance/invoices`, {
+                method: "POST",
+                body: JSON.stringify(data),
+            }),
+        generateBulk: (schoolId: string, data: { classId: string; termId: string; feeStructureId: string }) =>
+            request<ApiResponse<{ generated: number; total: number; errors: { studentId: string; reason: string }[]; invoices: Invoice[] }>>(`/schools/${schoolId}/finance/invoices/bulk`, {
                 method: "POST",
                 body: JSON.stringify(data),
             }),
@@ -746,6 +764,81 @@ export const platformAdminApi = {
             method: "PATCH",
             body: JSON.stringify(data),
         }),
+}
+
+/* =========================================================================
+ * BULK IMPORT / ADMISSIONS
+ * ========================================================================= */
+
+export const importApi = {
+    sessions: {
+        create: (schoolId: string, data: {
+            fileName: string
+            fileSize: number
+            fileType: "csv" | "xls" | "xlsx"
+            strategy?: string
+            batchSize?: number
+        }) =>
+            request<ApiResponse<{ sessionId: string; session: ImportSession }>>(`/schools/${schoolId}/admissions/sessions`, {
+                method: "POST",
+                body: JSON.stringify(data),
+            }),
+        upload: {
+            file: async (schoolId: string, sessionId: string, file: File) => {
+                const formData = new FormData()
+                formData.append("file", file)
+                const token = getAccessToken()
+                const res = await fetch(`/api/v1/schools/${schoolId}/admissions/sessions/${sessionId}/upload`, {
+                    method: "POST",
+                    headers: token ? { Authorization: `Bearer ${token}` } : {},
+                    body: formData,
+                })
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}))
+                    throw new Error(body?.error?.message || `Upload failed: ${res.status}`)
+                }
+                return res.json() as Promise<ApiResponse<{ sessionId: string; summary: PreviewSummary; mapping: ColumnMapping[] }>>
+            },
+        },
+        progress: {
+            get: (schoolId: string, sessionId: string) =>
+                request<ApiResponse<ImportProgress>>(`/schools/${schoolId}/admissions/sessions/${sessionId}/progress`),
+        },
+        preview: {
+            get: (schoolId: string, sessionId: string) =>
+                request<ApiResponse<{ summary: PreviewSummary; rows: ValidatedRow[]; mapping: ColumnMapping[] }>>(`/schools/${schoolId}/admissions/sessions/${sessionId}/preview`),
+        },
+        confirm: (schoolId: string, sessionId: string, strategy?: string) =>
+            request<ApiResponse<{ imported: number; skipped: number; failed: number; errors: any[]; totalRows: number }>>(`/schools/${schoolId}/admissions/sessions/${sessionId}/confirm`, {
+                method: "POST",
+                body: JSON.stringify(strategy ? { strategy } : {}),
+            }),
+        list: (schoolId: string, params?: { status?: string; page?: number; pageSize?: number }) => {
+            const qs = params ? "?" + new URLSearchParams(Object.fromEntries(Object.entries(params).filter(([_, v]) => v != null).map(([k, v]) => [k, String(v)]))).toString() : ""
+            return request<ApiResponse<{ sessions: ImportSession[]; total: number; page: number; pageSize: number }>>(`/schools/${schoolId}/admissions/sessions${qs}`)
+        },
+        cancel: (schoolId: string, sessionId: string) =>
+            request<ApiResponse<{ cancelled: boolean }>>(`/schools/${schoolId}/admissions/sessions/${sessionId}`, { method: "DELETE" }),
+        retryFailed: (schoolId: string, sessionId: string, rowNumbers: number[]) =>
+            request<ApiResponse<any>>(`/schools/${schoolId}/admissions/sessions/${sessionId}/retry-failed`, {
+                method: "POST",
+                body: JSON.stringify({ rowNumbers }),
+            }),
+        errorReport: (schoolId: string, sessionId: string) =>
+            request<ApiResponse<{ errors: any[]; rows: ValidatedRow[] }>>(`/schools/${schoolId}/admissions/sessions/${sessionId}/error-report`),
+        downloadUrl: (schoolId: string, sessionId: string) =>
+            request<ApiResponse<{ downloadUrl: string }>>(`/schools/${schoolId}/admissions/sessions/${sessionId}/download`),
+    },
+    config: {
+        get: (schoolId: string) =>
+            request<ApiResponse<any>>(`/schools/${schoolId}/admissions/config`),
+        supportedFormats: (schoolId: string) =>
+            request<ApiResponse<any>>(`/schools/${schoolId}/admissions/supported-formats`),
+    },
+    stats: {
+        get: (schoolId: string) =>
+            request<ApiResponse<any>>(`/schools/${schoolId}/admissions/stats`),
+    },
 }
 
 export const supportApi = {
