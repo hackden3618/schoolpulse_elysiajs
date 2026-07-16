@@ -1,7 +1,7 @@
 import { useState } from "react"
-import { Shield, Eye, Users, Loader2 } from "lucide-react"
+import { Shield, Eye, Users, Loader2, Check } from "lucide-react"
 import { useAuth } from "../../lib/auth-context"
-import type { Membership } from "../../types"
+import type { Membership, Role } from "../../types"
 
 interface RoleSwitcherModalProps {
   onClose: () => void
@@ -13,22 +13,67 @@ function roleIcon(name: string) {
   return <Shield size={14} />
 }
 
-export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
-  const { allMemberships, membership: activeMembership, school, switchContext } = useAuth()
-  const [selectedId, setSelectedId] = useState(activeMembership?.id)
-  const [busy, setBusy] = useState(false)
+function roleNameOf(r: any): string {
+  if (!r) return "Member"
+  return typeof r.role === "string" ? r.role : (r.role?.name || "Member")
+}
 
-  // Distinct memberships, each carrying its own roles/permissions.
+interface Option {
+  membershipId: string
+  role: Role
+  schoolName: string
+  isCurrentContext: boolean
+  isCurrentView: boolean
+}
+
+export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
+  const { allMemberships, membership: activeMembership, school, switchContext, switchRole, activeRole } = useAuth()
   const memberships: Membership[] = allMemberships?.length ? allMemberships : (activeMembership ? [activeMembership] : [])
 
+  // Flatten to (membership, role) pairs.
+  const options: Option[] = []
+  for (const m of memberships) {
+    const roles = (m.roles || []).map((r) => ({
+      id: r.role?.id || roleNameOf(r),
+      name: roleNameOf(r),
+      description: r.role?.description,
+      permissions: r.role?.permissions || [],
+      createdAt: "",
+    })) as Role[]
+    const schoolName = m.schoolId === school?.id ? (school?.schoolName || "School") : "School"
+    const isCurrentContext = m.id === activeMembership?.id
+    for (const role of roles) {
+      options.push({
+        membershipId: m.id,
+        role,
+        schoolName,
+        isCurrentContext,
+        isCurrentView: isCurrentContext && role.id === activeRole?.id,
+      })
+    }
+  }
+
+  const [selected, setSelected] = useState<Option | null>(
+    options.find((o) => o.isCurrentView) || options.find((o) => o.isCurrentContext) || null
+  )
+  const [busy, setBusy] = useState(false)
+
   const handleSwitch = async () => {
-    if (!selectedId || selectedId === activeMembership?.id) {
+    if (!selected) return
+    // Already the active view + context: nothing to do.
+    if (selected.isCurrentView) {
       onClose()
       return
     }
     setBusy(true)
     try {
-      await switchContext(selectedId)
+      if (!selected.isCurrentContext) {
+        // Different membership → re-issue token with that context's roles.
+        await switchContext(selected.membershipId)
+      }
+      // Set the active view role (works for both context switches and
+      // same-context role switches, e.g. staff + guardian in one school).
+      switchRole(selected.role)
       onClose()
     } catch {
       setBusy(false)
@@ -38,43 +83,43 @@ export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center bg-surface-900/40 p-4 backdrop-blur-sm">
       <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-2xl">
-        <h3 className="mb-1 text-lg font-bold text-surface-900">Switch Context</h3>
+        <h3 className="mb-1 text-lg font-bold text-surface-900">Switch Role & Context</h3>
         <p className="mb-6 text-sm text-surface-500">
-          You have multiple roles across this school. Switch context to change
-          which permissions and views are active.
+          You have multiple roles. Pick the role you want to use. Switching to a
+          different school context re-issues your session with those permissions.
         </p>
 
-        <div className="space-y-3 mb-6 max-h-[50vh] overflow-y-auto">
-          {memberships.map((m) => {
-            const isActive = m.id === activeMembership?.id
-            const selected = m.id === selectedId
-            const roleNames = (m.roles || []).map((r) => (typeof r.role === "string" ? r.role : r.role?.name) || "Member")
+        <div className="space-y-2 mb-6 max-h-[50vh] overflow-y-auto">
+          {options.map((opt) => {
+            const isSelected = selected?.membershipId === opt.membershipId && selected?.role.id === opt.role.id
             return (
               <button
-                key={m.id}
-                onClick={() => setSelectedId(m.id)}
+                key={`${opt.membershipId}:${opt.role.id}`}
+                onClick={() => setSelected(opt)}
                 className={`flex w-full items-start gap-3 rounded-lg border p-3 text-left transition-all ${
-                  selected
+                  isSelected
                     ? "border-accent bg-accent-50 ring-1 ring-accent"
                     : "border-surface-200 bg-white hover:border-surface-300"
                 }`}
               >
                 <div className={`flex h-8 w-8 items-center justify-center rounded-full ${
-                  selected ? "bg-accent text-white" : "bg-surface-100 text-surface-500"
+                  isSelected ? "bg-accent text-white" : "bg-surface-100 text-surface-500"
                 }`}>
-                  {roleIcon(roleNames[0] || "Staff")}
+                  {roleIcon(opt.role.name)}
                 </div>
                 <div className="flex-1">
-                  <p className={`text-sm font-semibold ${selected ? "text-accent-700" : "text-primary-900"}`}>
-                    {roleNames.join(" · ") || "Member"}
+                  <p className={`text-sm font-semibold ${isSelected ? "text-accent-700" : "text-primary-900"}`}>
+                    {opt.role.name === "Guardian" ? "Parent / Guardian" : opt.role.name}
                   </p>
                   <p className="text-xs text-primary-400">
-                    {m.schoolId === school?.id ? school?.schoolName : "School"}
-                    {isActive && " · current"}
+                    {opt.schoolName}
+                    {opt.isCurrentContext ? " · current context" : ""}
                   </p>
                 </div>
-                {isActive && (
-                  <span className="text-[10px] text-accent font-semibold">Active</span>
+                {opt.isCurrentView && (
+                  <span className="flex items-center gap-1 text-[10px] text-accent font-semibold">
+                    <Check size={12} /> Active
+                  </span>
                 )}
               </button>
             )
@@ -90,11 +135,11 @@ export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
           </button>
           <button
             onClick={handleSwitch}
-            disabled={busy || !selectedId || selectedId === activeMembership?.id}
+            disabled={busy || !selected || selected.isCurrentView}
             className="flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-bold text-white hover:bg-accent-600 disabled:opacity-50 transition-colors"
           >
             {busy && <Loader2 size={14} className="animate-spin" />}
-            Switch Context
+            Switch
           </button>
         </div>
       </div>
