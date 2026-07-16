@@ -92,19 +92,33 @@ does not need staff reporting permission:
 
 The prototype enforces `guardian.can_pay === true` both on the balance display
 and on STK initiation (`parent.routes.ts:189`, `fees.routes.ts:148`). v1.1.0
-relies on the frontend hiding buttons; the backend M-Pesa routes do not yet
-re-check `can_pay` per guardian.
+relies on the frontend hiding buttons; the backend M-Pesa routes did not
+re-check the guardian–student link.
 
-### Proposed change
+### Delivered in v1.1.0 patch
 
-When a guardian initiates M-Pesa, the finance service should verify the calling
-membership is a linked guardian of the student with `can_pay = true` before
-dispatching STK. (v1.1.0 already scopes by `schoolId`; this adds the
-relationship check.)
+- `Guardian` and `Parent` roles were granted `payment:record` so a parent can
+  pay their own child via M-Pesa (the school-counter flow for
+  admin/bursar is unchanged).
+- `FinancePolicy.assertGuardianOwnsStudent` verifies, for guardian/parent
+  callers only, that a `StudentGuardian` link exists (`guardianId =
+  authUser.userId`, school-scoped). Staff roles are not restricted to a single
+  student. This enforces the parent-child boundary server-side, mirroring the
+  prototype's `assertParentChildLink`.
+- Both `initiateMpesaPayment` and `initiateBulkMpesaPayment` now receive
+  `authUser` from the controller and apply the check.
+
+### Remaining (true v1.2.0 item)
+
+The `can_pay` boolean itself is not yet consulted — a linked guardian with
+`can_pay = false` can still pay. Add the `canPay` check inside
+`assertGuardianOwnsStudent` once the prototype's `can_pay` semantics are
+ratified for v1.2.0.
 
 ### Definition of Done (v1.2.0)
 
-✓ STK initiation rejected (403) if guardian `can_pay` is false  
+✓ STK initiation rejected (403) if guardian is not linked to the student  
+✓ (pending) STK initiation rejected if `can_pay` is false  
 ✓ Audit log entry on every guardian-initiated payment  
 
 ---
