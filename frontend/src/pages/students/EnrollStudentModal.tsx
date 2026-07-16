@@ -35,6 +35,9 @@ export function EnrollStudentModal({
       .then(([ciRes, ayRes]) => {
         setClassInstances(ciRes.data)
         setAcademicYears(ayRes.data)
+        // Smart default: preselect the active academic year.
+        const activeYear = ayRes.data.find((y: any) => y.active)
+        if (activeYear && !academicYearId) setAcademicYearId(activeYear.id)
         setLoadingData(false)
       })
       .catch(err => {
@@ -43,7 +46,7 @@ export function EnrollStudentModal({
       })
   }, [schoolId])
 
-  // Load terms when academic year changes
+  // Load terms when academic year changes; preselect the active term.
   useEffect(() => {
     if (!academicYearId) {
       setTerms([])
@@ -51,7 +54,11 @@ export function EnrollStudentModal({
       return
     }
     academicApi.terms.list(schoolId, academicYearId)
-      .then(res => setTerms(res.data))
+      .then(res => {
+        setTerms(res.data)
+        const active = res.data.find((t: any) => t.active)
+        if (active && !termId) setTermId(active.id)
+      })
       .catch(() => setTerms([]))
   }, [schoolId, academicYearId])
 

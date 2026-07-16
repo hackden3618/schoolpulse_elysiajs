@@ -904,6 +904,11 @@ const total = receipts.length
                               {!isMe && (
                                 <p className="text-[10px] font-semibold mb-0.5 text-accent">
                                   {msg.sender?.user?.firstName} {msg.sender?.user?.lastName}
+                                  {(() => {
+                                    const roleName = msg.sender?.roles?.[0]?.role?.name
+                                    if (!roleName) return null
+                                    return <span className="font-normal text-surface-400"> · {roleName}</span>
+                                  })()}
                                 </p>
                               )}
                               {msg.channel === "sms" && (

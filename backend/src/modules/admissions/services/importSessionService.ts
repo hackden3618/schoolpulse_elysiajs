@@ -138,7 +138,7 @@ export async function getAdmissionStats() {
 export function updateSessionProgress(
   sessionId: string,
   stage: ImportStatus,
-  progress: number
+  progress: number,
 ): void {
   prisma.importSession
     .update({

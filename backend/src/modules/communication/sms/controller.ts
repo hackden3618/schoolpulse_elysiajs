@@ -9,9 +9,9 @@ import {
 import { success } from "@/common/responses";
 import { calculateGsm7Segments } from "@/shared/utils";
 
-export async function sendSmsController({ params: { schoolId }, body, set }: any) {
+export async function sendSmsController({ params: { schoolId }, body, authUser, set }: any) {
   const { recipients, message } = body;
-  const result = await sendSms({ recipients, message, schoolId });
+  const result = await sendSms({ recipients, message, schoolId, authUser });
   set.status = 201;
   return success(result, schoolId);
 }

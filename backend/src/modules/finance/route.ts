@@ -15,6 +15,7 @@ import {
   initiateMpesaPaymentController,
   initiateBulkMpesaPaymentController,
   mpesaCallbackController,
+  mpesaReversalController,
 } from "./controller"
 import {
   createFeeStructureSchema,
@@ -31,6 +32,12 @@ export const mpesaWebhookRoute = new Elysia({ prefix: `/mpesa` })
   .post("/callback", mpesaCallbackController, {
     body: mpesaCallbackSchema,
     detail: { summary: "M-Pesa Webhook Callback", tags: ["Finance", "Webhooks"] },
+  })
+  .post("/reversal", mpesaReversalController, {
+    detail: {
+      summary: "M-Pesa Transaction Reversal Webhook (chargeback/timeout)",
+      tags: ["Finance", "Webhooks"],
+    },
   })
 
 export const financeRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/finance` })

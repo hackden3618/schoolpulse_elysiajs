@@ -14,6 +14,7 @@ import {
   updateEnrollmentController,
   addGuardianByDetailsController,
   getMyStudentsController,
+  generateAdmissionNumberController,
 } from "./controller";
 import {
   createStudentSchema,
@@ -55,6 +56,10 @@ export const studentRoute = new Elysia({ prefix: P })
       params: t.Object({ schoolId: t.String(), studentId: t.String() }),
       body: updateStudentSchema,
       detail: { summary: "Update student profile", tags: ["Students"] },
+    })
+    .get("/admission-number", generateAdmissionNumberController, {
+      params: t.Object({ schoolId: t.String() }),
+      detail: { summary: "Generate next admission number", tags: ["Students"] },
     })
   )
   .guard({ beforeHandle: [checkPermission("student:archive")] }, (app) => app

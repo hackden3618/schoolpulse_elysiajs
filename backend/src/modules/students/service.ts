@@ -7,6 +7,7 @@ import { sendSingleSms } from "@/infrastructure/messaging/sms/sms.provider";
 import { HOST } from "@/config";
 import crypto from "crypto";
 import * as repo from "./repository";
+import { StudentPolicy } from "./policy";
 import type {
   CreateStudentInput,
   UpdateStudentInput,
@@ -216,6 +217,12 @@ export async function archiveStudent(
   if (!student) throw AppError.notFound("Student not found");
   if (student.status === "archived") throw AppError.conflict("Student is already archived");
 
+  const activeEnrollment = await prisma.enrollment.findFirst({
+    where: { studentId, schoolId, deletedAt: null, status: "active" },
+    select: { id: true },
+  });
+  StudentPolicy.canArchive(student, Boolean(activeEnrollment));
+
   const updated = await repo.updateStudent(studentId, {
     status: "archived",
     archiveReason: data.reason as any,
@@ -368,6 +375,16 @@ export async function enrollStudent(
   const student = await repo.findStudentById(schoolId, studentId);
   if (!student) throw AppError.notFound("Student not found");
 
+  const [academicYear, term] = await Promise.all([
+    prisma.academicYear.findFirst({ where: { id: data.academicYearId, schoolId } }),
+    data.termId
+      ? prisma.term.findFirst({ where: { id: data.termId, schoolId } })
+      : Promise.resolve(null),
+  ]);
+
+  // Business rules: inactive year/term, inactive student, duplicate enrollment.
+  StudentPolicy.canEnroll(student, academicYear, term);
+
   const existingEnrollment = await prisma.enrollment.findFirst({
     where: {
       studentId,
@@ -376,14 +393,14 @@ export async function enrollStudent(
     }
   });
 
+  StudentPolicy.assertNotDuplicateEnrollment(existingEnrollment);
+
   if (existingEnrollment) {
     if (existingEnrollment.deletedAt !== null) {
       await prisma.enrollment.update({
         where: { id: existingEnrollment.id },
         data: { deletedAt: null },
       });
-    } else {
-      throw AppError.conflict("Student is already enrolled in this class for this academic year.");
     }
   }
 

@@ -386,7 +386,12 @@ export interface Message {
   isLatest: boolean
   createdAt: string
   updatedAt: string
-  sender: { id: string; userId: string; user: { id: string; firstName: string; lastName: string } } | null
+  sender: {
+    id: string
+    userId: string
+    user: { id: string; firstName: string; lastName: string }
+    roles?: { role?: { id: string; name: string } }[]
+  } | null
   receipts: {
     id: string
     recipientUserId: string | null

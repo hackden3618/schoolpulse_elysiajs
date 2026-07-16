@@ -88,6 +88,32 @@ export async function getStudentCreditBalance(studentId: string) {
   return student ? Number(student.creditBalance) : 0
 }
 
+/**
+ * Returns the active term for the school (joined to the active academic year).
+ * Used to prefill forms with the current term.
+ */
+export async function findActiveTerm(schoolId: string) {
+  return prisma.term.findFirst({
+    where: { schoolId, active: true, deletedAt: null },
+    include: { academicYear: true },
+  })
+}
+
+/**
+ * Generates the next sequential admission number for a school:
+ *   ADM/<YYYY>/<seq>
+ * `seq` is the count of (non-deleted) students + 1, zero-padded to 4.
+ * The caller may override manual entry; this is a smart default.
+ */
+export async function generateAdmissionNumber(schoolId: string): Promise<string> {
+  const count = await prisma.student.count({
+    where: { schoolId, deletedAt: null },
+  })
+  const year = new Date().getFullYear()
+  const seq = String(count + 1).padStart(4, "0")
+  return `ADM/${year}/${seq}`
+}
+
 export async function updateStudent(
   id: string,
   data: Prisma.StudentUpdateInput

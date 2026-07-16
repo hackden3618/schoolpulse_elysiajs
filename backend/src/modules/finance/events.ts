@@ -20,4 +20,14 @@ export class FinanceEvents {
       payload,
     })
   }
+
+  static async paymentReversed(schoolId: string, paymentId: string, payload: any) {
+    await writeEventOutbox({
+      schoolId,
+      aggregateId: paymentId,
+      aggregateType: "payment",
+      eventType: "PaymentReversed",
+      payload,
+    })
+  }
 }

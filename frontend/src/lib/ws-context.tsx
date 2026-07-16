@@ -19,6 +19,7 @@ export interface WsCallbacks {
   onTicketUpdated?: WsEventHandler
   onConversationCreated?: WsEventHandler
   onTyping?: WsEventHandler
+  onImportProgress?: WsEventHandler
 }
 
 interface WsContextType {
@@ -113,6 +114,9 @@ export function WsProvider({ children, platformMode, onGlobalMessageNew }: { chi
             break
           case "typing:indicator":
             cbs.onTyping?.(data)
+            break
+          case "import:progress":
+            cbs.onImportProgress?.(data)
             break
           default:
             break

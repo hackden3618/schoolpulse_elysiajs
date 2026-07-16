@@ -369,6 +369,8 @@ export const studentsApi = {
             method: "PATCH",
             body: JSON.stringify(data),
         }),
+    generateAdmissionNumber: (schoolId: string) =>
+        request<ApiResponse<{ admissionNumber: string }>>(`/schools/${schoolId}/students/admission-number`),
 }
 
 /* =========================================================================

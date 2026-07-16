@@ -133,6 +133,37 @@ export async function findConfirmedByReceipt(schoolId: string, receipt: string) 
   })
 }
 
+/**
+ * Loads a confirmed M-Pesa payment together with the invoice allocations it
+ * created and any credit payments spawned from its surplus. Used to reverse a
+ * Safaricom transaction reversal without leaving dangling balances.
+ */
+export async function findConfirmedWithAllocations(schoolId: string, receipt: string) {
+  return prisma.payment.findFirst({
+    where: {
+      schoolId,
+      transactionRef: String(receipt),
+      status: "confirmed",
+      method: "mpesa_stk",
+    },
+    include: {
+      allocations: true,
+      reversalPayments: {
+        where: { type: "credit", status: "confirmed" },
+      },
+      student: { select: { id: true, creditBalance: true } },
+    },
+  })
+}
+
+/**
+ * Removes every allocation tied to a reversed payment so the invoice balances
+ * are recomputed from the remaining (non-reversed) allocations.
+ */
+export async function deletePaymentAllocations(paymentId: string) {
+  return prisma.paymentAllocation.deleteMany({ where: { paymentId } })
+}
+
 export async function findStuckPendingStk(olderThanMs: number) {
   const cutoff = new Date(Date.now() - olderThanMs)
   return prisma.payment.findMany({

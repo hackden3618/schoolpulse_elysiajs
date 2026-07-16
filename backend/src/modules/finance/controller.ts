@@ -72,3 +72,15 @@ export async function mpesaCallbackController({ body, set }: any) {
   set.status = 200
   return { ResultCode: 0, ResultDesc: "Success" }
 }
+
+export async function mpesaReversalController({ body, set }: any) {
+  // Safaricom transaction reversal webhook (chargeback / timeout). Always
+  // acknowledge with 200 so Safaricom stops retrying the delivery.
+  try {
+    await svc.processMpesaReversal(body)
+  } catch (error) {
+    console.error("[FinanceController] Error processing M-Pesa Reversal:", error)
+  }
+  set.status = 200
+  return { ResultCode: 0, ResultDesc: "Success" }
+}

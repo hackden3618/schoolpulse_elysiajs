@@ -66,6 +66,12 @@ export function CreateStudent() {
     withMinDelay(academicApi.classInstances.list(school.id))
       .then(r => setClassInstances(r.data))
       .catch(() => {})
+    // Smart default: prefill the next admission number if not yet typed.
+    if (!admissionNumber) {
+      studentsApi.generateAdmissionNumber(school.id)
+        .then(r => { if (!admissionNumber) setAdmissionNumber(r.data.admissionNumber) })
+        .catch(() => {})
+    }
   }, [school])
 
   const addSpecialNeed = () => setSpecialNeeds(prev => [...prev, { category: SPECIAL_NEED_CATEGORIES[0], details: "" }])

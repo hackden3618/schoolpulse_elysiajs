@@ -64,14 +64,36 @@ const ALL_NAV: NavGroup[] = [
 ]
 
 const NAV_BY_ROLE: Record<string, string[]> = {
+  // Guardians / Parents see only their children's financial + communication surface.
   Guardian: ["/dashboard", "/payments", "/communication", "/support"],
+  Parent: ["/dashboard", "/payments", "/communication", "/support"],
+  // Teachers: classroom + assessment + messaging.
   Teacher: ["/dashboard", "/attendance", "/assessments", "/communication", "/support", "/reports"],
+  // Bursars: finance only.
   Bursar: ["/dashboard", "/finance", "/communication", "/support", "/reports"],
+  // Admissions / Reception: student data + messaging, no finance/reports/academics.
+  Admissions: ["/dashboard", "/students", "/communication", "/support"],
+  Reception: ["/dashboard", "/students", "/communication", "/support"],
+  // Academic Master: academics + classroom, no finance/users/system.
+  AcademicMaster: ["/dashboard", "/students", "/academics", "/attendance", "/assessments", "/communication", "/support", "/reports"],
+  // Deputy Principal: broad but not user-mgmt / system settings / bulk import.
+  DeputyPrincipal: ["/dashboard", "/students", "/academics", "/attendance", "/assessments", "/finance", "/communication", "/support", "/reports"],
+  // Full access tiers.
+  SuperAdmin: [],
+  Principal: [],
+  PlatformAdmin: [],
 }
 
+// Roles that receive the complete navigation (everything).
+const FULL_NAV_ROLES = new Set(["SuperAdmin", "Principal", "PlatformAdmin"])
+
 export function getNavigation(roleName?: string): NavGroup[] {
+  // Admin-tier roles get the full navigation.
+  if (roleName && FULL_NAV_ROLES.has(roleName)) return ALL_NAV
+
   const allowed = roleName ? NAV_BY_ROLE[roleName] : undefined
   if (!allowed) return ALL_NAV
+
   return ALL_NAV
     .map((group) => ({
       ...group,

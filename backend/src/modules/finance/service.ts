@@ -612,3 +612,137 @@ export async function processMpesaCallback(payload: MpesaCallbackInput) {
     source: "callback",
   })
 }
+
+/**
+ * Safaricom sends a `Transaction Reversal` (chargeback / timeout reversal) to
+ * the C2B confirmation URL. The original receipt is reported as
+ * `OrigTransactionID`. We must undo the original confirmation so the invoice
+ * balance and the student's credit balance stay correct — otherwise the school
+ * would show fees as paid for money that was actually reversed.
+ */
+export async function processMpesaReversal(payload: any) {
+  const txn = payload?.Transaction || payload?.Body?.stkCallback || payload
+  const transactionType = txn?.TransactionType
+  const origReceipt = txn?.OrigTransactionID || txn?.TransactionID
+
+  if (transactionType && transactionType !== "Transaction Reversal") {
+    // Not a reversal (e.g. a normal C2B payment). Acknowledge and ignore.
+    return { handled: false, reason: "not_a_reversal" }
+  }
+  if (!origReceipt) {
+    console.warn("[FinanceService] M-Pesa reversal: missing OrigTransactionID; ignoring.")
+    return { handled: false, reason: "missing_orig_transaction" }
+  }
+
+  // The reversal webhook is school-scoped via the route param when available.
+  const scopedSchoolId: string | undefined = payload?.__schoolId
+  const payment = scopedSchoolId
+    ? await repo.findConfirmedWithAllocations(scopedSchoolId, origReceipt)
+    : await findAcrossSchools(origReceipt)
+
+  if (!payment) {
+    console.warn(`[FinanceService] M-Pesa reversal: no confirmed payment for receipt ${origReceipt}`)
+    return { handled: false, reason: "no_confirmed_payment" }
+  }
+
+  const sid = payment.schoolId
+
+  // Idempotency: never reverse the same receipt twice.
+  const meta = payment.metadata as any
+  if (meta?.reversalHandled) {
+    console.info(`[FinanceService] M-Pesa reversal: receipt ${origReceipt} already reversed; skipping.`)
+    return { handled: true, alreadyReversed: true }
+  }
+
+  await prisma.$transaction(async (tx: any) => {
+    // 1. Reverse each invoice allocation and recompute the invoice state.
+    for (const alloc of payment.allocations as any[]) {
+      const inv = await tx.invoice.findUnique({ where: { id: alloc.invoiceId } })
+      if (!inv) continue
+      const newPaid = Number(inv.paidAmount) - Number(alloc.amount)
+      const newBalance = Number(inv.totalAmount) - newPaid
+      const newStatus =
+        newPaid <= 0 ? "issued" : newBalance <= 0.001 ? "paid" : "partially_paid"
+      await tx.invoice.update({
+        where: { id: alloc.invoiceId },
+        data: {
+          paidAmount: Math.max(0, newPaid),
+          balance: Math.max(0, newBalance),
+          status: newStatus,
+        },
+      })
+    }
+
+    // 2. Remove the allocation rows (kept only for the now-reversed payment).
+    await tx.paymentAllocation.deleteMany({ where: { paymentId: payment.id } })
+
+    // 3. If the original surplus created a credit payment, reclaim it.
+    for (const credit of payment.reversalPayments as any[]) {
+      const creditAmount = Number(credit.amount)
+      if (creditAmount > 0) {
+        await tx.student.update({
+          where: { id: payment.studentId },
+          data: { creditBalance: { decrement: creditAmount } },
+        })
+        await tx.payment.update({
+          where: { id: credit.id },
+          data: { status: "reversed" },
+        })
+      }
+    }
+
+    // 4. Mark the original payment as reversed.
+    await tx.payment.update({
+      where: { id: payment.id },
+      data: {
+        status: "reversed",
+        metadata: {
+          ...meta,
+          reversalHandled: true,
+          reversalAt: new Date().toISOString(),
+          reversalRaw: payload,
+        } as any,
+      },
+    })
+
+    await tx.financialAuditLog.create({
+      data: {
+        schoolId: sid,
+        paymentId: payment.id,
+        studentId: payment.studentId,
+        invoiceId: payment.invoiceId,
+        actionDescription: `M-Pesa transaction reversed (OrigTransactionID ${origReceipt})`,
+        metadata: {
+          origReceipt,
+          reversalType: transactionType || "Transaction Reversal",
+          amount: Number(payment.amount),
+        },
+      },
+    })
+  })
+
+  await FinanceEvents.paymentReversed(sid, payment.id, {
+    origReceipt,
+    amount: Number(payment.amount),
+  })
+
+  return { handled: true, paymentId: payment.id }
+}
+
+/**
+ * When the reversal webhook cannot be scoped to a single school (e.g. a shared
+ * callback URL), search every school for the confirmed receipt. Reversals are
+ * rare, so a cross-school scan is acceptable.
+ */
+async function findAcrossSchools(receipt: string) {
+  const matches = await prisma.payment.findMany({
+    where: { transactionRef: String(receipt), status: "confirmed", method: "mpesa_stk" },
+    include: {
+      allocations: true,
+      reversalPayments: { where: { type: "credit", status: "confirmed" } },
+      student: { select: { id: true, creditBalance: true } },
+    },
+    take: 1,
+  })
+  return matches[0] || null
+}

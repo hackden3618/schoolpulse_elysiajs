@@ -5,6 +5,7 @@ import { sendBulkSms, checkBalance as checkBalanceProvider } from "@/infrastruct
 import { calculateGsm7Segments } from "@/shared/utils";
 import type { Gsm7SegmentInfo } from "@/shared/utils";
 import * as schoolRepo from "@/modules/schools/repository";
+import { prisma } from "@/infrastructure/database/prisma";
 
 export interface SmsOptions {
   recipients: string[];
@@ -124,7 +125,10 @@ export async function deleteSmsTemplate(schoolId: string, templateId: string): P
   });
 }
 
-export async function sendSms(options: SmsOptions): Promise<SmsSendResult> {
+export async function sendSms(options: SmsOptions & { authUser?: any }): Promise<SmsSendResult> {
+  if (!options.schoolId) {
+    throw AppError.validation("schoolId is required to send SMS");
+  }
   const segmentInfo = calculateGsm7Segments(options.message);
   const BATCH_SIZE = 20;
 
@@ -132,6 +136,21 @@ export async function sendSms(options: SmsOptions): Promise<SmsSendResult> {
     mobile: normalizePhone(mobile).replace(/^\+/, ""),
     message: options.message,
   }));
+
+  const recipientCount = normalized.length;
+  // Cost = number of recipients × GSM-7 segments per message.
+  const cost = recipientCount * Math.max(1, segmentInfo.segmentCount);
+
+  // Credit guard: prevent sending without sufficient SMS credits.
+  const wallet = await prisma.smsWallet.findUnique({
+    where: { schoolId: options.schoolId },
+  });
+  const balance = wallet ? Number(wallet.balance) : 0;
+  if (balance < cost) {
+    throw AppError.validation(
+      `Insufficient SMS credits. Required: ${cost}, Available: ${balance}`
+    );
+  }
 
   const allResults: RecipientResult[] = [];
 
@@ -149,6 +168,31 @@ export async function sendSms(options: SmsOptions): Promise<SmsSendResult> {
 
   const successful = allResults.filter((r) => r.success).length;
   const failed = allResults.length - successful;
+  // Bill only successfully delivered messages.
+  const billed = successful * Math.max(1, segmentInfo.segmentCount);
+
+  await prisma.$transaction([
+    prisma.smsWallet.update({
+      where: { schoolId: options.schoolId },
+      data: { balance: { decrement: billed } },
+    }),
+    prisma.auditLog.create({
+      data: {
+        schoolId: options.schoolId,
+        actorMembershipId: options.authUser?.membershipId ?? null,
+        action: "sms_broadcast_sent",
+        tableName: "sms",
+        newValue: {
+          recipients: recipientCount,
+          successful,
+          failed,
+          segments: segmentInfo.segmentCount,
+          cost: billed,
+          messageLength: options.message.length,
+        } as any,
+      },
+    }),
+  ]);
 
   return {
     totalRecipients: allResults.length,

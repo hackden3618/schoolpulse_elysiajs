@@ -1,5 +1,6 @@
 import { success } from "@/common/responses";
 import * as svc from "./service";
+import * as repo from "./repository";
 
 export async function getStudentsController({ params: { schoolId }, query }: any) {
   const students = await svc.listAllStudents(schoolId, query?.includeArchived === "true");
@@ -63,4 +64,9 @@ export async function addGuardianByDetailsController({ params: { schoolId, stude
 export async function getMyStudentsController({ params: { schoolId }, authUser }: any) {
   const students = await svc.listMyStudents(schoolId, authUser.userId);
   return success(students, schoolId);
+}
+
+export async function generateAdmissionNumberController({ params: { schoolId } }: any) {
+  const admissionNumber = await repo.generateAdmissionNumber(schoolId);
+  return success({ admissionNumber }, schoolId);
 }

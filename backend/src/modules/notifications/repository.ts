@@ -18,7 +18,12 @@ const conversationInclude = {
 } as const
 
 const messageInclude = {
-  sender: { include: { user: { select: { id: true, firstName: true, lastName: true } } } },
+  sender: {
+    include: {
+      user: { select: { id: true, firstName: true, lastName: true } },
+      roles: { include: { role: { select: { id: true, name: true } } } },
+    },
+  },
   recipient: { select: { id: true, firstName: true, lastName: true } },
   receipts: true,
 } as const

@@ -207,6 +207,7 @@ enum PaymentType {
     subscription
     fee
     extra_curricular
+    credit
 }
 
 enum PaymentMethod {
