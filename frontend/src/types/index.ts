@@ -124,6 +124,7 @@ export interface Student {
   archiveReason?: string
   currentEnrollment?: Enrollment
   guardians: Guardian[]
+  creditBalance?: number
   enrollments?: Enrollment[]
   _count?: {
     enrollments: number

@@ -1,7 +1,7 @@
 import { Elysia, t } from "elysia"
 import { API_PREFIX } from "@/shared/constants"
 import { errorHandler, authGuard } from "@/common/middleware"
-import { checkPermission } from "@/common/middleware/permissionGuard"
+import { checkPermission, checkPermissionOrGuardianOfStudent } from "@/common/middleware/permissionGuard"
 import {
   getFeeStructuresController,
   createFeeStructureController,
@@ -56,7 +56,7 @@ export const financeRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolI
       detail: { summary: "List payments", tags: ["Finance"] },
     })
   )
-  .guard({ beforeHandle: [checkPermission("finance:guardian_view")] }, (app) => app
+  .guard({ beforeHandle: [checkPermissionOrGuardianOfStudent("finance:guardian_view")] }, (app) => app
     .get("/invoices/guardian/:studentId", getGuardianInvoicesController, {
       params: t.Object({ schoolId: t.String(), studentId: t.String() }),
       detail: { summary: "List a guardian's linked student invoices", tags: ["Finance", "Guardian"] },

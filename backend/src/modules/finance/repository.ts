@@ -122,6 +122,40 @@ export async function findPendingPaymentByCheckoutRequestId(checkoutRequestId: s
   })
 }
 
+export async function findConfirmedByReceipt(schoolId: string, receipt: string) {
+  return prisma.payment.findFirst({
+    where: {
+      schoolId,
+      transactionRef: String(receipt),
+      status: "confirmed",
+      method: "mpesa_stk",
+    },
+  })
+}
+
+export async function findStuckPendingStk(olderThanMs: number) {
+  const cutoff = new Date(Date.now() - olderThanMs)
+  return prisma.payment.findMany({
+    where: {
+      status: "pending",
+      method: "mpesa_stk",
+      receivedAt: { lt: cutoff },
+    },
+    include: paymentInclude,
+  })
+}
+
+export async function markPaymentStatus(
+  id: string,
+  status: "pending" | "confirmed" | "failed" | "reversed",
+  extra: Record<string, any> = {}
+) {
+  return prisma.payment.update({
+    where: { id },
+    data: { status, ...extra },
+  })
+}
+
 export async function findActiveStudentsByClassId(schoolId: string, classInstanceId: string) {
   return prisma.enrollment.findMany({
     where: {

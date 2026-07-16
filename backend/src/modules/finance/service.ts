@@ -2,6 +2,7 @@ import { AppError } from "@/common/errors"
 import { prisma } from "@/infrastructure/database/prisma"
 import { DarajaProvider } from "@/infrastructure/payment/daraja.provider"
 import * as repo from "./repository"
+import * as studentRepo from "@/modules/students/repository"
 import { FinancePolicy } from "./policy"
 import { FinanceMapper } from "./mapper"
 import { FinanceEvents } from "./events"
@@ -14,6 +15,33 @@ import type {
   InitiateBulkMpesaPaymentInput,
   MpesaCallbackInput,
 } from "./schema"
+
+/**
+ * Builds a concise M-Pesa TransactionDesc from the invoice's fee items so the
+ * customer sees what they are paying for (e.g. "School Fees", "Field Trip").
+ * Daraja limits TransactionDesc to 13 characters.
+ */
+function buildMpesaDescription(invoice: any): string {
+  const feeItems: any[] = invoice?.feeStructure?.feeItems ?? []
+  if (feeItems.length === 0) return "School Fees".substring(0, 13)
+  // Join the most relevant fee item names, trimmed to 13 chars.
+  const names = feeItems.map((i) => i.name).join(" ")
+  return names.substring(0, 13)
+}
+
+/**
+ * Builds a bulk M-Pesa TransactionDesc from the student's invoices' fee items.
+ * Daraja limits TransactionDesc to 13 characters.
+ */
+function buildBulkMpesaDescription(invoices: any[]): string {
+  const feeItemNames = new Set<string>()
+  for (const inv of invoices) {
+    const feeItems: any[] = inv?.feeStructure?.feeItems ?? []
+    for (const item of feeItems) feeItemNames.add(item.name)
+  }
+  if (feeItemNames.size === 0) return "School Fees".substring(0, 13)
+  return Array.from(feeItemNames).join(" ").substring(0, 13)
+}
 
 export async function listFeeStructures(schoolId: string) {
   const structures = await repo.findFeeStructures(schoolId)
@@ -60,6 +88,55 @@ export async function generateInvoice(schoolId: string, data: GenerateInvoiceInp
     balance: totalAmount,
     status: "issued",
   })
+
+  // Apply any existing student credit balance as a pre-payment.
+  const credit = await studentRepo.getStudentCreditBalance(data.studentId)
+  if (credit > 0) {
+    const applied = Math.min(credit, totalAmount)
+    const remainingCredit = credit - applied
+    await prisma.$transaction(async (tx: any) => {
+      await tx.invoice.update({
+        where: { id: invoice.id },
+        data: {
+          paidAmount: { increment: applied },
+          balance: { decrement: applied },
+          status: applied >= totalAmount ? "paid" : "partially_paid",
+        },
+      })
+      await tx.payment.create({
+        data: {
+          schoolId,
+          studentId: data.studentId,
+          method: "credit",
+          type: "credit",
+          status: "confirmed",
+          transactionRef: `credit-prepaid-${invoice.id}`,
+          amount: applied,
+          metadata: { appliedToInvoiceId: invoice.id, isCreditPrePayment: true },
+        },
+      })
+      await tx.paymentAllocation.create({
+        data: {
+          schoolId,
+          paymentId: (await tx.payment.findFirst({
+            where: { transactionRef: `credit-prepaid-${invoice.id}`, studentId: data.studentId },
+            orderBy: { createdAt: "desc" },
+          })).id,
+          invoiceId: invoice.id,
+          studentId: data.studentId,
+          amount: applied,
+        },
+      })
+      await tx.student.update({
+        where: { id: data.studentId },
+        data: { creditBalance: remainingCredit },
+      })
+    })
+    // Refresh invoice after credit application
+    const updated = await repo.findInvoiceById(schoolId, invoice.id)
+    await FinanceEvents.invoiceGenerated(schoolId, invoice.id, { studentId: data.studentId, amount: totalAmount, creditApplied: applied })
+    return FinanceMapper.toInvoiceDTO(updated)
+  }
 
   await FinanceEvents.invoiceGenerated(schoolId, invoice.id, { studentId: data.studentId, amount: totalAmount })
 
@@ -203,7 +280,7 @@ export async function initiateMpesaPayment(schoolId: string, data: InitiateMpesa
 
   const student = invoice!.student
   const accountReference = student.admissionNumber.substring(0, 12)
-  const transactionDesc = `Fee ${student.firstName}`.substring(0, 13)
+  const transactionDesc = buildMpesaDescription(invoice!)
 
   // Initiate STK Push via Daraja
   const darajaResponse = await DarajaProvider.initiateStkPush({
@@ -232,10 +309,11 @@ export async function initiateMpesaPayment(schoolId: string, data: InitiateMpesa
     await tx.financialAuditLog.create({
       data: {
         schoolId,
-        action: "mpesa_stk_push_initiated",
-        entityType: "payment",
-        entityId: p.id,
-        details: { amount: data.amount, phone: data.phoneNumber, invoiceId: invoice!.id },
+        paymentId: p.id,
+        invoiceId: invoice!.id,
+        studentId: student.id,
+        actionDescription: `M-Pesa STK push initiated for ${transactionDesc} - KES ${data.amount}`,
+        metadata: { amount: data.amount, phone: data.phoneNumber, invoiceId: invoice!.id },
       }
     })
     return p
@@ -250,7 +328,8 @@ export async function initiateBulkMpesaPayment(schoolId: string, data: InitiateB
   }
 
   const accountReference = "BULK_PAY".substring(0, 12)
-  const transactionDesc = `Bulk Fee Pmt`.substring(0, 13)
+  const studentInvoices = await repo.findInvoices(schoolId, data.studentId)
+  const transactionDesc = buildBulkMpesaDescription(studentInvoices)
 
   // Initiate STK Push via Daraja
   const darajaResponse = await DarajaProvider.initiateStkPush({
@@ -282,10 +361,10 @@ export async function initiateBulkMpesaPayment(schoolId: string, data: InitiateB
     await tx.financialAuditLog.create({
       data: {
         schoolId,
-        action: "bulk_mpesa_stk_push_initiated",
-        entityType: "payment",
-        entityId: p.id,
-        details: { amount: data.totalAmount, phone: data.phoneNumber, allocations: data.allocations },
+        paymentId: p.id,
+        studentId: data.studentId,
+        actionDescription: `Bulk M-Pesa STK push initiated for ${transactionDesc} - KES ${data.totalAmount}`,
+        metadata: { amount: data.totalAmount, phone: data.phoneNumber, allocations: data.allocations },
       }
     })
     return p
@@ -294,70 +373,161 @@ export async function initiateBulkMpesaPayment(schoolId: string, data: InitiateB
   return { checkoutRequestId: darajaResponse.CheckoutRequestID, paymentId: pendingPayment.id }
 }
 
-export async function processMpesaCallback(payload: MpesaCallbackInput) {
-  const { stkCallback } = payload.Body
-  const checkoutRequestId = stkCallback.CheckoutRequestID
-
-  // Find the pending payment
+/**
+ * Resolves an STK callback result against the pending payment it belongs to.
+ * Shared by the Safaricom webhook and the STK reconciliation job.
+ *
+ * `result` carries the authoritative data reported by Safaricom:
+ *   - resultCode / resultDesc
+ *   - receipt (MpesaReceiptNumber) + phone + gatewayAmount (for successes)
+ * `source` is "callback" (webhook) or "reconciler" (poller).
+ */
+export async function resolveStkResult(checkoutRequestId: string, result: {
+  resultCode: number
+  resultDesc: string
+  merchantRequestId?: string
+  receipt?: string
+  phoneNumber?: string
+  gatewayAmount?: number
+  transactionDate?: string
+  raw?: any
+  source?: string
+}) {
   const payment = await repo.findPendingPaymentByCheckoutRequestId(checkoutRequestId)
-  
+
   if (!payment) {
-    console.warn(`[FinanceService] M-Pesa Callback: Pending payment not found for CheckoutRequestID ${checkoutRequestId}`)
+    console.warn(`[FinanceService] STK ${result.source || "callback"}: no pending payment for CheckoutRequestID ${checkoutRequestId}`)
+    return
+  }
+
+  // Idempotency: if already resolved by an earlier callback/reconciler, skip.
+  if (payment.status !== "pending") {
+    console.info(`[FinanceService] STK ${result.source || "callback"}: payment ${payment.id} already ${payment.status}; ignoring duplicate.`)
     return
   }
 
   const schoolId = payment.schoolId
-  const isSuccess = stkCallback.ResultCode === 0
+  const isSuccess = result.resultCode === 0
 
   if (!isSuccess) {
-    // Payment failed or was cancelled by user
     await prisma.$transaction(async (tx: any) => {
       await tx.payment.update({
         where: { id: payment.id },
         data: {
           status: "failed",
-          metadata: { ...(payment.metadata as object), callback: payload } as any,
+          metadata: {
+            ...(payment.metadata as object),
+            resultCode: result.resultCode,
+            resultDesc: result.resultDesc,
+            merchantRequestId: result.merchantRequestId,
+            failedAt: new Date().toISOString(),
+            raw: result.raw,
+          } as any,
         },
       })
-      
       await tx.financialAuditLog.create({
         data: {
           schoolId,
-          action: "mpesa_stk_push_failed",
-          entityType: "payment",
-          entityId: payment.id,
-          details: { reason: stkCallback.ResultDesc },
-        }
+          paymentId: payment.id,
+          studentId: payment.studentId,
+          invoiceId: payment.invoiceId,
+          actionDescription: `M-Pesa STK push failed (${result.resultCode}): ${result.resultDesc}`,
+          metadata: { reason: result.resultDesc, resultCode: result.resultCode, source: result.source },
+        },
       })
     })
     return
   }
 
-  // Payment was successful
-  const metadataItems = stkCallback.CallbackMetadata?.Item || []
-  const mpesaReceiptObj = metadataItems.find((i: any) => i.Name === "MpesaReceiptNumber")
-  const mpesaReceiptNumber = mpesaReceiptObj ? mpesaReceiptObj.Value : checkoutRequestId
+  const receipt = result.receipt || checkoutRequestId
 
-  const result = await prisma.$transaction(async (tx: any) => {
-    // Update Payment to confirmed
+  // Duplicate receipt guard: never double-allocate the same receipt.
+  const existing = await repo.findConfirmedByReceipt(schoolId, receipt)
+  if (existing) {
+    console.warn(`[FinanceService] STK ${result.source || "callback"}: receipt ${receipt} already confirmed on payment ${existing.id}; marking ${payment.id} failed to avoid double capture.`)
+    await repo.markPaymentStatus(payment.id, "failed", {
+      metadata: {
+        ...(payment.metadata as object),
+        duplicateReceipt: receipt,
+        resultDesc: result.resultDesc,
+      } as any,
+    })
+    return
+  }
+
+  // Trust the amount Safaricom actually reports.
+  const requestedAmount = Number(payment.amount)
+  const gatewayAmount = typeof result.gatewayAmount === "number" && result.gatewayAmount > 0
+    ? Number(result.gatewayAmount)
+    : requestedAmount
+  const amountMismatch = Math.abs(gatewayAmount - requestedAmount) > 0.001
+
+  const confirmResult = await prisma.$transaction(async (tx: any) => {
     const confirmedPayment = await tx.payment.update({
       where: { id: payment.id },
       data: {
         status: "confirmed",
-        transactionRef: String(mpesaReceiptNumber),
-        metadata: { ...(payment.metadata as object), callback: payload } as any,
+        transactionRef: String(receipt),
+        metadata: {
+          ...(payment.metadata as object),
+          resultCode: result.resultCode,
+          resultDesc: result.resultDesc,
+          merchantRequestId: result.merchantRequestId,
+          gatewayAmount,
+          phoneNumber: result.phoneNumber,
+          transactionDate: result.transactionDate,
+          amountMismatch,
+          raw: result.raw,
+        } as any,
         receivedAt: new Date(),
       },
     })
 
     const metadata = payment.metadata as any
     const isBulk = metadata?.isBulk === true
-    const allocations = isBulk ? metadata.allocations : [{ invoiceId: payment.invoiceId, amount: payment.amount }]
+    let allocations = isBulk ? metadata.allocations : [{ invoiceId: payment.invoiceId, amount: payment.amount }]
 
+    // Total amount to allocate = actual gateway amount paid.
+    let remaining = gatewayAmount
+
+    // FIFO allocation across the selected invoices.
+    const applied: any[] = []
     for (const alloc of allocations) {
-      if (!alloc.invoiceId) continue
+      if (remaining <= 0) break
+      const toApply = Math.min(Number(alloc.amount), remaining)
+      if (toApply <= 0) continue
+      applied.push({ invoiceId: alloc.invoiceId, amount: toApply })
+      remaining -= toApply
+    }
 
-      // Allocate payment
+    // Any leftover after allocations is a surplus → student credit balance.
+    if (remaining > 0.001) {
+      applied.push({ invoiceId: null, amount: remaining })
+    }
+
+    for (const alloc of applied) {
+      if (!alloc.invoiceId) {
+        await tx.payment.create({
+          data: {
+            schoolId,
+            studentId: payment.studentId,
+            method: payment.method,
+            type: "credit",
+            status: "confirmed",
+            provider: payment.provider,
+            transactionRef: String(receipt),
+            amount: alloc.amount,
+            metadata: { ...(payment.metadata as object), isOverpaymentCredit: true, parentPaymentId: payment.id } as any,
+            receivedAt: new Date(),
+          },
+        })
+        await tx.student.update({
+          where: { id: payment.studentId },
+          data: { creditBalance: { increment: alloc.amount } },
+        })
+        continue
+      }
+
       await tx.paymentAllocation.create({
         data: {
           schoolId,
@@ -368,7 +538,6 @@ export async function processMpesaCallback(payload: MpesaCallbackInput) {
         },
       })
 
-      // Update Invoice balance
       const invoice = await tx.invoice.update({
         where: { id: alloc.invoiceId },
         data: {
@@ -393,20 +562,53 @@ export async function processMpesaCallback(payload: MpesaCallbackInput) {
     await tx.financialAuditLog.create({
       data: {
         schoolId,
-        action: "mpesa_stk_push_success",
-        entityType: "payment",
-        entityId: payment.id,
-        details: { receipt: String(mpesaReceiptNumber), amount: payment.amount, isBulk },
-      }
+        paymentId: payment.id,
+        studentId: payment.studentId,
+        invoiceId: payment.invoiceId,
+        actionDescription: `M-Pesa STK push confirmed - receipt ${String(receipt)} (gateway amount ${gatewayAmount})`,
+        metadata: {
+          receipt: String(receipt),
+          requestedAmount,
+          gatewayAmount,
+          amountMismatch,
+          phone: result.phoneNumber,
+          isBulk,
+          source: result.source,
+        },
+      },
     })
 
     return confirmedPayment
   })
 
-  // Emit Event
-  await FinanceEvents.paymentReceived(schoolId, result.id, { 
-    invoiceId: payment.invoiceId, 
-    amount: payment.amount, 
-    method: payment.method 
+  await FinanceEvents.paymentReceived(schoolId, confirmResult.id, {
+    invoiceId: payment.invoiceId,
+    amount: gatewayAmount,
+    method: payment.method,
+  })
+}
+
+export async function processMpesaCallback(payload: MpesaCallbackInput) {
+  const { stkCallback } = payload.Body
+  const checkoutRequestId = stkCallback.CheckoutRequestID
+
+  const metadataItems = stkCallback.CallbackMetadata?.Item || []
+  const getItem = (name: string) => metadataItems.find((i: any) => i.Name === name)?.Value
+
+  const receipt = getItem("MpesaReceiptNumber")
+  const phoneNumber = getItem("PhoneNumber")
+  const gatewayAmount = getItem("Amount")
+  const transactionDate = getItem("TransactionDate")
+
+  await resolveStkResult(checkoutRequestId, {
+    resultCode: stkCallback.ResultCode,
+    resultDesc: stkCallback.ResultDesc,
+    merchantRequestId: stkCallback.MerchantRequestID,
+    receipt,
+    phoneNumber,
+    gatewayAmount,
+    transactionDate,
+    raw: payload,
+    source: "callback",
   })
 }

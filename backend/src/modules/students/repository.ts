@@ -73,6 +73,21 @@ export async function findStudentByAdmission(
   });
 }
 
+export async function adjustStudentCredit(studentId: string, delta: number) {
+  return prisma.student.update({
+    where: { id: studentId },
+    data: { creditBalance: { increment: delta } },
+  })
+}
+
+export async function getStudentCreditBalance(studentId: string) {
+  const student = await prisma.student.findUnique({
+    where: { id: studentId },
+    select: { creditBalance: true },
+  })
+  return student ? Number(student.creditBalance) : 0
+}
+
 export async function updateStudent(
   id: string,
   data: Prisma.StudentUpdateInput

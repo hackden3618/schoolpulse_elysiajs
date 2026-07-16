@@ -13,8 +13,7 @@ import { Button } from "../../components/ui/Button"
 import { Skeleton } from "../../components/ui/Skeleton"
 import { ErrorBanner } from "../../components/ui/ErrorBanner"
 import { EmptyState } from "../../components/ui/EmptyState"
-import { MpesaPaymentModal } from "../../components/finance/MpesaPaymentModal"
-import { BulkMpesaPaymentModal } from "../../components/finance/BulkMpesaPaymentModal"
+import { GuardianMpesaModal as MpesaPaymentModal } from "../../components/finance/GuardianMpesaModal"
 import type { Student, Invoice, Guardian } from "../../types"
 
 function primaryGuardianPhone(student: Student): string | undefined {
@@ -38,8 +37,8 @@ export function GuardianPaymentsPage() {
   const [invoicesLoading, setInvoicesLoading] = useState(false)
   const [invoicesError, setInvoicesError] = useState("")
 
-  const [singleInvoice, setSingleInvoice] = useState<Invoice | null>(null)
-  const [bulkOpen, setBulkOpen] = useState(false)
+  const [payOpen, setPayOpen] = useState(false)
+  const [preselectId, setPreselectId] = useState<string | null>(null)
 
   const displayName = user ? `${user.firstName}${user.lastName ? " " + user.lastName : ""}` : "there"
 
@@ -155,15 +154,20 @@ export function GuardianPaymentsPage() {
                 <div className="text-right">
                   <p className="text-xs text-surface-500">Total Outstanding</p>
                   <p className="text-2xl font-bold text-danger-600">{money(totalOutstanding)}</p>
+                  {Number(activeStudent.creditBalance) > 0 && (
+                    <p className="text-xs text-success-600 mt-1">
+                      Credit: {money(Number(activeStudent.creditBalance))}
+                    </p>
+                  )}
                 </div>
               </div>
               {unpaidInvoices.length > 0 && (
                 <div className="mt-4 flex flex-wrap gap-2">
                   <Button
-                    onClick={() => setBulkOpen(true)}
+                    onClick={() => { setPreselectId(null); setPayOpen(true) }}
                     className="bg-emerald-600 hover:bg-emerald-700"
                   >
-                    <Wallet size={16} className="mr-1.5" /> Pay All via M-Pesa
+                    <Wallet size={16} className="mr-1.5" /> Pay via M-Pesa
                   </Button>
                 </div>
               )}
@@ -217,7 +221,7 @@ export function GuardianPaymentsPage() {
                         {!isPaid && (
                           <Button
                             size="sm"
-                            onClick={() => setSingleInvoice(inv)}
+                            onClick={() => { setPreselectId(inv.id); setPayOpen(true) }}
                             className="bg-emerald-600 hover:bg-emerald-700 shrink-0"
                           >
                             <Smartphone size={15} className="mr-1.5" /> Pay
@@ -233,23 +237,14 @@ export function GuardianPaymentsPage() {
         </div>
       )}
 
-      {singleInvoice && activeStudent && (
+      {payOpen && activeStudent && (
         <MpesaPaymentModal
-          invoice={singleInvoice}
-          guardianPhone={primaryGuardianPhone(activeStudent)}
-          studentName={`${activeStudent.firstName} ${activeStudent.lastName}`}
-          onClose={() => setSingleInvoice(null)}
-          onSuccess={() => activeStudent && loadInvoices(activeStudent)}
-        />
-      )}
-
-      {bulkOpen && activeStudent && (
-        <BulkMpesaPaymentModal
-          invoices={unpaidInvoices}
+          invoices={invoices}
           studentId={activeStudent.id}
           studentName={`${activeStudent.firstName} ${activeStudent.lastName}`}
           guardianPhone={primaryGuardianPhone(activeStudent)}
-          onClose={() => setBulkOpen(false)}
+          preselectedIds={preselectId ? [preselectId] : null}
+          onClose={() => setPayOpen(false)}
           onSuccess={() => activeStudent && loadInvoices(activeStudent)}
         />
       )}

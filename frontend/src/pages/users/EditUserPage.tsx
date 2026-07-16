@@ -17,7 +17,7 @@ import type { Role, User, Membership } from "../../types"
 export function EditUserPage() {
   const navigate = useNavigate()
   const { userId } = useParams<{ userId: string }>()
-  const { school, user: authUser, roles: authRoles } = useAuth()
+  const { school, user: authUser, roles: authRoles, allMemberships } = useAuth()
   const isOwnProfile = authUser?.id === userId
 
   const [firstName, setFirstName] = useState("")
@@ -184,10 +184,10 @@ export function EditUserPage() {
         description="Update user profile, status, and role assignments."
         actions={
           <div className="flex items-center gap-3">
-            {isOwnProfile && authRoles.length > 1 && (
+            {isOwnProfile && allMemberships.length > 1 && (
               <Button variant="secondary" onClick={() => setShowRoleSwitcherModal(true)}>
                 <Shield size={16} />
-                Switch Role
+                Switch Context
               </Button>
             )}
             <Button variant="secondary" onClick={() => navigate("/users")}>

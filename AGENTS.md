@@ -39,23 +39,22 @@ Current Version:
 
 v1.1.0
 
-This version is feature frozen.
+This is the active development version. Features are implemented as required
+to satisfy the product's real-world use cases (multi-tenant school management,
+including guardian self-service payments, M-Pesa integration, and credit
+handling).
 
-Only implement functionality already defined in:
+Implementation priority order:
 
-- Engineering Documents
+- Engineering Documentation
 - Database Schema
 - API Specification
+- Backend Implementation
+- Frontend
 
-Do NOT invent new product features.
-
-If an improvement is discovered:
-
-DO NOT implement it.
-
-Instead document it under:
-
-Future Improvements (v1.2+)
+When a needed capability is missing, implement it properly (with validation,
+authorization, audit, and tests) rather than working around it. Document
+non-obvious decisions where helpful.
 
 ---
 
@@ -92,23 +91,20 @@ Documentation drives implementation.
 
 ---
 
-# 4. Frozen Components
+# 4. Guiding Stability
 
-The following are frozen unless explicitly requested.
+The following should only change with deliberate, documented reasoning.
 
-✓ Database Schema
+• Core Business Rules
 
-✓ Product Scope
+• Entity Relationships
 
-✓ Core Business Rules
+• API Design Principles
 
-✓ Entity Relationships
+• Multi-tenancy Design (school isolation is mandatory)
 
-✓ API Design Principles
-
-✓ Multi-tenancy Design
-
-✓ Version 1.1.0 Scope
+Schema and scope may evolve as real use cases demand, provided changes keep
+validation, authorization, audit, and school isolation intact.
 
 ---
 
@@ -419,15 +415,18 @@ invent endpoints
 
 invent database tables
 
-change schema
-
-change version scope
-
 rename entities
 
 change business rules
 
 rewrite architecture
+
+AI agents MAY:
+
+extend the schema when a documented use case requires it, provided school
+isolation, validation, authorization, and audit remain intact
+
+add new features within the active v1.1.0 scope
 
 AI agents SHOULD:
 
@@ -492,64 +491,57 @@ Reuse it.
 
 ---
 
-2. Does this change Version 1.1.0 scope?
-
-If yes:
-Stop.
-Suggest documenting it for v1.2.0 instead.
-
----
-
-3. Does this violate the frozen schema?
-
-If yes:
-Stop.
-
----
-
-4. Does this duplicate an existing module?
+2. Does this duplicate an existing module?
 
 If yes:
 Extend the existing module.
 
 ---
 
-5. Does this belong in Infrastructure?
+3. Does this require a schema change?
+
+If yes:
+Extend the schema within v1.1.0 scope, keeping validation,
+authorization, audit, and school isolation intact.
+
+---
+
+4. Does this belong in Infrastructure?
 
 If yes:
 Move it there.
 
 ---
 
-6. Does this belong in Common?
+5. Does this belong in Common?
 
 If yes:
 Move it there.
 
 ---
 
-7. Does this belong in Policies?
+6. Does this belong in Policies?
 
 If it is a business rule,
 move it into a Policy class.
 
 ---
 
-8. Does this require an Event?
+7. Does this require an Event?
 
 If yes:
 Emit an EventOutbox event.
 
 ---
 
-9. Does this require an Audit Log?
+8. Does this require an Audit Log?
 
 If yes:
 Create one.
 
 ---
 
-10. Is this documented?
+9. Is this documented?
 
 If not:
 

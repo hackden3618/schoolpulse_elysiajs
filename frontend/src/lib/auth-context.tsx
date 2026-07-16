@@ -8,6 +8,7 @@ interface AuthContextType extends AuthState {
   refreshAuth: () => Promise<void>
   switchSchool: (membershipId: string) => Promise<void>
   switchRole: (role: Role) => void
+  switchContext: (membershipId: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -185,8 +186,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setState((s) => ({ ...s, activeRole: role }))
   }, [])
 
+  /**
+   * Switches the active membership (and therefore the JWT roles/permissions)
+   * by re-issuing a token for the chosen membership. This lets a user who is
+   * e.g. both a Super Admin and a Parent in the same school adopt the
+   * Parent context so guardian-scoped endpoints are authorized.
+   */
+  const switchContext = useCallback(async (membershipId: string) => {
+    const res = await authApi.switchSchool({ membershipId })
+    const { accessToken, refreshToken, membership, school } = res.data
+    const stored = loadStoredAuth()
+    if (!stored) return
+    const newStored: StoredAuth = {
+      ...stored,
+      accessToken,
+      refreshToken,
+      membership,
+      school,
+    }
+    storeAuth(newStored)
+    applyAuth(newStored)
+  }, [applyAuth])
+
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, refreshAuth, switchSchool, switchRole }}>
+    <AuthContext.Provider value={{ ...state, login, logout, refreshAuth, switchSchool, switchRole, switchContext }}>
       {children}
     </AuthContext.Provider>
   )

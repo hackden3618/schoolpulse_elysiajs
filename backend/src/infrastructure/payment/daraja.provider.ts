@@ -94,4 +94,44 @@ export class DarajaProvider {
       throw AppError.internal(error.message || "Failed to initiate payment")
     }
   }
+
+  /**
+   * Query the status of an STK Push that may not have called back yet.
+   * Used by the reconciliation job to resolve payments stuck in `pending`.
+   */
+  static async queryStkPush({ checkoutRequestId }: { checkoutRequestId: string }) {
+    const token = await this.getAccessToken()
+
+    const timestamp = new Date().toISOString().replace(/[^0-9]/g, "").slice(0, -3)
+    const password = Buffer.from(`${MPESA_SHORTCODE}${MPESA_PASSKEY}${timestamp}`).toString("base64")
+
+    const payload = {
+      BusinessShortCode: MPESA_SHORTCODE,
+      Password: password,
+      Timestamp: timestamp,
+      CheckoutRequestID: checkoutRequestId,
+    }
+
+    try {
+      const response = await fetch(`${MPESA_BASE_URL}/mpesa/stkpushquery/v1/processquery`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const data: any = await response.json()
+      return {
+        resultCode: data.ResultCode,
+        resultDesc: data.ResultDesc,
+        merchantRequestId: data.MerchantRequestID,
+        checkoutRequestId: data.CheckoutRequestID,
+      }
+    } catch (error: any) {
+      console.error("[DarajaProvider] Failed to query STK push:", error)
+      throw AppError.internal(error.message || "Failed to query payment status")
+    }
+  }
 }

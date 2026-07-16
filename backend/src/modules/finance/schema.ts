@@ -43,7 +43,7 @@ export const initiateMpesaPaymentSchema = t.Object({
 export const initiateBulkMpesaPaymentSchema = t.Object({
   studentId: uuidString(true),
   allocations: t.Array(t.Object({
-    invoiceId: uuidString(true),
+    invoiceId: t.Optional(uuidString(false)),
     amount: t.Number({ minimum: 1 }),
   }), { minItems: 1 }),
   phoneNumber: t.String({ minLength: 9, maxLength: 15 }),

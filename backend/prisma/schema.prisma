@@ -741,6 +741,7 @@ model Student {
     archiveReason          ArchiveReason?          @map("archive_reason")
     performanceExpectation PerformanceExpectation? @map("performance_expectation")
     specialNeeds           Json?                   @default("{}") @map("special_needs")
+    creditBalance          Decimal                 @default(0) @map("credit_balance") @db.Decimal(12, 2)
 
     createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
     updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)

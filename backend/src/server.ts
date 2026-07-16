@@ -2,6 +2,7 @@ import dotenv from "dotenv"
 import { app } from "./app"
 import { wsManager, handleWsOpen, handleWsMessage, handleWsClose } from "./infrastructure/websocket"
 import { startDeliveryPoller } from "./infrastructure/messaging/sms/delivery-poller"
+import { scheduleStkReconciler } from "./infrastructure/jobs/mpesa-stk-reconciler"
 
 dotenv.config()
 
@@ -10,6 +11,7 @@ const PORT = Number(process.env.SERVERPORT || 3000)
 const clients = new Map<WebSocket, ReturnType<typeof handleWsOpen>>()
 
 startDeliveryPoller()
+scheduleStkReconciler()
 
 Bun.serve({
   port: PORT,
