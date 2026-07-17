@@ -1,0 +1,93 @@
+@import "tailwindcss";
+
+@theme {
+  /* Primary Slate Colors */
+  --color-primary-50: #f8fafc;
+  --color-primary-100: #f1f5f9;
+  --color-primary-200: #e2e8f0;
+  --color-primary-300: #cbd5e1;
+  --color-primary-400: #94a3b8;
+  --color-primary-500: #64748b;
+  --color-primary-600: #475569;
+  --color-primary-700: #334155;
+  --color-primary-800: #1e293b;
+  --color-primary-900: #0f172a;
+  --color-primary-950: #020617;
+
+  /* Accent Gold / Warm Orange */
+  --color-accent: #e89d47;
+  --color-accent-50: #fef9f3;
+  --color-accent-100: #fdf0de;
+  --color-accent-200: #fbe0bc;
+  --color-accent-300: #f8cb91;
+  --color-accent-400: #f5b260;
+  --color-accent-500: #e89d47;
+  --color-accent-600: #c17929;
+  --color-accent-700: #96591a;
+  --color-accent-800: #6e3e10;
+  --color-accent-900: #4d2808;
+
+  /* Sidebar Specifics */
+  --color-sidebar-bg: #111827;
+  --color-sidebar-text: #9ca3af;
+  --color-sidebar-hover-text: #f3f4f6;
+  --color-sidebar-active-bg: #e89d47;
+  --color-sidebar-active-text: #ffffff;
+
+  /* Status Colors */
+  --color-success-50: #e6f4ea;
+  --color-success-100: #ceeade;
+  --color-success-500: #10b981;
+  --color-success-700: #137333;
+
+  --color-warning-50: #fef7e0;
+  --color-warning-100: #feefc3;
+  --color-warning-500: #f59e0b;
+  --color-warning-700: #b06000;
+
+  --color-danger-50: #fce8e6;
+  --color-danger-100: #fad2cf;
+  --color-danger-500: #ef4444;
+  --color-danger-700: #c5221f;
+
+  --color-info-50: #e8f0fe;
+  --color-info-100: #d2e3fc;
+  --color-info-500: #3b82f6;
+  --color-info-700: #1a73e8;
+
+  /* Surface colors */
+  --color-surface-50: #f8fafc;
+  --color-surface-100: #f1f5f9;
+  --color-surface-200: #e2e8f0;
+  --color-surface-300: #cbd5e1;
+  --color-surface-400: #94a3b8;
+  --color-surface-500: #64748b;
+  --color-surface-600: #475569;
+  --color-surface-700: #334155;
+  --color-surface-800: #1e293b;
+  --color-surface-900: #0f172a;
+
+  /* Backgrounds & Surfaces */
+  --color-background: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-border: #e5e7eb;
+
+  /* Fonts */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+
+  /* Border Radii */
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-primary-300) transparent;
+}
+
+body {
+  @apply bg-background text-primary-900 antialiased font-sans;
+  font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+}

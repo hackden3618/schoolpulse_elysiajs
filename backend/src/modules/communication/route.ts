@@ -1,0 +1,1 @@
+export { communicationRoute } from "./router";

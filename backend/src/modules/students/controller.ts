@@ -1,0 +1,72 @@
+import { success } from "@/common/responses";
+import * as svc from "./service";
+import * as repo from "./repository";
+
+export async function getStudentsController({ params: { schoolId }, query }: any) {
+  const students = await svc.listAllStudents(schoolId, query?.includeArchived === "true");
+  return success(students, schoolId);
+}
+
+export async function getStudentController({ params: { schoolId, studentId }, set }: any) {
+  const student = await svc.getStudentById(schoolId, studentId);
+  return success(student, schoolId);
+}
+
+export async function createStudentController({ params: { schoolId }, body, authUser, set }: any) {
+  const student = await svc.createStudent(schoolId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
+  set.status = 201;
+  return success(student, schoolId);
+}
+
+export async function updateStudentController({ params: { schoolId, studentId }, body, set }: any) {
+  const student = await svc.updateStudent(schoolId, studentId, body);
+  return success(student, schoolId);
+}
+
+export async function archiveStudentController({ params: { schoolId, studentId }, body, authUser, set }: any) {
+  const student = await svc.archiveStudent(schoolId, studentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
+  return success(student, schoolId);
+}
+
+export async function unarchiveStudentController({ params: { schoolId, studentId }, authUser }: any) {
+  const student = await svc.unarchiveStudent(schoolId, studentId, { id: authUser?.userId, membershipId: authUser?.membershipId });
+  return success(student, schoolId);
+}
+
+export async function linkGuardianController({ params: { schoolId, studentId }, body, authUser, set }: any) {
+  const guardian = await svc.linkGuardian(schoolId, studentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
+  set.status = 201;
+  return success(guardian, schoolId);
+}
+
+export async function unlinkGuardianController({ params: { schoolId, studentId, guardianId }, authUser, set }: any) {
+  const result = await svc.unlinkGuardian(schoolId, studentId, guardianId, { id: authUser?.userId, membershipId: authUser?.membershipId });
+  return success(result, schoolId);
+}
+
+export async function enrollStudentController({ params: { schoolId, studentId }, body, authUser, set }: any) {
+  const enrollment = await svc.enrollStudent(schoolId, studentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
+  set.status = 201;
+  return success(enrollment, schoolId);
+}
+
+export async function updateEnrollmentController({ params: { schoolId, studentId, enrollmentId }, body, authUser, set }: any) {
+  const enrollment = await svc.updateEnrollment(schoolId, studentId, enrollmentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
+  return success(enrollment, schoolId);
+}
+
+export async function addGuardianByDetailsController({ params: { schoolId, studentId }, body, authUser, set }: any) {
+  const guardian = await svc.addGuardianByDetails(schoolId, studentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
+  set.status = 201;
+  return success(guardian, schoolId);
+}
+
+export async function getMyStudentsController({ params: { schoolId }, authUser }: any) {
+  const students = await svc.listMyStudents(schoolId, authUser.userId);
+  return success(students, schoolId);
+}
+
+export async function generateAdmissionNumberController({ params: { schoolId } }: any) {
+  const admissionNumber = await repo.generateAdmissionNumber(schoolId);
+  return success({ admissionNumber }, schoolId);
+}
