@@ -10,7 +10,6 @@ import {
 import { getNavigation } from "../../lib/constants"
 import { useAuth } from "../../lib/auth-context"
 import { SchoolSwitcher } from "./SchoolSwitcher"
-import { useUnread } from "../../lib/unread-context"
 
 interface SidebarProps {
   collapsed: boolean
@@ -21,7 +20,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
   const { user, school, logout, activeRole, roleNames } = useAuth()
-  const { unreadCount } = useUnread()
   const navGroups = getNavigation(roleNames, activeRole?.name)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     () => new Set(navGroups.map((g) => g.label))
@@ -92,7 +90,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                   {group.items.map((item) => {
                     const active = isActive(item.href)
                     const Icon = item.icon
-                    const showBadge = item.href === "/communication" && unreadCount > 0
 
                     return (
                       <button
@@ -114,13 +111,6 @@ export function Sidebar({ collapsed, onToggle }: SidebarProps) {
                         {!collapsed && (
                           <>
                             <span className="flex-1 text-left truncate">{item.label}</span>
-                            {showBadge && (
-                              <span className={`flex h-5 min-w-[20px] items-center justify-center rounded-full px-1.5 text-xs font-semibold ${
-                                active ? "bg-white/20 text-white" : "bg-white/10 text-primary-300"
-                              }`}>
-                                {unreadCount}
-                              </span>
-                            )}
                           </>
                         )}
                       </button>

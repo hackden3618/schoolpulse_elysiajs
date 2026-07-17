@@ -24,7 +24,7 @@ function roleIcon(name: string) {
 
 export function SchoolSelectModal({ open, memberships, schools }: SchoolSelectModalProps) {
   const navigate = useNavigate()
-  const { switchContext, switchRole, activeRole } = useAuth()
+  const { switchSchool, switchRole, activeRole } = useAuth()
   const [loading, setLoading] = useState(false)
   const [step, setStep] = useState<"school" | "role">("school")
   const [selectedSchoolId, setSelectedSchoolId] = useState<string | null>(null)
@@ -67,7 +67,7 @@ export function SchoolSelectModal({ open, memberships, schools }: SchoolSelectMo
     if (loading || !role) return
     setLoading(true)
     try {
-      await switchContext(membershipId)
+      switchSchool(membershipId)
       switchRole(role)
       navigate("/dashboard", { replace: true })
     } catch {

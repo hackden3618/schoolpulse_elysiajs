@@ -27,7 +27,7 @@ interface Option {
 }
 
 export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
-  const { allMemberships, membership: activeMembership, school, switchContext, switchRole, activeRole } = useAuth()
+  const { allMemberships, membership: activeMembership, school, switchSchool, switchRole, activeRole } = useAuth()
   const memberships: Membership[] = allMemberships?.length ? allMemberships : (activeMembership ? [activeMembership] : [])
 
   // Flatten to (membership, role) pairs.
@@ -70,7 +70,8 @@ export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
       if (!selected.isCurrentContext) {
         // Different membership → re-issue the session as a single action with
         // the chosen role already assumed in that school's context.
-        await switchContext(selected.membershipId, selected.role.name)
+        switchSchool(selected.membershipId)
+        switchRole(selected.role)
       } else {
         // Same school context → just assume the chosen role.
         await switchRole(selected.role)

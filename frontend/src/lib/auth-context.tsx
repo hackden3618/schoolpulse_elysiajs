@@ -1,49 +1,103 @@
-import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react"
-import { authApi, setAccessToken, getAccessToken, setPlatformToken, getTokenClaims } from "./api"
+import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react"
 import type { AuthState, User, Membership, School, Role } from "../types"
 import { hasPermission as checkPermission, type Permission } from "./permissions"
+import {
+  MOCK_USER,
+  MOCK_MEMBERSHIPS,
+  MOCK_SCHOOLS,
+  MOCK_ROLES,
+  type MockMembership,
+} from "./mock/data"
 
 interface AuthContextType extends AuthState {
   roleNames: string[]
   hasPermission: (permission: Permission) => boolean
-  login: (login: string, password: string) => Promise<{ allMemberships: Membership[], allSchools: School[], user: User }>
-  logout: () => Promise<void>
-  refreshAuth: () => Promise<void>
-  switchSchool: (membershipId: string) => Promise<void>
+  login: (login: string, password: string) => Promise<{ allMemberships: Membership[]; allSchools: School[]; user: User }>
+  logout: () => void
+  switchSchool: (membershipId: string) => void
   switchRole: (role: Role) => void
-  switchContext: (membershipId: string, roleName?: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
 
 const STORAGE_KEY = "schoolpulse:auth"
 
-interface StoredAuth {
-  accessToken: string
-  refreshToken: string
-  user: User
-  membership: Membership
-  school: School
-  allMemberships?: Membership[]
-  allSchools?: School[]
+interface StoredSession {
+  membershipId: string
+  activeRoleName?: string
 }
 
-function loadStoredAuth(): StoredAuth | null {
+function loadSession(): StoredSession | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    return JSON.parse(raw) as StoredAuth
+    return JSON.parse(raw) as StoredSession
   } catch {
     return null
   }
 }
 
-function storeAuth(data: StoredAuth): void {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+function saveSession(session: StoredSession): void {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(session))
 }
 
-function clearStoredAuth(): void {
+function clearSession(): void {
   localStorage.removeItem(STORAGE_KEY)
+}
+
+function buildSchool(s: { id: string; name: string; code: string; level: string; county: string }): School {
+  return {
+    id: s.id,
+    schoolName: s.name,
+    schoolCode: s.code,
+    schoolLevel: s.level as any,
+    county: s.county,
+    schoolPhone: "",
+    postOffice: "",
+    town: "",
+    country: "Kenya",
+    currency: "KES",
+    timezone: "Africa/Nairobi",
+    subscriptionPlan: "trial" as any,
+    subscriptionStatus: "active" as any,
+    schoolTier: "standard" as any,
+    settings: {},
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as unknown as School
+}
+
+function membershipToAuth(mem: MockMembership, activeRoleName?: string) {
+  const roles: Role[] = mem.roles as unknown as Role[]
+  const roleNames = roles.map((r) => r.name)
+  const school = MOCK_SCHOOLS.find((s) => s.id === mem.schoolId)!
+  const activeRole = activeRoleName
+    ? (roles.find((r) => r.name === activeRoleName) ?? roles[0] ?? null)
+    : (roles[0] ?? null)
+
+  const user: User = {
+    id: MOCK_USER.id,
+    firstName: MOCK_USER.firstName,
+    lastName: MOCK_USER.lastName,
+    phone: MOCK_USER.phone,
+    email: MOCK_USER.email,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as unknown as User
+
+  const membership: Membership = {
+    id: mem.id,
+    userId: mem.userId,
+    schoolId: mem.schoolId,
+    roles: roles.map((r) => ({ id: r.id, role: r, membershipId: mem.id, roleId: r.id })),
+    status: "active",
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  } as unknown as Membership
+
+  const schoolOut: School = buildSchool(school)
+
+  return { user, membership, school: schoolOut, roles, roleNames, activeRole }
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -61,41 +115,58 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     allSchools: [],
   })
 
-  const applyAuth = useCallback((stored: StoredAuth) => {
-    setAccessToken(stored.accessToken)
-    const roles: Role[] = stored.membership?.roles?.map((r: any) => r.role || r) || []
-    const roleNames = roles.map((r) => r.name)
-    const allMemberships = stored.allMemberships || [stored.membership]
-    const allSchools = stored.allSchools || [stored.school]
-
-    // The active role is the canonical source of truth for the assumed
-    // context. It is carried in the JWT claim by the backend and re-issued on
-    // every role/school switch, so we derive it from the token rather than
-    // from local storage (which could diverge after a school switch).
-    const claims = getTokenClaims()
-    const activeRoleName = claims?.activeRole
-    const activeRole = activeRoleName
-      ? (roles.find((r: any) => r.name === activeRoleName) ?? null)
-      : (roles[0] ?? null)
-
+  const applySession = useCallback((mem: MockMembership, activeRoleName?: string) => {
+    const derived = membershipToAuth(mem, activeRoleName)
+    const allMemberships = MOCK_MEMBERSHIPS.map(
+      (m) => membershipToAuth(m).membership
+    )
+    const allSchools = MOCK_SCHOOLS.map((s) => buildSchool(s))
     setState({
-      user: stored.user,
-      membership: stored.membership,
-      school: stored.school,
-      accessToken: stored.accessToken,
+      user: derived.user,
+      membership: derived.membership,
+      school: derived.school,
+      accessToken: "mock-token",
       isAuthenticated: true,
       isLoading: false,
-      activeRole,
-      roles,
-      roleNames,
+      activeRole: derived.activeRole,
+      roles: derived.roles,
+      roleNames: derived.roleNames,
       allMemberships,
       allSchools,
     })
   }, [])
 
-  const clearAuth = useCallback(() => {
-    setAccessToken(null)
-    clearStoredAuth()
+  useEffect(() => {
+    const stored = loadSession()
+    if (stored) {
+      const mem = MOCK_MEMBERSHIPS.find((m) => m.id === stored.membershipId)
+      if (mem) {
+        applySession(mem, stored.activeRoleName)
+        return
+      }
+    }
+    setState((s) => ({ ...s, isLoading: false }))
+  }, [applySession])
+
+  const login = useCallback(
+    async (_login: string, _password: string) => {
+      // Frontend-only prototype: any credentials open the sample session.
+      const mem = MOCK_MEMBERSHIPS[0]!
+      const session = { membershipId: mem.id, activeRoleName: mem.roles[0]?.name }
+      saveSession(session)
+      applySession(mem, session.activeRoleName)
+      const derived = membershipToAuth(mem, session.activeRoleName)
+      return {
+        allMemberships: MOCK_MEMBERSHIPS.map((m) => membershipToAuth(m).membership),
+        allSchools: MOCK_SCHOOLS.map((s) => buildSchool(s)),
+        user: derived.user,
+      }
+    },
+    [applySession]
+  )
+
+  const logout = useCallback(() => {
+    clearSession()
     setState({
       user: null,
       membership: null,
@@ -111,132 +182,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     })
   }, [])
 
-  useEffect(() => {
-    const stored = loadStoredAuth()
-    if (stored) {
-      applyAuth(stored)
-    } else {
-      setState((s) => ({ ...s, isLoading: false }))
-    }
-  }, [applyAuth])
+  const switchSchool = useCallback(
+    (membershipId: string) => {
+      const mem = MOCK_MEMBERSHIPS.find((m) => m.id === membershipId)
+      if (!mem) return
+      const session = { membershipId: mem.id, activeRoleName: mem.roles[0]?.name }
+      saveSession(session)
+      applySession(mem, session.activeRoleName)
+    },
+    [applySession]
+  )
 
-  useEffect(() => {
-    const handler = () => {
-      clearAuth()
-      setPlatformToken(null)
-      localStorage.removeItem("schoolpulse:platform")
-    }
-    window.addEventListener("auth:unauthorized", handler)
-    return () => window.removeEventListener("auth:unauthorized", handler)
-  }, [clearAuth])
-
-  const login = useCallback(async (loginStr: string, password: string) => {
-    const res = await authApi.login({ login: loginStr, password })
-    const { accessToken, refreshToken, user, membership, school, memberships, schools } = res.data
-
-    const allMemberships = memberships || [membership]
-    const allSchools = schools || [school]
-
-    const stored: StoredAuth = {
-      accessToken, refreshToken, user, membership, school,
-      allMemberships,
-      allSchools,
-    }
-    storeAuth(stored)
-    applyAuth(stored)
-
-    return { allMemberships, allSchools, user }
-  }, [applyAuth])
-
-  const logout = useCallback(async () => {
-    try {
-      await authApi.logout()
-    } catch {
-      // proceed with local logout even if API fails
-    }
-    clearAuth()
-  }, [clearAuth])
-
-  const refreshAuth = useCallback(async () => {
-    const stored = loadStoredAuth()
-    if (!stored) {
-      clearAuth()
-      return
-    }
-    try {
-      const res = await authApi.refresh(stored.refreshToken)
-      const newStored: StoredAuth = {
-        ...stored,
-        accessToken: res.data.accessToken,
-        refreshToken: res.data.refreshToken,
-      }
-      storeAuth(newStored)
-      applyAuth(newStored)
-    } catch {
-      clearAuth()
-    }
-  }, [applyAuth, clearAuth])
-
-  const switchSchool = useCallback(async (membershipId: string) => {
-    const sessionId = getTokenClaims()?.sessionId
-    const res = await authApi.switchSchool({ membershipId, sessionId })
-    const { accessToken, refreshToken, membership, school } = res.data
-    const stored = loadStoredAuth()
-    if (!stored) return
-    const newStored: StoredAuth = {
-      ...stored,
-      accessToken,
-      refreshToken,
-      membership,
-      school,
-    }
-    storeAuth(newStored)
-    applyAuth(newStored)
-  }, [applyAuth])
-
-  const switchRole = useCallback(async (role: Role) => {
-    const sessionId = getTokenClaims()?.sessionId
-    // Do NOT optimistically set activeRole. The backend is the source of truth;
-    // the role is only committed once the token is successfully re-issued
-    // (applyAuth derives activeRole from the JWT claim). On failure the UI
-    // keeps the previously authorized role, avoiding a client/backend split.
-    try {
-      const res = await authApi.switchRole({ roleName: role.name })
-      const stored = loadStoredAuth()
+  const switchRole = useCallback(
+    (role: Role) => {
+      const stored = loadSession()
       if (!stored) return
-      const newStored: StoredAuth = {
-        ...stored,
-        accessToken: res.data.accessToken,
-        refreshToken: res.data.refreshToken,
-      }
-      storeAuth(newStored)
-      applyAuth(newStored)
-    } catch {
-      // Leave activeRole as the previously authorized value.
-    }
-  }, [applyAuth])
-
-  /**
-   * Switches the active membership (and therefore the JWT roles/permissions)
-   * by re-issuing a token for the chosen membership. This lets a user who is
-   * e.g. both a Super Admin and a Parent in the same school adopt the
-   * Parent context so guardian-scoped endpoints are authorized.
-   */
-  const switchContext = useCallback(async (membershipId: string, roleName?: string) => {
-    const res = await authApi.switchSchool({ membershipId, roleName })
-    const { accessToken, refreshToken, membership, school } = res.data
-    const stored = loadStoredAuth()
-    if (!stored) return
-    const newStored: StoredAuth = {
-      ...stored,
-      accessToken,
-      refreshToken,
-      membership,
-      school,
-    }
-    storeAuth(newStored)
-    applyAuth(newStored)
-  }, [applyAuth])
+      const session = { membershipId: stored.membershipId, activeRoleName: role.name }
+      saveSession(session)
+      const mem = MOCK_MEMBERSHIPS.find((m) => m.id === stored.membershipId)
+      if (mem) applySession(mem, role.name)
+    },
+    [applySession]
+  )
 
   const effectiveHasPermission = useCallback(
     (permission: Permission) =>
@@ -252,10 +219,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         hasPermission: effectiveHasPermission,
         login,
         logout,
-        refreshAuth,
         switchSchool,
         switchRole,
-        switchContext,
       }}
     >
       {children}
