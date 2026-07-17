@@ -1,6 +1,6 @@
 import { Elysia, t } from "elysia";
 import { API_PREFIX } from "@/shared/constants";
-import { errorHandler, authGuard, checkPermission } from "@/common/middleware";
+import { errorHandler, authGuard, checkPermission, checkPermissionOrGuardian } from "@/common/middleware";
 import {
   getStudentsController,
   getStudentController,
@@ -41,6 +41,8 @@ export const studentRoute = new Elysia({ prefix: P })
       params: t.Object({ schoolId: t.String(), studentId: t.String() }),
       detail: { summary: "Get student profile", tags: ["Students"] },
     })
+  )
+  .guard({ beforeHandle: [checkPermissionOrGuardian("student:read")] }, (app) => app
     .get("/my", getMyStudentsController, {
       params: t.Object({ schoolId: t.String() }),
       detail: { summary: "Get my students (guardian view)", tags: ["Students"] },

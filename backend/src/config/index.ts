@@ -9,4 +9,6 @@ export const MPESA_SHORTCODE = process.env.MPESA_SHORTCODE || ""
 export const MPESA_PASSKEY = process.env.MPESA_PASSKEY || ""
 export const MPESA_ENVIRONMENT = process.env.MPESA_ENVIRONMENT || "sandbox"
 export const MPESA_CALLBACK_URL = process.env.MPESA_CALLBACK_URL || `${EXPOSED_BACKEND}/mpesa/callback`
+export const MPESA_CONFIRMATION_URL = process.env.MPESA_CONFIRMATION_URL || `${EXPOSED_BACKEND}/mpesa/c2b`
+export const MPESA_VALIDATION_URL = process.env.MPESA_VALIDATION_URL || `${EXPOSED_BACKEND}/mpesa/validation`
 export const MPESA_BASE_URL = process.env.MPESA_BASE_URL || "https://sandbox.safaricom.co.ke"

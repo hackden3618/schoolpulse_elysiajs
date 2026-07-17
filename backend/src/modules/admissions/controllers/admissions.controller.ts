@@ -361,8 +361,8 @@ export async function getDownloadUrlHandler(context: {
   )
 }
 
-export async function getStatsHandler() {
-  const stats = await getAdmissionStats()
+export async function getStatsHandler(schoolId: string, authUser: any) {
+  const stats = await getAdmissionStats(schoolId)
   return { success: true, data: stats }
 }
 

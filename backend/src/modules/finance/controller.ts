@@ -84,3 +84,22 @@ export async function mpesaReversalController({ body, set }: any) {
   set.status = 200
   return { ResultCode: 0, ResultDesc: "Success" }
 }
+
+export async function mpesaValidationController({ set }: any) {
+  // Safaricom C2B validation step. Approving every transaction (ResultCode 0)
+  // lets the confirmation/reversal webhook do the real processing.
+  set.status = 200
+  return { ResultCode: 0, ResultDesc: "Accepted" }
+}
+
+export async function mpesaC2BController({ body, set }: any) {
+  // Safaricom C2B confirmation URL — receives BOTH normal paybill payments
+  // and Transaction Reversals. Always 200 so Safaricom stops retrying.
+  try {
+    await svc.processC2BConfirmation(body)
+  } catch (error) {
+    console.error("[FinanceController] Error processing C2B confirmation:", error)
+  }
+  set.status = 200
+  return { ResultCode: 0, ResultDesc: "Success" }
+}

@@ -12,8 +12,8 @@ export async function getStudentController({ params: { schoolId, studentId }, se
   return success(student, schoolId);
 }
 
-export async function createStudentController({ params: { schoolId }, body, set }: any) {
-  const student = await svc.createStudent(schoolId, body);
+export async function createStudentController({ params: { schoolId }, body, authUser, set }: any) {
+  const student = await svc.createStudent(schoolId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
   set.status = 201;
   return success(student, schoolId);
 }
@@ -23,40 +23,40 @@ export async function updateStudentController({ params: { schoolId, studentId },
   return success(student, schoolId);
 }
 
-export async function archiveStudentController({ params: { schoolId, studentId }, body, set }: any) {
-  const student = await svc.archiveStudent(schoolId, studentId, body);
+export async function archiveStudentController({ params: { schoolId, studentId }, body, authUser, set }: any) {
+  const student = await svc.archiveStudent(schoolId, studentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
   return success(student, schoolId);
 }
 
-export async function unarchiveStudentController({ params: { schoolId, studentId } }: any) {
-  const student = await svc.unarchiveStudent(schoolId, studentId);
+export async function unarchiveStudentController({ params: { schoolId, studentId }, authUser }: any) {
+  const student = await svc.unarchiveStudent(schoolId, studentId, { id: authUser?.userId, membershipId: authUser?.membershipId });
   return success(student, schoolId);
 }
 
-export async function linkGuardianController({ params: { schoolId, studentId }, body, set }: any) {
-  const guardian = await svc.linkGuardian(schoolId, studentId, body);
+export async function linkGuardianController({ params: { schoolId, studentId }, body, authUser, set }: any) {
+  const guardian = await svc.linkGuardian(schoolId, studentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
   set.status = 201;
   return success(guardian, schoolId);
 }
 
-export async function unlinkGuardianController({ params: { schoolId, studentId, guardianId }, set }: any) {
-  const result = await svc.unlinkGuardian(schoolId, studentId, guardianId);
+export async function unlinkGuardianController({ params: { schoolId, studentId, guardianId }, authUser, set }: any) {
+  const result = await svc.unlinkGuardian(schoolId, studentId, guardianId, { id: authUser?.userId, membershipId: authUser?.membershipId });
   return success(result, schoolId);
 }
 
-export async function enrollStudentController({ params: { schoolId, studentId }, body, set }: any) {
-  const enrollment = await svc.enrollStudent(schoolId, studentId, body);
+export async function enrollStudentController({ params: { schoolId, studentId }, body, authUser, set }: any) {
+  const enrollment = await svc.enrollStudent(schoolId, studentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
   set.status = 201;
   return success(enrollment, schoolId);
 }
 
-export async function updateEnrollmentController({ params: { schoolId, studentId, enrollmentId }, body, set }: any) {
-  const enrollment = await svc.updateEnrollment(schoolId, studentId, enrollmentId, body);
+export async function updateEnrollmentController({ params: { schoolId, studentId, enrollmentId }, body, authUser, set }: any) {
+  const enrollment = await svc.updateEnrollment(schoolId, studentId, enrollmentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
   return success(enrollment, schoolId);
 }
 
-export async function addGuardianByDetailsController({ params: { schoolId, studentId }, body, set }: any) {
-  const guardian = await svc.addGuardianByDetails(schoolId, studentId, body);
+export async function addGuardianByDetailsController({ params: { schoolId, studentId }, body, authUser, set }: any) {
+  const guardian = await svc.addGuardianByDetails(schoolId, studentId, body, { id: authUser?.userId, membershipId: authUser?.membershipId });
   set.status = 201;
   return success(guardian, schoolId);
 }

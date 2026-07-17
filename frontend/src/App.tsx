@@ -3,6 +3,7 @@ import { LoadingScreen } from "./components/ui/LoadingScreen"
 import { Navigate, Route, Routes, useLocation } from "react-router-dom"
 import { AuthProvider, useAuth } from "./lib/auth-context"
 import { getNavigation } from "./lib/constants"
+import { ToastProvider } from "./components/ui/Toast"
 
 // Auth pages — light, load eagerly
 import { LoginPage } from "./pages/auth/LoginPage"
@@ -18,6 +19,7 @@ import { PlatformLoginPage } from "./pages/platform/PlatformLoginPage"
 const PlatformDashboard = lazy(() => import("./pages/platform/PlatformDashboard").then((m) => ({ default: m.PlatformDashboard })))
 const AppShell = lazy(() => import("./components/shell/AppShell").then((m) => ({ default: m.AppShell })))
 const Dashboard = lazy(() => import("./pages/Dashboard").then((m) => ({ default: m.Dashboard })))
+const ProfilePage = lazy(() => import("./pages/ProfilePage").then((m) => ({ default: m.ProfilePage })))
 const StudentList = lazy(() => import("./pages/students/StudentList").then((m) => ({ default: m.StudentList })))
 const StudentDetail = lazy(() => import("./pages/students/StudentDetail").then((m) => ({ default: m.StudentDetail })))
 const CreateStudent = lazy(() => import("./pages/students/CreateStudent").then((m) => ({ default: m.CreateStudent })))
@@ -39,7 +41,8 @@ const NotFoundPage = lazy(() => import("./pages/NotFoundPage").then((m) => ({ de
 export function App() {
   return (
     <AuthProvider>
-      <Routes>
+      <ToastProvider>
+        <Routes>
         {/* Auth routes (outside AppShell, loaded eagerly) */}
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/forgot-password" element={<ForgotPasswordPage />} />
@@ -69,6 +72,7 @@ export function App() {
                   <Routes>
                     <Route path="/" element={<Navigate to="/dashboard" replace />} />
                     <Route path="/dashboard" element={<Dashboard />} />
+                    <Route path="/profile" element={<ProfilePage />} />
                     <Route path="/students" element={<RoleGuard><StudentList /></RoleGuard>} />
                     <Route path="/students/create" element={<RoleGuard><CreateStudent /></RoleGuard>} />
                     <Route path="/students/import" element={<RoleGuard><BulkImportPage /></RoleGuard>} />
@@ -96,6 +100,7 @@ export function App() {
           </RequireAuth>
         } />
       </Routes>
+      </ToastProvider>
     </AuthProvider>
   )
 }
@@ -108,7 +113,7 @@ function RequireAuth({ children }: { children: React.ReactNode }) {
 }
 
 function RoleGuard({ children }: { children: React.ReactNode }) {
-  const { activeRole, isLoading, isAuthenticated } = useAuth()
+  const { activeRole, isLoading, isAuthenticated, roleNames } = useAuth()
   const location = useLocation()
   if (isLoading) return null
   if (!isAuthenticated) return <Navigate to="/auth/login" replace />
@@ -116,7 +121,7 @@ function RoleGuard({ children }: { children: React.ReactNode }) {
   const isGuardian = activeRole.name === "Guardian"
   // Allow guardians to view individual student profiles
   if (isGuardian && location.pathname.startsWith("/students/") && location.pathname !== "/students") return <>{children}</>
-  const allowed = getNavigation(activeRole.name).flatMap((g) => g.items.map((i) => i.href))
+  const allowed = getNavigation(roleNames, activeRole?.name).flatMap((g) => g.items.map((i) => i.href))
   const isAllowed = allowed.some((path) => location.pathname === path || location.pathname.startsWith(path + "/"))
   if (!isAllowed) return <Navigate to="/dashboard" replace />
   return <>{children}</>

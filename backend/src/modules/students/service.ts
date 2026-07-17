@@ -2,7 +2,7 @@ import { AppError } from "@/common/errors";
 import { hashPassword } from "@/common/auth";
 import { normalizePhone } from "@/common/validation";
 import { prisma } from "@/infrastructure/database/prisma";
-import { writeEventOutbox } from "@/infrastructure/events";
+import { writeEventOutbox, writeAuditLog } from "@/infrastructure/events";
 import { sendSingleSms } from "@/infrastructure/messaging/sms/sms.provider";
 import { HOST } from "@/config";
 import crypto from "crypto";
@@ -33,7 +33,11 @@ export async function getStudentById(schoolId: string, studentId: string) {
   return student;
 }
 
-export async function createStudent(schoolId: string, data: CreateStudentInput) {
+export async function createStudent(
+  schoolId: string,
+  data: CreateStudentInput,
+  authUser?: { id: string; membershipId?: string }
+) {
   const existing = await repo.findStudentByAdmission(schoolId, data.admissionNumber);
   if (existing) {
     throw AppError.conflict("Admission number already exists for this school", [
@@ -195,6 +199,16 @@ export async function createStudent(schoolId: string, data: CreateStudentInput) 
     },
   });
 
+  await writeAuditLog({
+    schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "admit",
+    tableName: "student",
+    recordId: student.id,
+    newValue: { admissionNumber: student.admissionNumber, firstName: student.firstName, lastName: student.lastName },
+  }).catch(() => {});
+
   return repo.findStudentById(schoolId, student.id);
 }
 
@@ -211,7 +225,8 @@ export async function updateStudent(
 export async function archiveStudent(
   schoolId: string,
   studentId: string,
-  data: ArchiveStudentInput
+  data: ArchiveStudentInput,
+  authUser?: { id: string; membershipId?: string }
 ) {
   const student = await repo.findStudentById(schoolId, studentId);
   if (!student) throw AppError.notFound("Student not found");
@@ -236,10 +251,25 @@ export async function archiveStudent(
     payload: { reason: data.reason, details: data.details },
   });
 
+  await writeAuditLog({
+    schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "archive",
+    tableName: "student",
+    recordId: studentId,
+    oldValue: { status: student.status },
+    newValue: { status: "archived", archiveReason: data.reason },
+  }).catch(() => {});
+
   return updated;
 }
 
-export async function unarchiveStudent(schoolId: string, studentId: string) {
+export async function unarchiveStudent(
+  schoolId: string,
+  studentId: string,
+  authUser?: { id: string; membershipId?: string }
+) {
   const student = await repo.findStudentById(schoolId, studentId)
   if (!student) throw AppError.notFound("Student not found")
   if (student.status !== "archived") throw AppError.conflict("Student is not archived")
@@ -256,6 +286,17 @@ export async function unarchiveStudent(schoolId: string, studentId: string) {
     eventType: "StudentTransferred",
     payload: { action: "unarchived" },
   })
+
+  await writeAuditLog({
+    schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "unarchive",
+    tableName: "student",
+    recordId: studentId,
+    oldValue: { status: student.status },
+    newValue: { status: "active" },
+  }).catch(() => {})
 
   return updated
 }
@@ -291,7 +332,8 @@ async function ensureGuardianMembership(schoolId: string, guardianId: string): P
 export async function linkGuardian(
   schoolId: string,
   studentId: string,
-  data: LinkGuardianInput
+  data: LinkGuardianInput,
+  authUser?: { id: string; membershipId?: string }
 ) {
   const student = await repo.findStudentById(schoolId, studentId);
   if (!student) throw AppError.notFound("Student not found");
@@ -337,13 +379,24 @@ export async function linkGuardian(
     payload: { guardianId: data.guardianId, relationship: data.relationship },
   });
 
+  await writeAuditLog({
+    schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "link_guardian",
+    tableName: "student_guardian",
+    recordId: linked.id,
+    newValue: { studentId, guardianId: data.guardianId, relationship: data.relationship },
+  }).catch(() => {});
+
   return linked;
 }
 
 export async function unlinkGuardian(
   schoolId: string,
   studentId: string,
-  guardianId: string
+  guardianId: string,
+  authUser?: { id: string; membershipId?: string }
 ) {
   const student = await repo.findStudentById(schoolId, studentId);
   if (!student) throw AppError.notFound("Student not found");
@@ -364,13 +417,24 @@ export async function unlinkGuardian(
     payload: { guardianId },
   });
 
+  await writeAuditLog({
+    schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "unlink_guardian",
+    tableName: "student_guardian",
+    recordId: `${studentId}:${guardianId}`,
+    oldValue: { studentId, guardianId },
+  }).catch(() => {});
+
   return { message: "Guardian unlinked successfully" };
 }
 
 export async function enrollStudent(
   schoolId: string,
   studentId: string,
-  data: { classInstanceId: string; academicYearId: string; termId?: string }
+  data: { classInstanceId: string; academicYearId: string; termId?: string },
+  authUser?: { id: string; membershipId?: string }
 ) {
   const student = await repo.findStudentById(schoolId, studentId);
   if (!student) throw AppError.notFound("Student not found");
@@ -435,6 +499,16 @@ export async function enrollStudent(
     payload: { classInstanceId: data.classInstanceId, academicYearId: data.academicYearId, action: "enrolled" },
   });
 
+  await writeAuditLog({
+    schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "enroll",
+    tableName: "enrollment",
+    recordId: enrollment?.id ?? "",
+    newValue: { studentId, classInstanceId: data.classInstanceId, academicYearId: data.academicYearId },
+  }).catch(() => {});
+
   return enrollment;
 }
 
@@ -442,7 +516,8 @@ export async function updateEnrollment(
   schoolId: string,
   studentId: string,
   enrollmentId: string,
-  data: UpdateEnrollmentInput
+  data: UpdateEnrollmentInput,
+  authUser?: { id: string; membershipId?: string }
 ) {
   const enrollment = await prisma.enrollment.findFirst({
     where: { id: enrollmentId, schoolId, studentId },
@@ -476,6 +551,16 @@ export async function updateEnrollment(
     },
   });
 
+  await writeAuditLog({
+    schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "update_enrollment",
+    tableName: "enrollment",
+    recordId: enrollmentId,
+    newValue: data,
+  }).catch(() => {});
+
   return updated;
 }
 
@@ -487,7 +572,8 @@ export async function updateEnrollment(
 export async function addGuardianByDetails(
   schoolId: string,
   studentId: string,
-  data: AddGuardianByDetailsInput
+  data: AddGuardianByDetailsInput,
+  authUser?: { id: string; membershipId?: string }
 ) {
   const student = await repo.findStudentById(schoolId, studentId);
   if (!student) throw AppError.notFound("Student not found");
@@ -567,6 +653,16 @@ export async function addGuardianByDetails(
     eventType: "GuardianAdded",
     payload: { guardianId: guardianUser.id, relationship: data.relationship },
   });
+
+  await writeAuditLog({
+    schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "link_guardian",
+    tableName: "student_guardian",
+    recordId: linked.id,
+    newValue: { studentId, guardianId: guardianUser.id, relationship: data.relationship },
+  }).catch(() => {});
 
   return linked;
 }

@@ -10,6 +10,12 @@ export const loginSchema = t.Object({
 export const switchSchoolSchema = t.Object({
   membershipId: t.Optional(t.String({ format: "uuid" })),
   schoolId: t.Optional(t.String({ format: "uuid" })),
+  sessionId: t.Optional(t.String()),
+  roleName: t.Optional(t.String({ minLength: 1, maxLength: 100 })),
+})
+
+export const switchRoleSchema = t.Object({
+  roleName: t.String({ minLength: 1, maxLength: 100 }),
 })
 
 export const registerSchema = t.Object({

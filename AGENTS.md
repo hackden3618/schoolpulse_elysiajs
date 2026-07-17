@@ -464,7 +464,37 @@ A task is complete only when:
 
 ---
 
-# 20. Guiding Principle
+# 20. Engineering Method
+
+The product-first, workflow-first method is mandatory. It operationalizes
+`ENGINEERING_DOCS/SYSTEM_STORY.md` (the "why") into the sequence every feature
+must follow before implementation.
+
+Full rules: `ENGINEERING_DOCS/ENGINEERING_METHOD.md`
+
+Key mandates:
+
+• Features are business capabilities, not CRUD pages. Name the real-world
+  event, not the table.
+
+• The four actors are Platform, School, People, Academic Records. Every feature
+  maps to them.
+
+• Every feature passes the ten-question intake sequence (event, actor,
+  changed entities, immutable records, historical records, emitted events,
+  notifications, immediate UI feedback, auditability, API contract).
+
+• Permissions determine behaviour, not roles. Navigation is generated from
+  permissions; if a permission disappears, the page disappears.
+
+• The frontend is a projection of backend state. Business rules, authorization,
+  and validation always live in the backend.
+
+• School isolation is mandatory and enforced at the school-context layer.
+
+---
+
+# 21. Guiding Principle
 
 Every change should make the project feel like it was built by
 a disciplined engineering team over many years.
@@ -545,5 +575,6 @@ Create one.
 
 If not:
 
-Document first.
-Code second.
+Apply the Engineering Method (`ENGINEERING_DOCS/ENGINEERING_METHOD.md`):
+answer the ten-question intake sequence, then document the feature and code it.
+Document first. Code second.

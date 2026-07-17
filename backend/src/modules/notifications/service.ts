@@ -264,5 +264,12 @@ export async function markMessageRead(schoolId: string, messageId: string, userI
 
   wsManager.broadcastToConversation(message.conversationId!, "receipt:updated", message)
 
+  // Keep the recipient's unread badge accurate in real time. The count is
+  // scoped to the caller so a tampered userId cannot read another user's total.
+  const remainingUnread = await prisma.messageReceipt.count({
+    where: { schoolId, recipientUserId: userId, status: { not: "read" } },
+  })
+  wsManager.broadcastToUser(userId, "UnreadCountChanged", { unreadCount: remainingUnread })
+
   return { success: true }
 }

@@ -137,11 +137,36 @@ export const authApi = {
         }),
     listMemberships: () =>
         request<ApiResponse<{ memberships: Membership[]; schools: School[] }>>("/auth/memberships"),
-    switchSchool: (data: { membershipId?: string; schoolId?: string }) =>
+    switchSchool: (data: { membershipId?: string; schoolId?: string; roleName?: string; sessionId?: string }) =>
         request<ApiResponse<{ accessToken: string; refreshToken: string; membership: Membership; school: School }>>("/auth/switch-school", {
             method: "POST",
             body: JSON.stringify(data),
         }),
+    switchRole: (data: { roleName: string; sessionId?: string }) =>
+        request<ApiResponse<{ accessToken: string; refreshToken: string }>>("/auth/switch-role", {
+            method: "POST",
+            body: JSON.stringify(data),
+        }),
+}
+
+// Decodes the JWT payload (header.payload.signature) without verifying the
+// signature — used only to read non-trust-critical claims (activeRole,
+// sessionId) that the backend re-issues authoritatively.
+export function getTokenClaims(): { sub?: string; activeRole?: string; sessionId?: string; roles?: string[] } | null {
+    try {
+        const raw = localStorage.getItem("schoolpulse:auth")
+        if (!raw) return null
+        const token = JSON.parse(raw)?.accessToken as string | undefined
+        if (!token) return null
+        const payload = token.split(".")[1]
+        if (!payload) return null
+        const json = typeof atob === "function"
+            ? atob(payload)
+            : Buffer.from(payload, "base64").toString("utf-8")
+        return JSON.parse(json)
+    } catch {
+        return null
+    }
 }
 
 /* =========================================================================
@@ -237,6 +262,15 @@ export const usersApi = {
         request<ApiResponse<{ message: string }>>(`/schools/${schoolId}/users/${userId}`, {
             method: "DELETE",
         }),
+    me: {
+        get: (schoolId: string) =>
+            request<ApiResponse<User>>(`/schools/${schoolId}/users/me`),
+        update: (schoolId: string, data: Partial<User>) =>
+            request<ApiResponse<User>>(`/schools/${schoolId}/users/me`, {
+                method: "PATCH",
+                body: JSON.stringify(data),
+            }),
+    },
 }
 
 export const membershipsApi = {

@@ -8,6 +8,8 @@ import {
   createUserController,
   updateUserController,
   deleteUserController,
+  getSelfController,
+  updateSelfController,
   getMembershipsController,
   searchMembersController,
   createMembershipController,
@@ -25,6 +27,15 @@ import {
 const userRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:schoolId/users` })
   .use(errorHandler)
   .use(authGuard)
+  .get("/me", getSelfController, {
+    params: t.Object({ schoolId: t.String() }),
+    detail: { summary: "Get own profile (self-service)", tags: ["Users"] },
+  })
+  .patch("/me", updateSelfController, {
+    params: t.Object({ schoolId: t.String() }),
+    body: updateUserSchema,
+    detail: { summary: "Update own profile (self-service)", tags: ["Users"] },
+  })
   .guard({ beforeHandle: [checkPermission("user:read")] }, (app) => app
     .get("/", getUsersController, {
       params: t.Object({ schoolId: t.String() }),

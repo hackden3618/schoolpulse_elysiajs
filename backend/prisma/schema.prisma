@@ -305,6 +305,8 @@ enum AggregateType {
     subscription
     join_request
     platform_admin
+    message_template
+    notification_preference
 
     @@map("aggregate_type")
 }
@@ -341,6 +343,8 @@ enum EventType {
     PlatformAdminCreated
     SchoolDeleted
     SchoolClaimed
+
+    BroadcastSent
 
     @@map("event_type")
 }
@@ -473,6 +477,7 @@ model User {
     createdSupportTickets    SupportTicket[]
     supportTicketMessages    SupportTicketMessage[]
     createdImportSessions    ImportSession[]
+    notificationPreferences  NotificationPreference[]
 
     @@map("users")
 }
@@ -552,6 +557,8 @@ model School {
     smsWallet                SmsWallet?
     supportTickets           SupportTicket[]
     importSessions           ImportSession[]
+    messageTemplates         MessageTemplate[]
+    notificationPreferences  NotificationPreference[]
 
     @@unique([schoolName, schoolLevel, schoolPhone, schoolEmail])
 
@@ -1254,6 +1261,8 @@ model ConversationParticipant {
 
     participantType String @map("participant_type")
 
+    lastReadAt DateTime? @map("last_read_at") @db.Timestamptz(6)
+
     createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
     updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
     deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -1281,6 +1290,9 @@ model Message {
     payload     Json            @default("{}")
     isLatest    Boolean         @default(true) @map("is_latest")
 
+    scheduledAt DateTime? @map("scheduled_at") @db.Timestamptz(6)
+    sentAt      DateTime? @map("sent_at") @db.Timestamptz(6)
+
     createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
     updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
     deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -1293,6 +1305,8 @@ model Message {
     receipts MessageReceipt[]
 
     @@index([schoolId, createdAt(sort: Desc)], map: "idx_messages_school_created")
+    @@index([schoolId, channel, messageType, createdAt(sort: Desc)], map: "idx_messages_search")
+    @@index([schoolId, scheduledAt, sentAt], map: "idx_messages_scheduled")
     @@map("messages")
 }
 
@@ -1315,6 +1329,44 @@ model MessageReceipt {
     recipientUser User?   @relation(fields: [recipientUserId], references: [id], onDelete: Cascade)
 
     @@map("message_receipts")
+}
+
+model MessageTemplate {
+    id        String   @id @default(uuid()) @db.Uuid
+    schoolId  String   @map("school_id") @db.Uuid
+    name      String
+    content   String
+    channel   MessageChannel @default(sms)
+    variables Json?
+
+    createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+    deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+    school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+    @@unique([schoolId, name])
+    @@map("message_templates")
+}
+
+model NotificationPreference {
+    id      String @id @default(uuid()) @db.Uuid
+    userId  String @map("user_id") @db.Uuid
+    schoolId String @map("school_id") @db.Uuid
+
+    channel        MessageChannel
+    enabled        Boolean   @default(true)
+    quietHoursStart DateTime? @map("quiet_hours_start")
+    quietHoursEnd   DateTime? @map("quiet_hours_end")
+
+    createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+    updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+    user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+    school School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+    @@unique([userId, schoolId, channel])
+    @@map("notification_preferences")
 }
 
 /**

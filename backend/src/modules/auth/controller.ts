@@ -48,8 +48,8 @@ export async function listJoinRequestsController({ set }: any) {
   return success(result)
 }
 
-export async function approveJoinRequestController({ params, authUser, set }: any) {
-  const result = await svc.approveJoinRequest(params.id, authUser.userId)
+export async function approveJoinRequestController({ params, platformAdmin, set }: any) {
+  const result = await svc.approveJoinRequest(params.id, platformAdmin.id)
   return success(result)
 }
 
@@ -60,5 +60,14 @@ export async function listMembershipsController({ authUser }: any) {
 
 export async function switchSchoolController({ body, authUser }: any) {
   const result = await svc.switchSchool(authUser.userId, body)
+  return success(result)
+}
+
+export async function switchRoleController({ body, authUser }: any) {
+  const result = await svc.switchRole(authUser.userId, {
+    ...body,
+    sessionId: authUser.sessionId,
+    membershipId: authUser.membershipId,
+  })
   return success(result)
 }

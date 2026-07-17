@@ -548,7 +548,12 @@ export function AdminDashboard() {
         </div>
       </div>
 
-      {showRoleSwitcher && <RoleSwitcherModal onClose={() => setShowRoleSwitcher(false)} />}
+      {showRoleSwitcher && (
+        <RoleSwitcherModal onClose={() => {
+          setShowRoleSwitcher(false)
+          navigate(".", { replace: true, state: { ...(location.state as object), promptRoleSwitch: undefined } })
+        }} />
+      )}
     </div>
   )
 }

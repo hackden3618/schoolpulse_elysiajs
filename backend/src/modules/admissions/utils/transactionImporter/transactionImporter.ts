@@ -58,9 +58,22 @@ export class TransactionImporter {
                 result.skipped++
                 continue
               } else if (this.strategy === "replace") {
-                await tx.studentGuardian.deleteMany({ where: { studentId: existingStudent.id } })
-                await tx.enrollment.deleteMany({ where: { studentId: existingStudent.id } })
-                await tx.student.delete({ where: { id: existingStudent.id } })
+                // Immutability: do NOT hard-delete history. Soft-archive the
+                // existing student (and its guardian links / enrollments) and
+                // create a fresh record. The old history remains queryable for
+                // audits and rollbacks.
+                await tx.studentGuardian.updateMany({
+                  where: { studentId: existingStudent.id, deletedAt: null },
+                  data: { deletedAt: new Date() },
+                })
+                await tx.enrollment.updateMany({
+                  where: { studentId: existingStudent.id, deletedAt: null },
+                  data: { deletedAt: new Date() },
+                })
+                await tx.student.update({
+                  where: { id: existingStudent.id },
+                  data: { deletedAt: new Date() },
+                })
 
                 const created = await tx.student.create({
                   data: {

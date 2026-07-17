@@ -59,32 +59,57 @@ export async function getAttendanceReport(schoolId: string) {
 }
 
 export async function getFinanceReport(schoolId: string) {
-  const [invoiceAgg, paymentAgg, invoicesByStatus] = await Promise.all([
+  const [totalInvoicedAgg, paymentAgg, invoices, paidByInvoice] = await Promise.all([
     prisma.invoice.aggregate({
       where: { schoolId, deletedAt: null },
-      _sum: { totalAmount: true, paidAmount: true, balance: true },
+      _sum: { totalAmount: true },
     }),
     prisma.payment.aggregate({
       where: { schoolId, status: "confirmed" },
       _sum: { amount: true },
     }),
-    prisma.invoice.groupBy({
-      by: ["status"],
+    prisma.invoice.findMany({
       where: { schoolId, deletedAt: null },
-      _count: { id: true },
-      _sum: { totalAmount: true, balance: true },
+      select: { id: true, totalAmount: true },
+    }),
+    prisma.paymentAllocation.groupBy({
+      by: ["invoiceId"],
+      where: {
+        payment: { status: "confirmed" },
+        invoice: { schoolId, deletedAt: null },
+      },
+      _sum: { amount: true },
     }),
   ])
 
+  const paidMap = new Map(paidByInvoice.map((a) => [a.invoiceId, Number(a._sum.amount ?? 0)]))
+  const totalInvoiced = Number(totalInvoicedAgg._sum.totalAmount ?? 0)
+  const totalPaid = paidByInvoice.reduce((sum, a) => sum + Number(a._sum.amount ?? 0), 0)
+  const totalOutstanding = totalInvoiced - totalPaid
+
+  const statusBuckets: Record<string, { count: number; totalAmount: number; outstanding: number }> = {}
+  for (const inv of invoices) {
+    const paid = paidMap.get(inv.id) ?? 0
+    const total = Number(inv.totalAmount)
+    const bal = total - paid
+    const status = bal <= 0 ? "paid" : paid > 0 ? "partially_paid" : "issued"
+    if (!statusBuckets[status]) {
+      statusBuckets[status] = { count: 0, totalAmount: 0, outstanding: 0 }
+    }
+    statusBuckets[status].count++
+    statusBuckets[status].totalAmount += total
+    statusBuckets[status].outstanding += Math.max(0, bal)
+  }
+
   return {
-    totalInvoiced: invoiceAgg._sum.totalAmount ?? 0,
-    totalCollected: paymentAgg._sum.amount ?? 0,
-    totalOutstanding: invoiceAgg._sum.balance ?? 0,
-    invoicesByStatus: invoicesByStatus.map((g) => ({
-      status: g.status,
-      count: g._count.id,
-      totalAmount: g._sum.totalAmount ?? 0,
-      outstanding: g._sum.balance ?? 0,
+    totalInvoiced,
+    totalCollected: Number(paymentAgg._sum.amount ?? 0),
+    totalOutstanding: Math.max(0, totalOutstanding),
+    invoicesByStatus: Object.entries(statusBuckets).map(([status, data]) => ({
+      status,
+      count: data.count,
+      totalAmount: data.totalAmount,
+      outstanding: data.outstanding,
     })),
   }
 }

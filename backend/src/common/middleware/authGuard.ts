@@ -5,6 +5,8 @@ import type { JwtPayload } from "@/shared/jwt"
 export interface AuthUser extends JwtPayload {
   userId: string
   membershipId?: string | null
+  sessionId?: string
+  activeRole?: string | null
 }
 
 export function authGuard(app: any): any {
@@ -28,6 +30,8 @@ export function authGuard(app: any): any {
       schoolId: payload.schoolId,
       membershipId: payload.membershipId,
       roles: payload.roles,
+      sessionId: payload.sessionId,
+      activeRole: payload.activeRole ?? null,
     }
 
     const routeSchoolId = params?.schoolId

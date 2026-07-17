@@ -27,7 +27,12 @@ export class FinanceMapper {
     }
   }
 
-  static toInvoiceDTO(entity: any) {
+  static toInvoiceDTO(entity: any, ledgerFields?: { paidAmount: number; balance: number; status: string }) {
+    const paidAmount = ledgerFields?.paidAmount ?? Number(entity.paidAmount ?? 0)
+    const totalAmount = Number(entity.totalAmount ?? 0)
+    const balance = ledgerFields?.balance ?? (ledgerFields ? totalAmount - paidAmount : Number(entity.balance ?? totalAmount))
+    const status = ledgerFields?.status ?? entity.status
+
     return {
       id: entity.id,
       schoolId: entity.schoolId,
@@ -35,10 +40,10 @@ export class FinanceMapper {
       enrollmentId: entity.enrollmentId ?? null,
       termId: entity.termId,
       feeStructureId: entity.feeStructureId ?? null,
-      totalAmount: Number(entity.totalAmount),
-      paidAmount: Number(entity.paidAmount),
-      balance: Number(entity.balance),
-      status: entity.status,
+      totalAmount,
+      paidAmount,
+      balance: Math.max(0, balance),
+      status,
       isCurrent: entity.isCurrent ?? false,
       dueDate: entity.dueDate ?? entity.createdAt,
       createdAt: entity.createdAt,

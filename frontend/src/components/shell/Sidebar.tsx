@@ -20,9 +20,9 @@ interface SidebarProps {
 export function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, school, logout, activeRole } = useAuth()
+  const { user, school, logout, activeRole, roleNames } = useAuth()
   const { unreadCount } = useUnread()
-  const navGroups = getNavigation(activeRole?.name)
+  const navGroups = getNavigation(roleNames, activeRole?.name)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(
     () => new Set(navGroups.map((g) => g.label))
   )

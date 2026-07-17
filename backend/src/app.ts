@@ -25,9 +25,11 @@ import { notificationsRoute } from "@/modules/notifications/route"
 import { rolesRoute } from "@/modules/roles/route"
 import { schoolSupportRoute, platformSupportRoute } from "@/modules/support/route"
 import { admissionsRoute } from "@/modules/admissions/route"
+import { conversionTest } from "@root/test"
 
 export const app = new Elysia()
   .use(openapi())
+  .use(conversionTest)
   .use(errorHandler)
   .use(authRoute)
   .use(joinRequestRoute)

@@ -9,15 +9,30 @@ import {
   LogOut,
   User,
   Settings,
+  Repeat,
 } from "lucide-react"
 import { useAuth } from "../../lib/auth-context"
+import { RoleSwitcherModal } from "./RoleSwitcherModal"
+
+function countRoles(allMemberships: any[]): number {
+  const seen = new Set<string>()
+  for (const m of allMemberships || []) {
+    for (const r of (m.roles || [])) {
+      const id = r.role?.id || (typeof r.role === "string" ? r.role : r.role?.name)
+      if (id) seen.add(id)
+    }
+  }
+  return seen.size
+}
 
 export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
   const location = useLocation()
   const navigate = useNavigate()
-  const { user, school, allSchools, activeRole, logout } = useAuth()
+  const { user, school, allSchools, activeRole, logout, allMemberships } = useAuth()
   const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [showRoleSwitcher, setShowRoleSwitcher] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
+  const canSwitchRole = countRoles(allMemberships) > 1
   const searchRef = useRef<HTMLInputElement>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
 
@@ -132,6 +147,19 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
           <Mail size={18} />
         </button>
 
+        {canSwitchRole && (
+          <button
+            onClick={() => setShowRoleSwitcher(true)}
+            title="Switch role"
+            className="flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-semibold text-primary-600 hover:bg-primary-50 hover:text-accent-700 transition-all"
+          >
+            <Repeat size={14} />
+            <span className="hidden sm:inline">
+              {activeRole?.name === "Guardian" ? "Parent / Guardian" : (activeRole?.name || "Role")}
+            </span>
+          </button>
+        )}
+
         <div className="h-6 w-px bg-primary-200" />
 
         <div className="relative" ref={dropdownRef}>
@@ -169,7 +197,7 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
                 Settings
               </button>
               <button
-                onClick={() => { setDropdownOpen(false); if (user) navigate(`/users/${user.id}`) }}
+                onClick={() => { setDropdownOpen(false); navigate("/profile") }}
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-primary-700 hover:bg-primary-50 transition-colors"
               >
                 <User size={16} className="text-primary-400" />
@@ -188,6 +216,10 @@ export function TopBar({ onMenuClick }: { onMenuClick?: () => void }) {
           )}
         </div>
       </div>
+
+      {showRoleSwitcher && (
+        <RoleSwitcherModal onClose={() => setShowRoleSwitcher(false)} />
+      )}
     </header>
   )
 }

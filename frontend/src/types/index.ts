@@ -360,11 +360,13 @@ export interface Conversation {
   subject: string | null
   createdAt: string
   updatedAt: string
+  unreadCount: number
   participants: {
     id: string
     userId: string | null
     membershipId: string | null
     participantType: string
+    lastReadAt: string | null
     user: { id: string; firstName: string; lastName: string; phone: string } | null
     membership: { id: string; userId: string; user: { id: string; firstName: string; lastName: string } } | null
   }[]
@@ -384,6 +386,8 @@ export interface Message {
   content: string
   payload: Record<string, unknown>
   isLatest: boolean
+  scheduledAt: string | null
+  sentAt: string | null
   createdAt: string
   updatedAt: string
   sender: {
@@ -523,6 +527,7 @@ export interface AuthState {
   isLoading: boolean
   activeRole: Role | null
   roles: Role[]
+  roleNames: string[]
   allMemberships: Membership[]
   allSchools: School[]
 }
@@ -675,4 +680,87 @@ export interface ImportSession {
   completedAt: string | null
   createdAt: string
   updatedAt: string
+}
+
+export interface MessageTemplate {
+  id: string
+  schoolId: string
+  name: string
+  content: string
+  channel: string
+  variables: string[] | null
+  createdAt: string
+  updatedAt: string
+}
+
+export interface BroadcastInput {
+  content: string
+  channel: "in_app" | "sms"
+  priority?: "low" | "normal" | "high" | "urgent"
+  subject?: string
+  scheduledAt?: string | null
+  audience: {
+    roles?: string[]
+    classIds?: string[]
+    studentIds?: string[]
+    allMembers?: boolean
+  }
+}
+
+export interface BroadcastResult {
+  conversation: Conversation
+  message: Message
+  recipientCount: number
+  scheduledAt: string | null
+}
+
+export interface BroadcastStats {
+  messageId: string
+  subject: string | null
+  channel: string
+  createdAt: string
+  scheduledAt: string | null
+  sentAt: string | null
+  stats: {
+    total: number
+    sent: number
+    delivered: number
+    failed: number
+    read: number
+    pending: number
+  }
+}
+
+export interface DeliveryReport {
+  id: string
+  messageId: string
+  recipientUserId: string | null
+  status: string
+  channel: string
+  createdAt: string
+  recipientUser: { id: string; firstName: string; lastName: string; phone: string } | null
+  message: { id: string; subject: string | null; content: string; channel: string }
+}
+
+export interface DeliveryStats {
+  sent: number
+  delivered: number
+  failed: number
+  read: number
+  pending: number
+  total: number
+}
+
+export interface NotificationPreference {
+  channel: string
+  enabled: boolean
+  quietHoursStart: string | null
+  quietHoursEnd: string | null
+}
+
+export interface PaginatedResult<T> {
+  data: T[]
+  total: number
+  page: number
+  pageSize: number
 }

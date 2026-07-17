@@ -16,8 +16,13 @@ import { EmptyState } from "../../components/ui/EmptyState"
 import { GuardianMpesaModal as MpesaPaymentModal } from "../../components/finance/GuardianMpesaModal"
 import type { Student, Invoice, Guardian } from "../../types"
 
-function primaryGuardianPhone(student: Student): string | undefined {
-  const primary = student.guardians.find((g) => g.isPrimary && g.canPay) ?? student.guardians.find((g) => g.canPay)
+function primaryGuardianPhone(student: Student, userPhone?: string): string | undefined {
+  // Prefer the in-context user's own registered number (the line that will
+  // authorize the STK push). Fall back to the student's primary paying
+  // guardian only when the user has no phone on file.
+  if (userPhone) return userPhone
+  const guardians = student.guardians ?? []
+  const primary = guardians.find((g) => g.isPrimary && g.canPay) ?? guardians.find((g) => g.canPay)
   return primary?.guardian.phone
 }
 
@@ -94,7 +99,7 @@ export function GuardianPaymentsPage() {
       ) : !activeStudent ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {students.map((s) => {
-            const phone = primaryGuardianPhone(s)
+              const phone = primaryGuardianPhone(s, user?.phone)
             return (
               <button
                 key={s.id}
@@ -242,7 +247,7 @@ export function GuardianPaymentsPage() {
           invoices={invoices}
           studentId={activeStudent.id}
           studentName={`${activeStudent.firstName} ${activeStudent.lastName}`}
-          guardianPhone={primaryGuardianPhone(activeStudent)}
+          guardianPhone={primaryGuardianPhone(activeStudent, user?.phone)}
           preselectedIds={preselectId ? [preselectId] : null}
           onClose={() => setPayOpen(false)}
           onSuccess={() => activeStudent && loadInvoices(activeStudent)}

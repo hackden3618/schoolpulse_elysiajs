@@ -8,6 +8,10 @@ export interface JwtPayload {
   schoolId: string
   membershipId?: string | null
   roles: string[]
+  /** Stable per-login session identifier for tracing and session management. */
+  sessionId?: string
+  /** The role currently assumed by the user (view/switch context). */
+  activeRole?: string | null
   joinRequestId?: string
 }
 

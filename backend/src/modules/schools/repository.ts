@@ -19,6 +19,21 @@ export async function findAllSchools() {
   });
 }
 
+/**
+ * Returns only the schools a specific user belongs to. The global school list
+ * is scoped this way so a low-privilege member (e.g. a Guardian) can never
+ * enumerate other tenants' profiles — school isolation is mandatory.
+ */
+export async function findSchoolsByUserId(userId: string) {
+  const memberships = await prisma.schoolMembership.findMany({
+    where: { userId, deletedAt: null, status: "active" },
+    select: { school: { include: schoolInclude } },
+  });
+  return memberships
+    .map((m: any) => m.school)
+    .filter((s: any) => s && s.deletedAt === null);
+}
+
 export async function findSchoolById(id: string) {
   return prisma.school.findFirst({
     where: { id, deletedAt: null },

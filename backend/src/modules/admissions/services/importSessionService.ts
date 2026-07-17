@@ -122,8 +122,9 @@ export async function deleteImportSession(sessionId: string) {
   return prisma.importSession.delete({ where: { id: sessionId } })
 }
 
-export async function getAdmissionStats() {
+export async function getAdmissionStats(schoolId: string) {
   const sessions = await prisma.importSession.findMany({
+    where: { schoolId },
     select: { status: true, totalRows: true, importedRows: true },
   })
 

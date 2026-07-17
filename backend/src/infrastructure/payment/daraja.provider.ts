@@ -4,6 +4,8 @@ import {
   MPESA_SHORTCODE,
   MPESA_PASSKEY,
   MPESA_CALLBACK_URL,
+  MPESA_CONFIRMATION_URL,
+  MPESA_VALIDATION_URL,
   MPESA_BASE_URL,
 } from "@/config"
 import { AppError } from "@/common/errors"
@@ -132,6 +134,54 @@ export class DarajaProvider {
     } catch (error: any) {
       console.error("[DarajaProvider] Failed to query STK push:", error)
       throw AppError.internal(error.message || "Failed to query payment status")
+    }
+  }
+
+  /**
+   * Registers the C2B Confirmation and Validation URLs with Safaricom.
+   *
+   * This is what makes M-Pesa Transaction Reversals (chargebacks / timeouts)
+   * reach our system: Safaricom pushes them to the Confirmation URL. Without
+   * this registration the reversal never arrives and a reversed payment stays
+   * marked as confirmed (fees wrongly shown as paid).
+   *
+   * `ResponseType: "Completed"` tells Daraja to deliver the transaction to our
+   * Confirmation URL first and queue it if we are briefly unreachable.
+   */
+  static async registerC2BUrls() {
+    const token = await this.getAccessToken()
+
+    const payload = {
+      ShortCode: MPESA_SHORTCODE,
+      ResponseType: "Completed",
+      ConfirmationURL: MPESA_CONFIRMATION_URL,
+      ValidationURL: MPESA_VALIDATION_URL,
+    }
+
+    try {
+      const response = await fetch(`${MPESA_BASE_URL}/mpesa/c2b/v1/registerurl`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      })
+
+      const data: any = await response.json()
+      if (data.ResponseCode !== "0") {
+        throw new Error(`Daraja C2B register error: ${data.errorMessage || data.ResponseDescription}`)
+      }
+      console.info("[DarajaProvider] C2B URLs registered:", {
+        confirmation: MPESA_CONFIRMATION_URL,
+        validation: MPESA_VALIDATION_URL,
+      })
+      return data
+    } catch (error: any) {
+      // Non-fatal: the app can still initiate STK pushes and process callbacks.
+      // Reversals/C2B payments will simply not be delivered until the URLs
+      // are registered (done once via the Daraja portal or this call).
+      console.warn("[DarajaProvider] C2B URL registration skipped:", error?.message || error)
     }
   }
 }

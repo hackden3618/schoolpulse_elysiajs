@@ -7,7 +7,7 @@ export function checkPermission(permission: Permission) {
     if (!authUser) {
       throw AppError.unauthenticated("Authentication required")
     }
-    if (!hasPermission(authUser.roles || [], permission)) {
+    if (!hasPermission(authUser.roles || [], permission, authUser.activeRole)) {
       throw AppError.forbidden(`Requires ${permission}`)
     }
   }
@@ -19,7 +19,7 @@ export function requirePermission(permission: Permission) {
       if (!authUser) {
         throw AppError.unauthenticated("Authentication required")
       }
-      if (!hasPermission(authUser.roles || [], permission)) {
+      if (!hasPermission(authUser.roles || [], permission, authUser.activeRole)) {
         throw AppError.forbidden(`Requires ${permission}`)
       }
       return {}
@@ -49,7 +49,7 @@ export function checkPermissionOrGuardianOfStudent(permission: Permission) {
     if (!authUser) {
       throw AppError.unauthenticated("Authentication required")
     }
-    if (hasPermission(authUser.roles || [], permission)) {
+    if (hasPermission(authUser.roles || [], permission, authUser.activeRole)) {
       return
     }
     const studentId: string | undefined = params?.studentId
@@ -61,6 +61,34 @@ export function checkPermissionOrGuardianOfStudent(permission: Permission) {
       where: {
         schoolId: authUser.schoolId,
         studentId,
+        guardianId: authUser.userId,
+        deletedAt: null,
+      },
+    })
+    if (!link) {
+      throw AppError.forbidden(`Requires ${permission}`)
+    }
+  }
+}
+
+/**
+ * Allows the request when the caller holds `permission` OR is a guardian in the
+ * active school (regardless of assigned roles). Used for "my students" style
+ * endpoints that have no specific `studentId` param but must be reachable by a
+ * parent viewing their own children.
+ */
+export function checkPermissionOrGuardian(permission: Permission) {
+  return async function guard({ authUser }: { authUser?: AuthUser }) {
+    if (!authUser) {
+      throw AppError.unauthenticated("Authentication required")
+    }
+    if (hasPermission(authUser.roles || [], permission, authUser.activeRole)) {
+      return
+    }
+    const { prisma } = await import("@/infrastructure/database/prisma")
+    const link = await prisma.studentGuardian.findFirst({
+      where: {
+        schoolId: authUser.schoolId,
         guardianId: authUser.userId,
         deletedAt: null,
       },

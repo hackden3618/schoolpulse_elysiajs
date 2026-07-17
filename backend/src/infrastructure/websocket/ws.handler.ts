@@ -8,7 +8,8 @@ interface WsMessage {
 }
 
 export function handleWsOpen(ws: WebSocket, userId: string, schoolId: string, isPlatformAdmin: boolean = false): WsClient {
-  return wsManager.register(ws, userId, schoolId, isPlatformAdmin)
+  const client = wsManager.register(ws, userId, schoolId, isPlatformAdmin)
+  return client
 }
 
 export function handleWsMessage(client: WsClient, raw: string | Buffer) {
@@ -39,24 +40,26 @@ export function handleWsMessage(client: WsClient, raw: string | Buffer) {
     case "ping":
       client.ws.send(JSON.stringify({ event: "pong" }))
       break
+    case "presence:sync":
+      if (typeof parsed.data?.schoolId === "string") {
+        const onlineUsers = wsManager.getOnlineUsers(parsed.data.schoolId)
+        client.ws.send(JSON.stringify({ event: "presence:sync", data: { users: onlineUsers } }))
+      }
+      break
     case "typing:start":
+    case "UserTypingStarted":
       if (typeof parsed.data?.conversationId === "string" && typeof parsed.data?.displayName === "string") {
-        wsManager.broadcastToConversationExcept(
-          parsed.data.conversationId,
-          "typing:indicator",
-          { conversationId: parsed.data.conversationId, userId: client.userId, displayName: parsed.data.displayName, typing: true },
-          client.userId
-        )
+        const payload = { conversationId: parsed.data.conversationId, userId: client.userId, displayName: parsed.data.displayName, typing: true }
+        wsManager.broadcastToConversationExcept(parsed.data.conversationId, "typing:indicator", payload, client.userId)
+        wsManager.broadcastToConversationExcept(parsed.data.conversationId, "UserTypingStarted", payload, client.userId)
       }
       break
     case "typing:stop":
+    case "UserTypingStopped":
       if (typeof parsed.data?.conversationId === "string") {
-        wsManager.broadcastToConversationExcept(
-          parsed.data.conversationId,
-          "typing:indicator",
-          { conversationId: parsed.data.conversationId, userId: client.userId, typing: false },
-          client.userId
-        )
+        const payload = { conversationId: parsed.data.conversationId, userId: client.userId, typing: false }
+        wsManager.broadcastToConversationExcept(parsed.data.conversationId, "typing:indicator", payload, client.userId)
+        wsManager.broadcastToConversationExcept(parsed.data.conversationId, "UserTypingStopped", payload, client.userId)
       }
       break
     default:

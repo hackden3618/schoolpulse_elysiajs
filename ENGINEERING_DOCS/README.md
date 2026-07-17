@@ -17,6 +17,7 @@ The binary Word files in this directory are treated as legacy drafts. The Markdo
 
 | Document | Audience | Purpose |
 | --- | --- | --- |
+| `ENGINEERING_METHOD.md` | Backend, frontend, AI agents | Operationalizes `SYSTEM_STORY.md` into the mandatory feature-intake sequence (ten questions), four-actor model, capability-not-CRUD rule, and permission-driven navigation. |
 | `SCHOOLPULSE_PROJECT_CHARTER.MD` | Everyone | Defines the product mission, v1.1.0 scope boundary, operating principles, and document governance. |
 | `SchoolPulse_ProductDocument_v1.1.0.md` | Sales, founders, school leaders, investors | Non-technical product, pitch, pricing, ROI, onboarding, objection handling, and demo guide. |
 | `SchoolPulse_Engineering_Spec_v1.1.0.md` | Backend, frontend, QA, DevOps | Architecture, modules, domain model, REST API, events, security, coding standards, deployment, testing, and implementation rules. |

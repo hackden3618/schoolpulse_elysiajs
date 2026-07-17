@@ -81,6 +81,23 @@ export async function findInvoices(schoolId: string, studentId?: string) {
   return prisma.invoice.findMany({ where, include: invoiceInclude, orderBy: { createdAt: "desc" } })
 }
 
+/**
+ * A student's current, not-fully-paid invoices, oldest first — used to apply a
+ * walk-in C2B payment FIFO across what the student still owes.
+ */
+export async function findOutstandingInvoicesForStudent(schoolId: string, studentId: string) {
+  return prisma.invoice.findMany({
+    where: {
+      schoolId,
+      studentId,
+      deletedAt: null,
+      status: { in: ["issued", "partially_paid", "overdue"] },
+      balance: { gt: 0 },
+    },
+    orderBy: { createdAt: "asc" },
+  })
+}
+
 export async function findGuardianStudentLink(schoolId: string, studentId: string, userId: string) {
   return prisma.studentGuardian.findFirst({
     where: { schoolId, studentId, guardianId: userId, deletedAt: null },
@@ -129,6 +146,20 @@ export async function findConfirmedByReceipt(schoolId: string, receipt: string) 
       transactionRef: String(receipt),
       status: "confirmed",
       method: "mpesa_stk",
+    },
+  })
+}
+
+/**
+ * Cross-school lookup of a confirmed payment by its Daraja receipt/TransID.
+ * Used by the C2B confirmation webhook, which cannot be scoped to one school.
+ */
+export async function findConfirmedByReceiptAcrossSchools(receipt: string) {
+  return prisma.payment.findFirst({
+    where: {
+      transactionRef: String(receipt),
+      status: "confirmed",
+      method: { in: ["mpesa_stk", "mpesa_c2b"] },
     },
   })
 }
@@ -217,5 +248,62 @@ export async function findExistingInvoice(schoolId: string, studentId: string, t
       deletedAt: null,
       status: { notIn: ["cancelled", "written_off"] },
     },
+  })
+}
+
+/**
+ * Calculates the effective paid amount, balance, and status for an invoice
+ * by aggregating its confirmed payment allocations from the ledger.
+ * This is the source of truth — stored fields are only a cache.
+ */
+export async function calculateInvoiceLedgerFields(schoolId: string, invoiceId: string) {
+  const result = await prisma.paymentAllocation.aggregate({
+    where: {
+      invoiceId,
+      payment: { status: "confirmed" },
+    },
+    _sum: { amount: true },
+  })
+  const paidAmount = Number(result._sum.amount ?? 0)
+
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: invoiceId },
+    select: { totalAmount: true },
+  })
+  if (!invoice) return { paidAmount: 0, balance: 0, status: "cancelled" as const }
+
+  const totalAmount = Number(invoice.totalAmount)
+  const balance = totalAmount - paidAmount
+  const status = balance <= 0 ? "paid" as const : paidAmount > 0 ? "partially_paid" as const : "issued" as const
+
+  return { paidAmount, balance: Math.max(0, balance), status }
+}
+
+/**
+ * Bulk version: for every invoice in a school, computes ledger-based fields.
+ * Used by reports where scanning all allocations is more efficient than N queries.
+ */
+export async function calculateAllInvoiceLedgerFields(schoolId: string) {
+  const allocations = await prisma.paymentAllocation.groupBy({
+    by: ["invoiceId"],
+    where: {
+      payment: { status: "confirmed" },
+      invoice: { schoolId, deletedAt: null },
+    },
+    _sum: { amount: true },
+  })
+
+  const invoices = await prisma.invoice.findMany({
+    where: { schoolId, deletedAt: null },
+    select: { id: true, totalAmount: true },
+  })
+
+  const paidMap = new Map(allocations.map((a) => [a.invoiceId, Number(a._sum.amount ?? 0)]))
+  return invoices.map((inv) => {
+    const paidAmount = paidMap.get(inv.id) ?? 0
+    const totalAmount = Number(inv.totalAmount)
+    const balance = totalAmount - paidAmount
+    const status = balance <= 0 ? "paid" as const : paidAmount > 0 ? "partially_paid" as const : "issued" as const
+    return { id: inv.id, paidAmount, balance: Math.max(0, balance), status }
   })
 }

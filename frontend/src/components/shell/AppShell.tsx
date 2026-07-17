@@ -14,7 +14,7 @@ interface AppShellProps {
 
 function AppShellInner({ children }: { children: React.ReactNode }) {
   const navigate = useNavigate()
-  const { activeRole } = useAuth()
+  const { activeRole, roleNames } = useAuth()
   const { increment } = useUnread()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
@@ -73,7 +73,7 @@ function AppShellInner({ children }: { children: React.ReactNode }) {
           </main>
           {isMobile && (
             <div className="fixed bottom-0 left-0 right-0 z-50 h-16 bg-white border-t border-primary-100 px-4 flex items-center justify-around shadow-lg overflow-x-auto">
-              {getNavigation(activeRole?.name).flatMap((group) => group.items).slice(0, 5).map((item) => {
+              {getNavigation(roleNames, activeRole?.name).flatMap((group) => group.items).slice(0, 5).map((item) => {
                 const Icon = item.icon
                 return (
                   <button 

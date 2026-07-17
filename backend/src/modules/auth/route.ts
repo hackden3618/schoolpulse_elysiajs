@@ -1,6 +1,8 @@
 import { Elysia, t } from "elysia"
 import { API_PREFIX } from "@/shared/constants"
 import { errorHandler, authGuard } from "@/common/middleware"
+import { checkPlatformRole } from "@/common/middleware/permissionGuard"
+import { platformAuthGuard } from "@/modules/platform-admin/platformAuthGuard"
 import * as controller from "./controller"
 import {
     loginSchema,
@@ -11,6 +13,7 @@ import {
     refreshSchema,
     createJoinRequestSchema,
     switchSchoolSchema,
+    switchRoleSchema,
 } from "./schema"
 
 export const authRoute = new Elysia({ prefix: `${API_PREFIX}/auth` })
@@ -50,6 +53,10 @@ export const authRoute = new Elysia({ prefix: `${API_PREFIX}/auth` })
         body: switchSchoolSchema,
         detail: { summary: "Switch active school without re-login", tags: ["Auth"] },
     })
+    .post("/switch-role", controller.switchRoleController, {
+        body: switchRoleSchema,
+        detail: { summary: "Switch active role without re-login", tags: ["Auth"] },
+    })
 
 export const joinRequestRoute = new Elysia({ prefix: `${API_PREFIX}/join-requests` })
     .use(errorHandler)
@@ -57,17 +64,25 @@ export const joinRequestRoute = new Elysia({ prefix: `${API_PREFIX}/join-request
         body: createJoinRequestSchema,
         detail: { summary: "Submit school join request", tags: ["Onboarding"] },
     })
+
+// Join-request administration is a platform-level operation. Only a platform
+// Super Admin may list or approve requests; a school-scoped user (including a
+// Guardian) must never reach these endpoints.
 export const joinRequestListRoute = new Elysia({ prefix: `${API_PREFIX}/join-requests` })
     .use(errorHandler)
-    .use(authGuard)
-    .get("/", controller.listJoinRequestsController, {
-        detail: { summary: "List join requests (admin)", tags: ["Onboarding"] },
-    })
+    .use(platformAuthGuard)
+    .guard({ beforeHandle: [checkPlatformRole(["Super Admin"])] }, (app) =>
+        app.get("/", controller.listJoinRequestsController, {
+            detail: { summary: "List join requests (platform admin)", tags: ["Onboarding"] },
+        })
+    )
 
 export const joinRequestApproveRoute = new Elysia({ prefix: `${API_PREFIX}/join-requests` })
     .use(errorHandler)
-    .use(authGuard)
-    .post("/:id/approve", controller.approveJoinRequestController, {
-        params: t.Object({ id: t.String({ format: "uuid" }) }),
-        detail: { summary: "Approve a join request", tags: ["Onboarding"] },
-    })
+    .use(platformAuthGuard)
+    .guard({ beforeHandle: [checkPlatformRole(["Super Admin"])] }, (app) =>
+        app.post("/:id/approve", controller.approveJoinRequestController, {
+            params: t.Object({ id: t.String({ format: "uuid" }) }),
+            detail: { summary: "Approve a join request (platform admin)", tags: ["Onboarding"] },
+        })
+    )

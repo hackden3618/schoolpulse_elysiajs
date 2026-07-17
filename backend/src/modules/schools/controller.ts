@@ -1,8 +1,8 @@
 import { success } from "@/common/responses";
 import * as svc from "./service";
 
-export async function getSchoolsController({ set }: any) {
-  const schools = await svc.listAllSchools();
+export async function getSchoolsController({ authUser, set }: any) {
+  const schools = await svc.listMySchools(authUser.userId);
   return success(schools);
 }
 

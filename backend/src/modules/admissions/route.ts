@@ -80,30 +80,26 @@ export const admissionsRoute = new Elysia({ prefix: `${API_PREFIX}/schools/:scho
     }, {
       detail: { summary: "Download original file", tags: ["Admissions"] },
     })
+    .get("/config", async () => {
+      const result = await controller.getConfigHandler()
+      return result
+    }, {
+      detail: { summary: "Get import configuration", tags: ["Admissions"] },
+    })
+    .get("/supported-formats", () => ({
+      success: true,
+      data: {
+        formats: [
+          { type: "csv", mimeType: "text/csv", extension: ".csv", maxRows: 100000 },
+          { type: "xls", mimeType: "application/vnd.ms-excel", extension: ".xls", maxRows: 50000 },
+          { type: "xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", extension: ".xlsx", maxRows: 50000 },
+        ],
+      },
+    }))
+    .get("/stats", async ({ params, authUser }) => {
+      const result = await controller.getStatsHandler(params.schoolId, authUser)
+      return result
+    }, {
+      detail: { summary: "Get admission stats", tags: ["Admissions"] },
+    })
   )
-  .get("/health", () => ({
-    success: true,
-    data: { status: "healthy", timestamp: new Date().toISOString() },
-  }))
-  .get("/stats", async () => {
-    const result = await controller.getStatsHandler()
-    return result
-  }, {
-    detail: { summary: "Get admission stats", tags: ["Admissions"] },
-  })
-  .get("/config", async () => {
-    const result = await controller.getConfigHandler()
-    return result
-  }, {
-    detail: { summary: "Get import configuration", tags: ["Admissions"] },
-  })
-  .get("/supported-formats", () => ({
-    success: true,
-    data: {
-      formats: [
-        { type: "csv", mimeType: "text/csv", extension: ".csv", maxRows: 100000 },
-        { type: "xls", mimeType: "application/vnd.ms-excel", extension: ".xls", maxRows: 50000 },
-        { type: "xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", extension: ".xlsx", maxRows: 50000 },
-      ],
-    },
-  }))

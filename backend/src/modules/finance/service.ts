@@ -17,6 +17,17 @@ import type {
 } from "./schema"
 
 /**
+ * Loads the ledger-calculated paidAmount/balance/status for an invoice
+ * and attaches them so the mapper returns the source-of-truth values.
+ */
+async function enrichWithLedger(invoice: any): Promise<any> {
+  if (!invoice) return invoice
+  const fields = await repo.calculateInvoiceLedgerFields(invoice.schoolId, invoice.id)
+  invoice._ledger = fields
+  return invoice
+}
+
+/**
  * Builds a concise M-Pesa TransactionDesc from the invoice's fee items so the
  * customer sees what they are paying for (e.g. "School Fees", "Field Trip").
  * Daraja limits TransactionDesc to 13 characters.
@@ -134,13 +145,14 @@ export async function generateInvoice(schoolId: string, data: GenerateInvoiceInp
     })
     // Refresh invoice after credit application
     const updated = await repo.findInvoiceById(schoolId, invoice.id)
+    const enriched = await enrichWithLedger(updated)
     await FinanceEvents.invoiceGenerated(schoolId, invoice.id, { studentId: data.studentId, amount: totalAmount, creditApplied: applied })
-    return FinanceMapper.toInvoiceDTO(updated)
+    return FinanceMapper.toInvoiceDTO(enriched, enriched._ledger)
   }
 
   await FinanceEvents.invoiceGenerated(schoolId, invoice.id, { studentId: data.studentId, amount: totalAmount })
 
-  return FinanceMapper.toInvoiceDTO(invoice)
+  return FinanceMapper.toInvoiceDTO(invoice, { paidAmount: 0, balance: totalAmount, status: "issued" })
 }
 
 export async function generateBulkInvoices(schoolId: string, data: GenerateBulkInvoicesInput) {
@@ -182,7 +194,7 @@ export async function generateBulkInvoices(schoolId: string, data: GenerateBulkI
     })
 
     await FinanceEvents.invoiceGenerated(schoolId, invoice.id, { studentId: student.id, amount: totalAmount })
-    results.push(FinanceMapper.toInvoiceDTO(invoice))
+    results.push(FinanceMapper.toInvoiceDTO(invoice, { paidAmount: 0, balance: totalAmount, status: "issued" }))
   }
 
   return { generated: results.length, total: enrollments.length, errors, invoices: results }
@@ -190,25 +202,29 @@ export async function generateBulkInvoices(schoolId: string, data: GenerateBulkI
 
 export async function listInvoices(schoolId: string, studentId?: string) {
   const invoices = await repo.findInvoices(schoolId, studentId)
-  return invoices.map(FinanceMapper.toInvoiceDTO)
+  const enriched = await Promise.all(invoices.map(enrichWithLedger))
+  return enriched.map((inv) => FinanceMapper.toInvoiceDTO(inv, inv._ledger))
 }
 
 export async function listGuardianInvoices(schoolId: string, studentId: string, userId: string) {
   const link = await repo.findGuardianStudentLink(schoolId, studentId, userId)
   FinancePolicy.canViewGuardianInvoices(link)
   const invoices = await repo.findInvoices(schoolId, studentId)
-  return invoices.map(FinanceMapper.toInvoiceDTO)
+  const enriched = await Promise.all(invoices.map(enrichWithLedger))
+  return enriched.map((inv) => FinanceMapper.toInvoiceDTO(inv, inv._ledger))
 }
 
 export async function getInvoice(schoolId: string, invoiceId: string) {
   const invoice = await repo.findInvoiceById(schoolId, invoiceId)
   if (!invoice) throw AppError.notFound("Invoice not found")
-  return FinanceMapper.toInvoiceDTO(invoice)
+  const enriched = await enrichWithLedger(invoice)
+  return FinanceMapper.toInvoiceDTO(enriched, enriched._ledger)
 }
 
 export async function recordPayment(schoolId: string, authUser: { membershipId?: string }, data: RecordPaymentInput) {
   const invoice = await repo.findInvoiceById(schoolId, data.invoiceId)
-  FinancePolicy.canPayInvoice(invoice, data.amount)
+  const invoiceLedger = await repo.calculateInvoiceLedgerFields(schoolId, data.invoiceId)
+  FinancePolicy.canPayInvoice(invoice, data.amount, invoiceLedger.balance)
 
   const result = await prisma.$transaction(async (tx: any) => {
     const payment = await tx.payment.create({
@@ -236,7 +252,7 @@ export async function recordPayment(schoolId: string, authUser: { membershipId?:
       },
     })
 
-    const updatedInvoice = await tx.invoice.update({
+    await tx.invoice.update({
       where: { id: data.invoiceId },
       data: {
         paidAmount: { increment: data.amount },
@@ -244,24 +260,30 @@ export async function recordPayment(schoolId: string, authUser: { membershipId?:
       },
     })
 
-    if (Number(updatedInvoice.balance) <= 0) {
-      await tx.invoice.update({
-        where: { id: data.invoiceId },
-        data: { status: "paid", paidAmount: updatedInvoice.totalAmount, balance: 0 },
-      })
-    } else if (Number(updatedInvoice.paidAmount) > 0) {
-      await tx.invoice.update({
-        where: { id: data.invoiceId },
-        data: { status: "partially_paid" },
-      })
-    }
+    await tx.financialAuditLog.create({
+      data: {
+        schoolId,
+        paymentId: payment.id,
+        invoiceId: data.invoiceId,
+        studentId: data.studentId,
+        actionDescription: `Manual payment recorded (${data.method}) - KES ${data.amount}`,
+        metadata: { method: data.method, ref: data.transactionRef, payerId: data.payerId },
+      },
+    })
 
-    return payment
+    return { payment, invoiceId: data.invoiceId }
   })
 
-  await FinanceEvents.paymentReceived(schoolId, result.id, { invoiceId: data.invoiceId, amount: data.amount, method: data.method })
+  const newLedger = await repo.calculateInvoiceLedgerFields(schoolId, result.invoiceId)
+  // Sync stored fields to ledger truth
+  await prisma.invoice.update({
+    where: { id: result.invoiceId },
+    data: { paidAmount: newLedger.paidAmount, balance: newLedger.balance, status: newLedger.status },
+  })
 
-  const savedPayment = await repo.findPaymentById(schoolId, result.id)
+  await FinanceEvents.paymentReceived(schoolId, result.payment.id, { invoiceId: data.invoiceId, amount: data.amount, method: data.method })
+
+  const savedPayment = await repo.findPaymentById(schoolId, result.payment.id)
   return FinanceMapper.toPaymentDTO(savedPayment)
 }
 
@@ -272,7 +294,8 @@ export async function listPayments(schoolId: string, studentId?: string) {
 
 export async function initiateMpesaPayment(schoolId: string, data: InitiateMpesaPaymentInput, authUser?: any) {
   const invoice = await repo.findInvoiceById(schoolId, data.invoiceId)
-  FinancePolicy.canPayInvoice(invoice, data.amount)
+  const invoiceLedger = await repo.calculateInvoiceLedgerFields(schoolId, data.invoiceId)
+  FinancePolicy.canPayInvoice(invoice, data.amount, invoiceLedger.balance)
 
   if (authUser) {
     await FinancePolicy.assertGuardianOwnsStudent(schoolId, invoice!.studentId, authUser)
@@ -517,6 +540,7 @@ export async function resolveStkResult(checkoutRequestId: string, result: {
             provider: payment.provider,
             transactionRef: String(receipt),
             amount: alloc.amount,
+            reversedPaymentId: payment.id,
             metadata: { ...(payment.metadata as object), isOverpaymentCredit: true, parentPaymentId: payment.id } as any,
             receivedAt: new Date(),
           },
@@ -634,35 +658,37 @@ export async function processMpesaReversal(payload: any) {
     return { handled: false, reason: "missing_orig_transaction" }
   }
 
-  // The reversal webhook is school-scoped via the route param when available.
-  const scopedSchoolId: string | undefined = payload?.__schoolId
-  const payment = scopedSchoolId
-    ? await repo.findConfirmedWithAllocations(scopedSchoolId, origReceipt)
-    : await findAcrossSchools(origReceipt)
+  const payment = await findAcrossSchools(origReceipt)
 
   if (!payment) {
     console.warn(`[FinanceService] M-Pesa reversal: no confirmed payment for receipt ${origReceipt}`)
     return { handled: false, reason: "no_confirmed_payment" }
   }
 
-  const sid = payment.schoolId
+  return reverseConfirmedPayment(payment, origReceipt, transactionType, payload)
+}
 
-  // Idempotency: never reverse the same receipt twice.
+/**
+ * Reverses a previously-confirmed M-Pesa payment, restoring every invoice it
+ * touched and reclaiming any credit surplus. Shared by the reversal webhook
+ * (chargeback) path. Idempotent via a `reversalHandled` metadata flag.
+ */
+async function reverseConfirmedPayment(payment: any, origReceipt: string, transactionType: string | undefined, payload: any) {
+  const sid = payment.schoolId
   const meta = payment.metadata as any
+
   if (meta?.reversalHandled) {
     console.info(`[FinanceService] M-Pesa reversal: receipt ${origReceipt} already reversed; skipping.`)
     return { handled: true, alreadyReversed: true }
   }
 
   await prisma.$transaction(async (tx: any) => {
-    // 1. Reverse each invoice allocation and recompute the invoice state.
     for (const alloc of payment.allocations as any[]) {
       const inv = await tx.invoice.findUnique({ where: { id: alloc.invoiceId } })
       if (!inv) continue
       const newPaid = Number(inv.paidAmount) - Number(alloc.amount)
       const newBalance = Number(inv.totalAmount) - newPaid
-      const newStatus =
-        newPaid <= 0 ? "issued" : newBalance <= 0.001 ? "paid" : "partially_paid"
+      const newStatus = newPaid <= 0 ? "issued" : newBalance <= 0.001 ? "paid" : "partially_paid"
       await tx.invoice.update({
         where: { id: alloc.invoiceId },
         data: {
@@ -673,10 +699,8 @@ export async function processMpesaReversal(payload: any) {
       })
     }
 
-    // 2. Remove the allocation rows (kept only for the now-reversed payment).
     await tx.paymentAllocation.deleteMany({ where: { paymentId: payment.id } })
 
-    // 3. If the original surplus created a credit payment, reclaim it.
     for (const credit of payment.reversalPayments as any[]) {
       const creditAmount = Number(credit.amount)
       if (creditAmount > 0) {
@@ -684,24 +708,15 @@ export async function processMpesaReversal(payload: any) {
           where: { id: payment.studentId },
           data: { creditBalance: { decrement: creditAmount } },
         })
-        await tx.payment.update({
-          where: { id: credit.id },
-          data: { status: "reversed" },
-        })
+        await tx.payment.update({ where: { id: credit.id }, data: { status: "reversed" } })
       }
     }
 
-    // 4. Mark the original payment as reversed.
     await tx.payment.update({
       where: { id: payment.id },
       data: {
         status: "reversed",
-        metadata: {
-          ...meta,
-          reversalHandled: true,
-          reversalAt: new Date().toISOString(),
-          reversalRaw: payload,
-        } as any,
+        metadata: { ...meta, reversalHandled: true, reversalAt: new Date().toISOString(), reversalRaw: payload } as any,
       },
     })
 
@@ -712,21 +727,169 @@ export async function processMpesaReversal(payload: any) {
         studentId: payment.studentId,
         invoiceId: payment.invoiceId,
         actionDescription: `M-Pesa transaction reversed (OrigTransactionID ${origReceipt})`,
-        metadata: {
-          origReceipt,
-          reversalType: transactionType || "Transaction Reversal",
-          amount: Number(payment.amount),
-        },
+        metadata: { origReceipt, reversalType: transactionType || "Transaction Reversal", amount: Number(payment.amount) },
       },
     })
   })
 
-  await FinanceEvents.paymentReversed(sid, payment.id, {
-    origReceipt,
-    amount: Number(payment.amount),
+  await FinanceEvents.paymentReversed(sid, payment.id, { origReceipt, amount: Number(payment.amount) })
+  return { handled: true, paymentId: payment.id }
+}
+
+/**
+ * Handles a normal C2B (walk-in paybill) confirmation from Safaricom.
+ * The parent pays the school paybill and uses the student's admission number as
+ * the `BillRefNumber`. We find the student by that reference, then apply the
+ * amount FIFO across their outstanding invoices, rolling any surplus into the
+ * student's credit balance — the same rule as STK payments.
+ *
+ * Idempotent: a duplicate `TransID` is ignored. Returns
+ * `{ handled: false, reason: "unknown_student" }` when the reference cannot
+ * be matched, so the school can follow up manually.
+ */
+export async function processC2BPayment(payload: any) {
+  const txn = payload?.Transaction || payload
+  const transId = String(txn?.TransID || txn?.TransactionID || "")
+  const amount = Number(txn?.TransAmount || txn?.Amount || 0)
+  const ref = String(txn?.BillRefNumber || txn?.BillRef || "").trim()
+  const phone = String(txn?.MSISDN || txn?.PhoneNumber || "")
+  const firstName = txn?.FirstName || txn?.MiddleName ? `${txn.FirstName || ""} ${txn.MiddleName || ""}`.trim() : undefined
+  const lastName = txn?.LastName || undefined
+
+  if (!transId) {
+    console.warn("[FinanceService] C2B: missing TransID; ignoring.")
+    return { handled: false, reason: "missing_trans_id" }
+  }
+  if (!amount || amount <= 0) {
+    console.warn("[FinanceService] C2B: zero/negative amount; ignoring.")
+    return { handled: false, reason: "invalid_amount" }
+  }
+
+  // Dedup: same TransID already captured?
+  const existing = await repo.findConfirmedByReceiptAcrossSchools(transId)
+  if (existing) {
+    console.info(`[FinanceService] C2B: TransID ${transId} already captured; skipping.`)
+    return { handled: true, alreadyCaptured: true }
+  }
+
+  // Match the student by admission number (the BillRefNumber).
+  const student = ref ? await studentRepo.findStudentByAdmissionAcrossSchools(ref) : null
+  if (!student) {
+    console.warn(`[FinanceService] C2B: no student for reference "${ref}" (TransID ${transId}); manual follow-up needed.`)
+    await prisma.financialAuditLog.create({
+      data: {
+        schoolId: "unmatched",
+        actionDescription: `C2B payment received but student reference "${ref}" not found`,
+        metadata: { transId, amount, phone, firstName, lastName, ref },
+      },
+    }).catch(() => {})
+    return { handled: false, reason: "unknown_student", transId, amount, ref }
+  }
+
+  const schoolId = student.schoolId
+  const invoices = await repo.findOutstandingInvoicesForStudent(schoolId, student.id)
+
+  let remaining = amount
+  const applied: any[] = []
+  for (const inv of invoices) {
+    if (remaining <= 0.001) break
+    const toApply = Math.min(Number(inv.balance), remaining)
+    if (toApply <= 0) continue
+    applied.push({ invoiceId: inv.id, amount: toApply })
+    remaining -= toApply
+  }
+  if (remaining > 0.001) applied.push({ invoiceId: null, amount: remaining })
+
+  await prisma.$transaction(async (tx: any) => {
+    const payment = await tx.payment.create({
+      data: {
+        schoolId,
+        studentId: student.id,
+        method: "mpesa_c2b",
+        type: "fee",
+        status: "confirmed",
+        provider: "daraja",
+        transactionRef: transId,
+        amount,
+        metadata: { source: "c2b", phone, firstName, lastName, ref, raw: payload } as any,
+        receivedAt: new Date(),
+      },
+    })
+
+    for (const alloc of applied) {
+      if (!alloc.invoiceId) {
+        await tx.payment.create({
+          data: {
+            schoolId,
+            studentId: student.id,
+            method: "mpesa_c2b",
+            type: "credit",
+            status: "confirmed",
+            provider: "daraja",
+            transactionRef: transId,
+            amount: alloc.amount,
+            metadata: { isOverpaymentCredit: true, parentPaymentId: payment.id } as any,
+            receivedAt: new Date(),
+          },
+        })
+        await tx.student.update({ where: { id: student.id }, data: { creditBalance: { increment: alloc.amount } } })
+        continue
+      }
+
+      await tx.paymentAllocation.create({
+        data: { schoolId, paymentId: payment.id, invoiceId: alloc.invoiceId, studentId: student.id, amount: alloc.amount },
+      })
+      const inv = await tx.invoice.update({
+        where: { id: alloc.invoiceId },
+        data: { paidAmount: { increment: alloc.amount }, balance: { decrement: alloc.amount } },
+      })
+      if (Number(inv.balance) <= 0.001) {
+        await tx.invoice.update({ where: { id: alloc.invoiceId }, data: { status: "paid", paidAmount: inv.totalAmount, balance: 0 } })
+      } else {
+        await tx.invoice.update({ where: { id: alloc.invoiceId }, data: { status: "partially_paid" } })
+      }
+    }
+
+    await tx.financialAuditLog.create({
+      data: {
+        schoolId,
+        paymentId: payment.id,
+        studentId: student.id,
+        actionDescription: `C2B payment captured - TransID ${transId} (KES ${amount}) for ${ref}`,
+        metadata: { transId, amount, phone, ref, isCredit: remaining > 0.001 },
+      },
+    })
   })
 
-  return { handled: true, paymentId: payment.id }
+  await FinanceEvents.paymentReceived(schoolId, "", { invoiceId: null, amount, method: "mpesa_c2b" })
+  return { handled: true, studentId: student.id, amount, transId }
+}
+
+/**
+ * Single entry point for the C2B confirmation URL. Safaricom sends BOTH normal
+ * paybill payments and `Transaction Reversal` (chargeback) notifications to this
+ * one URL, distinguished by `TransactionType`. Branch accordingly.
+ */
+export async function processC2BConfirmation(payload: any) {
+  const txn = payload?.Transaction || payload?.Body?.stkCallback || payload
+  const transactionType = txn?.TransactionType
+
+  if (transactionType === "Transaction Reversal") {
+    // Reuse the reversal pipeline (lookup by OrigTransactionID).
+    const origReceipt = txn?.OrigTransactionID || txn?.TransactionID
+    if (!origReceipt) {
+      console.warn("[FinanceService] C2B reversal: missing OrigTransactionID; ignoring.")
+      return { handled: false, reason: "missing_orig_transaction" }
+    }
+    const payment = await findAcrossSchools(origReceipt)
+    if (!payment) {
+      console.warn(`[FinanceService] C2B reversal: no confirmed payment for receipt ${origReceipt}`)
+      return { handled: false, reason: "no_confirmed_payment" }
+    }
+    return reverseConfirmedPayment(payment, origReceipt, transactionType, payload)
+  }
+
+  return processC2BPayment(payload)
 }
 
 /**
@@ -736,7 +899,7 @@ export async function processMpesaReversal(payload: any) {
  */
 async function findAcrossSchools(receipt: string) {
   const matches = await prisma.payment.findMany({
-    where: { transactionRef: String(receipt), status: "confirmed", method: "mpesa_stk" },
+    where: { transactionRef: String(receipt), status: "confirmed", method: { in: ["mpesa_stk", "mpesa_c2b"] } },
     include: {
       allocations: true,
       reversalPayments: { where: { type: "credit", status: "confirmed" } },

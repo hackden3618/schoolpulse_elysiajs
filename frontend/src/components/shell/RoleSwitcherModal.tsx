@@ -68,12 +68,13 @@ export function RoleSwitcherModal({ onClose }: RoleSwitcherModalProps) {
     setBusy(true)
     try {
       if (!selected.isCurrentContext) {
-        // Different membership → re-issue token with that context's roles.
-        await switchContext(selected.membershipId)
+        // Different membership → re-issue the session as a single action with
+        // the chosen role already assumed in that school's context.
+        await switchContext(selected.membershipId, selected.role.name)
+      } else {
+        // Same school context → just assume the chosen role.
+        await switchRole(selected.role)
       }
-      // Set the active view role (works for both context switches and
-      // same-context role switches, e.g. staff + guardian in one school).
-      switchRole(selected.role)
       onClose()
     } catch {
       setBusy(false)

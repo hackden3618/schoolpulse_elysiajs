@@ -20,6 +20,7 @@ export interface WsCallbacks {
   onConversationCreated?: WsEventHandler
   onTyping?: WsEventHandler
   onImportProgress?: WsEventHandler
+  onUnreadChanged?: WsEventHandler
 }
 
 interface WsContextType {
@@ -117,6 +118,9 @@ export function WsProvider({ children, platformMode, onGlobalMessageNew }: { chi
             break
           case "import:progress":
             cbs.onImportProgress?.(data)
+            break
+          case "UnreadCountChanged":
+            cbs.onUnreadChanged?.(data)
             break
           default:
             break

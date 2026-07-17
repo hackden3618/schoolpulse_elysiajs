@@ -1,7 +1,7 @@
 import { hashPassword } from "@/common/auth";
 import { AppError } from "@/common/errors";
 import { prisma } from "@/infrastructure/database/prisma";
-import { writeEventOutbox } from "@/infrastructure/events";
+import { writeEventOutbox, writeAuditLog } from "@/infrastructure/events";
 import * as repo from "./repository";
 import type {
   CreateUserInput,
@@ -139,6 +139,43 @@ export async function searchMembers(schoolId: string, q: string) {
   return results.slice(0, 30)
 }
 
+export async function getSelfProfile(userId: string, schoolId: string) {
+  const user = await repo.findUserById(userId);
+  if (!user) {
+    throw AppError.notFound("User not found");
+  }
+  const membership = await repo.findMembership(schoolId, userId);
+  const guardianLinks = await prisma.studentGuardian.findMany({
+    where: { guardianId: userId, student: { schoolId, status: "active" } }
+  });
+
+  if (!membership && guardianLinks.length === 0) {
+    throw AppError.forbidden("User does not belong to this school");
+  }
+
+  const { hashedPassword, ...safeUser } = user;
+  return {
+    ...safeUser,
+    isGuardian: guardianLinks.length > 0
+  };
+}
+
+export async function updateSelfProfile(
+  userId: string,
+  schoolId: string,
+  data: UpdateUserInput
+) {
+  const user = await repo.findUserById(userId);
+  if (!user) {
+    throw AppError.notFound("User not found");
+  }
+  const membership = await repo.findMembership(schoolId, userId);
+  if (!membership) {
+    throw AppError.forbidden("User does not belong to this school");
+  }
+  return repo.updateUser(userId, data as any);
+}
+
 export async function updateUser(
   schoolId: string,
   userId: string,
@@ -219,18 +256,30 @@ export async function createMembership(
 
 export async function updateMembership(
   membershipId: string,
-  data: UpdateMembershipInput
+  data: UpdateMembershipInput,
+  authUser?: { id: string; membershipId?: string }
 ) {
   const membership = await repo.findMembershipById(membershipId);
   if (!membership) {
     throw AppError.notFound("Membership not found");
   }
-  return repo.updateMembership(membershipId, data as any);
+  const updated = await repo.updateMembership(membershipId, data as any);
+  await writeAuditLog({
+    schoolId: membership.schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "update_membership",
+    tableName: "school_membership",
+    recordId: membershipId,
+    newValue: data,
+  }).catch(() => {});
+  return updated;
 }
 
 export async function assignRoles(
   membershipId: string,
-  data: AssignRolesInput
+  data: AssignRolesInput,
+  authUser?: { id: string; membershipId?: string }
 ) {
   const membership = await repo.findMembershipById(membershipId);
   if (!membership) {
@@ -258,6 +307,16 @@ export async function assignRoles(
     eventType: "RoleAssigned",
     payload: { roleIds: data.roleIds },
   });
+
+  await writeAuditLog({
+    schoolId: membership.schoolId,
+    actorUserId: authUser?.id,
+    actorMembershipId: authUser?.membershipId,
+    action: "assign_roles",
+    tableName: "school_membership",
+    recordId: membershipId,
+    newValue: { roleIds: data.roleIds },
+  }).catch(() => {});
 
   return repo.findMembershipById(membershipId);
 }

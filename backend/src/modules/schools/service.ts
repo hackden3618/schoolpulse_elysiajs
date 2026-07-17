@@ -28,6 +28,10 @@ export async function listAllSchools() {
   return repo.findAllSchools();
 }
 
+export async function listMySchools(userId: string) {
+  return repo.findSchoolsByUserId(userId);
+}
+
 export async function getSchoolById(id: string) {
   const school = await repo.findSchoolById(id);
   if (!school) {

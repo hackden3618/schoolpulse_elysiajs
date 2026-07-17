@@ -2,10 +2,21 @@ import { verifyToken } from "@/shared/jwt"
 import type { JwtPayload } from "@/shared/jwt"
 import type { WsClient } from "./ws.types"
 
+export type PresenceStatus = "online" | "away"
+
+export interface PresenceInfo {
+  userId: string
+  schoolId: string
+  status: PresenceStatus
+  lastSeen: Date
+  deviceCount: number
+}
+
 class WsManager {
     private connections = new Map<string, Set<WsClient>>()
     private conversationSubs = new Map<string, Set<WsClient>>()
     private adminConnections = new Set<WsClient>()
+    private presence = new Map<string, PresenceInfo>()
 
     authenticate(urlOrSearch: string): { userId: string; schoolId: string; isPlatformAdmin: boolean } | null {
         const params = new URLSearchParams(urlOrSearch.includes("?") ? urlOrSearch.split("?")[1] ?? "" : urlOrSearch)
@@ -31,6 +42,18 @@ class WsManager {
         if (isPlatformAdmin) {
             this.adminConnections.add(client)
         }
+
+        const existing = this.presence.get(userId)
+        if (existing) {
+          existing.deviceCount++
+          existing.lastSeen = new Date()
+        } else {
+          this.presence.set(userId, { userId, schoolId, status: "online", lastSeen: new Date(), deviceCount: 1 })
+          if (schoolId && !isPlatformAdmin) {
+            this.broadcastToSchool(schoolId, "UserOnline", { userId, schoolId, lastSeen: new Date().toISOString() })
+          }
+        }
+
         return client
     }
 
@@ -38,13 +61,46 @@ class WsManager {
         const userConns = this.connections.get(client.userId)
         if (userConns) {
             userConns.delete(client)
-            if (userConns.size === 0) this.connections.delete(client.userId)
+            if (userConns.size === 0) {
+              this.connections.delete(client.userId)
+              const presence = this.presence.get(client.userId)
+              if (presence) {
+                presence.deviceCount--
+                if (presence.deviceCount <= 0) {
+                  this.presence.delete(client.userId)
+                  if (client.schoolId && !client.isPlatformAdmin) {
+                    this.broadcastToSchool(client.schoolId, "UserOffline", { userId: client.userId, schoolId: client.schoolId, lastSeen: new Date().toISOString() })
+                  }
+                } else {
+                  presence.lastSeen = new Date()
+                }
+              }
+            }
         }
         for (const [convId, subs] of this.conversationSubs) {
             subs.delete(client)
             if (subs.size === 0) this.conversationSubs.delete(convId)
         }
         this.adminConnections.delete(client)
+    }
+
+    getOnlineUsers(schoolId: string): PresenceInfo[] {
+      const result: PresenceInfo[] = []
+      for (const [, info] of this.presence) {
+        if (info.schoolId === schoolId && info.status === "online") {
+          result.push(info)
+        }
+      }
+      return result
+    }
+
+    isUserOnline(userId: string): boolean {
+      const info = this.presence.get(userId)
+      return info !== undefined && info.status === "online"
+    }
+
+    getUserPresence(userId: string): PresenceInfo | null {
+      return this.presence.get(userId) ?? null
     }
 
     subscribe(client: WsClient, conversationId: string) {

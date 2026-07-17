@@ -13,7 +13,10 @@ import {
   Building2,
   LifeBuoy,
   Wallet,
+  UserCircle,
 } from "lucide-react"
+import type { Permission } from "./permissions"
+import { getEffectivePermissions } from "./permissions"
 
 export interface NavGroup {
   label: string
@@ -61,48 +64,62 @@ const ALL_NAV: NavGroup[] = [
       { label: "Settings", href: "/settings/system", icon: Settings },
     ],
   },
+  {
+    label: "Personal",
+    items: [
+      { label: "My Profile", href: "/profile", icon: UserCircle },
+    ],
+  },
 ]
 
-const NAV_BY_ROLE: Record<string, string[]> = {
-  // Guardians / Parents see only their children's financial + communication surface.
-  Guardian: ["/dashboard", "/payments", "/communication", "/support"],
-  Parent: ["/dashboard", "/payments", "/communication", "/support"],
-  // Teachers: classroom + assessment + messaging.
-  Teacher: ["/dashboard", "/attendance", "/assessments", "/communication", "/support", "/reports"],
-  // Bursars: finance only.
-  Bursar: ["/dashboard", "/finance", "/communication", "/support", "/reports"],
-  // Admissions / Reception: student data + messaging, no finance/reports/academics.
-  Admissions: ["/dashboard", "/students", "/communication", "/support"],
-  Reception: ["/dashboard", "/students", "/communication", "/support"],
-  // Academic Master: academics + classroom, no finance/users/system.
-  AcademicMaster: ["/dashboard", "/students", "/academics", "/attendance", "/assessments", "/communication", "/support", "/reports"],
-  // Deputy Principal: broad but not user-mgmt / system settings / bulk import.
-  DeputyPrincipal: ["/dashboard", "/students", "/academics", "/attendance", "/assessments", "/finance", "/communication", "/support", "/reports"],
-  // Full access tiers.
-  SuperAdmin: [],
-  Principal: [],
-  PlatformAdmin: [],
+// Dashboard is always shown.
+const DASHBOARD_HREF = "/dashboard"
+
+// Permission required to reveal each route. My Profile is universal.
+const ROUTE_PERMISSION: Record<string, Permission | null> = {
+  "/dashboard": null,
+  "/payments": "finance:guardian_view",
+  "/students": "student:read",
+  "/users": "user:read",
+  "/academics": "academic-year:write",
+  "/attendance": "attendance:mark",
+  "/assessments": "assessment:write",
+  "/finance": "finance:report",
+  "/communication": "communication:write",
+  "/support": "school:read",
+  "/reports": "attendance:report",
+  "/settings": "school:read",
+  "/settings/system": "school:admin",
+  "/profile": null,
 }
 
-// Roles that receive the complete navigation (everything).
-const FULL_NAV_ROLES = new Set(["SuperAdmin", "Principal", "PlatformAdmin"])
+function routeVisible(href: string, perms: Set<Permission>): boolean {
+  if (href === DASHBOARD_HREF || href === "/profile") return true
+  const req = ROUTE_PERMISSION[href]
+  if (!req) return true
+  return perms.has(req)
+}
 
-export function getNavigation(roleName?: string): NavGroup[] {
-  // Admin-tier roles get the full navigation.
-  if (roleName && FULL_NAV_ROLES.has(roleName)) return ALL_NAV
-
-  const allowed = roleName ? NAV_BY_ROLE[roleName] : undefined
-  if (!allowed) return ALL_NAV
+/**
+ * Builds navigation from the caller's effective permissions (derived from the
+ * JWT claims), NOT from a role name. If a permission disappears, the route
+ * disappears — exactly mirroring backend authorization.
+ */
+export function getNavigation(
+  roleNames?: string[],
+  activeRole?: string | null
+): NavGroup[] {
+  const perms = new Set<Permission>(
+    roleNames ? getEffectivePermissions(roleNames, activeRole) : []
+  )
 
   return ALL_NAV
     .map((group) => ({
       ...group,
-      items: group.items.filter((item) => allowed.includes(item.href)),
+      items: group.items.filter((item) => routeVisible(item.href, perms)),
     }))
     .filter((group) => group.items.length > 0)
 }
-
-export const navigation = ALL_NAV
 
 export const quickActions = [
   { label: "Admit Student", href: "/students/create" },

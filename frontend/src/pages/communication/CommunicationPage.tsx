@@ -101,6 +101,151 @@ function hasUnread(conv: Conversation, currentUserId?: string): boolean {
   )
 }
 
+// Case-insensitive fuzzy match: every query token must appear in the target.
+function fuzzyMatches(query: string, target: string): boolean {
+  const q = query.trim().toLowerCase()
+  if (!q) return true
+  const hay = target.toLowerCase()
+  return q.split(/\s+/).every((tok) => hay.includes(tok))
+}
+
+interface RecipientPickerProps {
+  query: string
+  onQueryChange: (q: string) => void
+  staff: StaffEntry[]
+  guardians: GuardianEntry[]
+  selected: Set<string>
+  onToggle: (userId: string) => void
+}
+
+// Direct messages: the only place a recipient is chosen by hand. A fuzzy
+// search over name + phone keeps it fast on slow networks (no long lists).
+function DirectRecipientPicker({ query, onQueryChange, staff, guardians, selected, onToggle }: RecipientPickerProps) {
+  const matches = [...staff, ...guardians]
+    .filter((p) => fuzzyMatches(query, `${p.name} ${"phone" in p ? (p as any).phone : ""}`))
+    .slice(0, 40)
+
+  return (
+    <div className="space-y-1.5">
+      <Input
+        type="text"
+        value={query}
+        onChange={(e) => onQueryChange(e.target.value)}
+        placeholder="Type a name or phone number…"
+        className="block w-full rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-xs"
+      />
+      <div className="max-h-32 overflow-y-auto space-y-0.5 border border-surface-100 rounded-lg p-1.5">
+        {matches.length === 0 ? (
+          <p className="text-[10px] text-surface-400 py-1">No matching people.</p>
+        ) : (
+          matches.map((p) => (
+            <label key={p.userId} className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-surface-50 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={selected.has(p.userId)}
+                onChange={() => onToggle(p.userId)}
+                className="h-3 w-3 rounded border-surface-300 text-accent focus:ring-accent"
+              />
+              <span className="text-[10px] text-surface-700 truncate flex-1">{p.name}</span>
+              <span className="text-[9px] text-surface-400 shrink-0">
+                {"relationship" in p ? (p as GuardianEntry).relationship : (p as StaffEntry).role?.split(",")[0]}
+              </span>
+            </label>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+interface GroupPickerProps {
+  staff: StaffEntry[]
+  guardians: GuardianEntry[]
+  classGroups: { className: string; userIds: string[] }[]
+  selected: Set<string>
+  onToggleGroup: (userIds: string[]) => void
+  onToggleOne: (userId: string) => void
+}
+
+// Group/announcement: recipients are chosen by live groupings derived from
+// school data (all staff, all guardians, by role, by class) — not by hand.
+function GroupRecipientPicker({ staff, guardians, classGroups, selected, onToggleGroup, onToggleOne }: GroupPickerProps) {
+  const allStaff = staff.map((s) => s.userId)
+  const allGuardians = guardians.map((g) => g.userId)
+
+  const roleGroups = new Map<string, string[]>()
+  for (const s of staff) {
+    const roles = s.role ? s.role.split(",").map((r) => r.trim()).filter(Boolean) : ["Staff"]
+    for (const role of roles) {
+      if (!roleGroups.has(role)) roleGroups.set(role, [])
+      roleGroups.get(role)!.push(s.userId)
+    }
+  }
+
+  const renderChip = (label: string, userIds: string[]) => {
+    const picked = userIds.filter((id) => selected.has(id)).length
+    const allSelected = picked === userIds.length && userIds.length > 0
+    const someSelected = picked > 0 && !allSelected
+    return (
+      <button
+        type="button"
+        key={label}
+        onClick={() => onToggleGroup(userIds)}
+        className={`px-2 py-1 rounded-full text-[10px] font-medium border transition-colors ${
+          allSelected
+            ? "bg-accent text-white border-accent"
+            : someSelected
+              ? "bg-accent-50 text-accent border-accent-200"
+              : "bg-white text-surface-600 border-surface-200 hover:bg-surface-50"
+        }`}
+      >
+        {label}
+        {userIds.length > 0 && <span className="ml-1 opacity-70">({picked}/{userIds.length})</span>}
+      </button>
+    )
+  }
+
+  return (
+    <div className="space-y-2 max-h-40 overflow-y-auto border border-surface-100 rounded-lg p-2">
+      <div>
+        <p className="text-[9px] font-semibold uppercase tracking-wide text-surface-400 mb-1">School-wide</p>
+        <div className="flex flex-wrap gap-1.5">
+          {renderChip("All Staff", allStaff)}
+          {renderChip("All Guardians", allGuardians)}
+        </div>
+      </div>
+
+      {roleGroups.size > 0 && (
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-wide text-surface-400 mb-1">By Role</p>
+          <div className="flex flex-wrap gap-1.5">
+            {Array.from(roleGroups.entries()).map(([role, ids]) => renderChip(role, ids))}
+          </div>
+        </div>
+      )}
+
+      {classGroups.length > 0 && (
+        <div>
+          <p className="text-[9px] font-semibold uppercase tracking-wide text-surface-400 mb-1">By Class (guardians)</p>
+          <div className="flex flex-wrap gap-1.5">
+            {classGroups.map((g) => renderChip(g.className, g.userIds))}
+          </div>
+        </div>
+      )}
+
+      {selected.size > 0 && (
+        <button
+          type="button"
+          onClick={() => onToggleGroup(Array.from(selected))}
+          className="text-[9px] text-danger-600 hover:underline"
+        >
+          Clear {selected.size} selected
+        </button>
+      )}
+    </div>
+  )
+}
+
 export function CommunicationPage() {
   const { school, user, membership } = useAuth()
   const schoolId = school!.id
@@ -122,6 +267,7 @@ export function CommunicationPage() {
 
   const [staffMembers, setStaffMembers] = useState<StaffEntry[]>([])
   const [guardianEntries, setGuardianEntries] = useState<GuardianEntry[]>([])
+  const [guardianClassGroups, setGuardianClassGroups] = useState<{ className: string; userIds: string[] }[]>([])
   const [selectedRecipientIds, setSelectedRecipientIds] = useState<Set<string>>(new Set())
   const [recipientsLoading, setRecipientsLoading] = useState(false)
 
@@ -134,6 +280,7 @@ export function CommunicationPage() {
   const [convSubject, setConvSubject] = useState("")
   const [convParticipantIds, setConvParticipantIds] = useState<Set<string>>(new Set())
   const [convError, setConvError] = useState("")
+  const [recipientQuery, setRecipientQuery] = useState("")
   const [creatingConv, setCreatingConv] = useState(false)
 
   const [menuConvId, setMenuConvId] = useState<string | null>(null)
@@ -317,6 +464,28 @@ export function CommunicationPage() {
       const allGuardians = Array.from(guardianMap.values())
       setGuardianEntries(allGuardians)
 
+      // Group guardians by their student's current class so the UI can offer
+      // "live" class-based broadcast groups derived from real enrollment data.
+      const byClass = new Map<string, Set<string>>()
+      for (const student of students) {
+        const ci = student.enrollments?.[0]?.classInstance
+          || student.currentEnrollment?.classInstance
+        const className = ci ? `${ci.class?.name ?? ""} ${ci.streamName ?? ""}`.trim() : null
+        if (!className) continue
+        const gs = student.guardians || []
+        for (const g of gs) {
+          const uid = g.guardian?.id
+          if (!uid) continue
+          if (!byClass.has(className)) byClass.set(className, new Set())
+          byClass.get(className)!.add(uid)
+        }
+      }
+      setGuardianClassGroups(
+        Array.from(byClass.entries())
+          .map(([className, ids]) => ({ className, userIds: Array.from(ids) }))
+          .sort((a, b) => a.className.localeCompare(b.className))
+      )
+
       const primaryIds = allGuardians.filter((g) => g.isPrimary).map((g) => g.userId)
       setSelectedRecipientIds(new Set(primaryIds))
     } catch { /* ignore */ } finally {
@@ -463,7 +632,7 @@ export function CommunicationPage() {
       return
     }
 
-    if (convParticipantIds.size === 0) {
+    if (convType !== "announcement" && convParticipantIds.size === 0) {
       setConvError("Select at least one recipient.")
       return
     }
@@ -652,9 +821,24 @@ export function CommunicationPage() {
       else next.add(userId)
       return next
     })
-    if (convType === "announcement") setConvType("group")
     if (convError) setConvError("")
   }
+
+  // Toggling a live group adds/removes every member of that group at once,
+  // rather than forcing the user to pick each recipient individually.
+  const toggleGroup = (userIds: string[]) => {
+    setConvParticipantIds((prev) => {
+      const next = new Set(prev)
+      const allSelected = userIds.every((id) => next.has(id))
+      for (const id of userIds) {
+        if (allSelected) next.delete(id)
+        else next.add(id)
+      }
+      return next
+    })
+    if (convError) setConvError("")
+  }
+
 
   const renderNewConvDialog = () => (
     <div className="shrink-0 border-b border-surface-100 bg-white">
@@ -667,18 +851,19 @@ export function CommunicationPage() {
         </div>
 
         <div className="flex gap-2">
-          <select value={convType} onChange={(e) => { 
+          <select value={convType} onChange={(e) => {
             const newType = e.target.value as any
             setConvType(newType)
-            if (newType === "announcement") {
-              setConvParticipantIds(new Set([...staffMembers.map((s) => s.userId), ...guardianEntries.map((g) => g.userId)]))
-            }
+            // Announcements broadcast to the entire school server-side, so no
+            // manual recipient selection is required (or used).
+            setConvParticipantIds(new Set())
+            setRecipientQuery("")
             setConvError("")
           }}
             className="block rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-xs flex-1">
-            <option value="direct">Direct</option>
-            <option value="group">Group</option>
-            <option value="announcement">Announcement</option>
+            <option value="direct">Direct (search a person)</option>
+            <option value="group">Group (pick live groups)</option>
+            <option value="announcement">Announcement (whole school)</option>
           </select>
           <Button size="sm" type="submit" disabled={creatingConv}>{creatingConv ? "..." : "Create"}</Button>
         </div>
@@ -687,37 +872,42 @@ export function CommunicationPage() {
           placeholder="Subject (required for group/announcement)..."
           className="block w-full rounded-lg border border-surface-200 bg-white px-2 py-1.5 text-xs" />
 
-        {/* Participant Selector */}
+        {/* Recipient selection: live groupings for group/announcement, fuzzy
+            search only for direct messages. */}
         <div>
           <div className="flex items-center justify-between mb-1">
             <span className="text-[10px] font-semibold text-surface-600">
-              Recipients ({convParticipantIds.size})
+              {convType === "direct"
+                ? "Search recipient"
+                : convType === "announcement"
+                  ? "Whole school broadcast"
+                  : `Recipients (${convParticipantIds.size})`}
             </span>
             {recipientsLoading && <span className="text-[9px] text-surface-400">Loading...</span>}
           </div>
-          {staffMembers.length === 0 && guardianEntries.length === 0 && !recipientsLoading ? (
-            <p className="text-[10px] text-surface-400 py-1">No recipients available.</p>
+
+          {convType === "announcement" ? (
+            <p className="text-[10px] text-surface-500 py-1 px-1.5 border border-surface-100 rounded-lg bg-surface-50">
+              This message is delivered to every staff member and guardian in the school.
+            </p>
+          ) : convType === "direct" ? (
+            <DirectRecipientPicker
+              query={recipientQuery}
+              onQueryChange={(q) => { setRecipientQuery(q); if (convError) setConvError("") }}
+              staff={staffMembers}
+              guardians={guardianEntries}
+              selected={convParticipantIds}
+              onToggle={(userId) => toggleConvParticipant(userId)}
+            />
           ) : (
-            <div className="max-h-32 overflow-y-auto space-y-0.5 border border-surface-100 rounded-lg p-1.5">
-              {staffMembers.map((s) => (
-                <label key={s.userId} className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-surface-50 cursor-pointer">
-                  <input type="checkbox" checked={convParticipantIds.has(s.userId)}
-                    onChange={() => toggleConvParticipant(s.userId)}
-                    className="h-3 w-3 rounded border-surface-300 text-accent focus:ring-accent" />
-                  <span className="text-[10px] text-surface-700 truncate flex-1">{s.name}</span>
-                  <span className="text-[9px] text-surface-400 shrink-0">{s.role?.split(",")[0]}</span>
-                </label>
-              ))}
-              {guardianEntries.map((g) => (
-                <label key={g.userId} className="flex items-center gap-1.5 px-1.5 py-0.5 rounded hover:bg-surface-50 cursor-pointer">
-                  <input type="checkbox" checked={convParticipantIds.has(g.userId)}
-                    onChange={() => toggleConvParticipant(g.userId)}
-                    className="h-3 w-3 rounded border-surface-300 text-accent focus:ring-accent" />
-                  <span className="text-[10px] text-surface-700 truncate flex-1">{g.name}</span>
-                  <span className="text-[9px] text-surface-400 capitalize shrink-0">{g.relationship}</span>
-                </label>
-              ))}
-            </div>
+            <GroupRecipientPicker
+              staff={staffMembers}
+              guardians={guardianEntries}
+              classGroups={guardianClassGroups}
+              selected={convParticipantIds}
+              onToggleGroup={(userIds) => toggleGroup(userIds)}
+              onToggleOne={(userId) => toggleConvParticipant(userId)}
+            />
           )}
         </div>
 

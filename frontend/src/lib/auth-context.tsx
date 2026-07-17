@@ -1,14 +1,17 @@
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from "react"
-import { authApi, setAccessToken, getAccessToken, setPlatformToken } from "./api"
+import { authApi, setAccessToken, getAccessToken, setPlatformToken, getTokenClaims } from "./api"
 import type { AuthState, User, Membership, School, Role } from "../types"
+import { hasPermission as checkPermission, type Permission } from "./permissions"
 
 interface AuthContextType extends AuthState {
+  roleNames: string[]
+  hasPermission: (permission: Permission) => boolean
   login: (login: string, password: string) => Promise<{ allMemberships: Membership[], allSchools: School[], user: User }>
   logout: () => Promise<void>
   refreshAuth: () => Promise<void>
   switchSchool: (membershipId: string) => Promise<void>
   switchRole: (role: Role) => void
-  switchContext: (membershipId: string) => Promise<void>
+  switchContext: (membershipId: string, roleName?: string) => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | null>(null)
@@ -53,20 +56,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isLoading: true,
     activeRole: null,
     roles: [],
+    roleNames: [],
     allMemberships: [],
     allSchools: [],
   })
 
   const applyAuth = useCallback((stored: StoredAuth) => {
     setAccessToken(stored.accessToken)
-    const roles = stored.membership?.roles?.map((r: any) => r.role || r) || []
+    const roles: Role[] = stored.membership?.roles?.map((r: any) => r.role || r) || []
+    const roleNames = roles.map((r) => r.name)
     const allMemberships = stored.allMemberships || [stored.membership]
     const allSchools = stored.allSchools || [stored.school]
 
-    const savedRoleId = localStorage.getItem("schoolpulse:activeRole")
-    const activeRole = savedRoleId
-      ? roles.find((r: any) => r.id === savedRoleId) || roles[0] || null
-      : roles.length > 0 ? roles[0] : null
+    // The active role is the canonical source of truth for the assumed
+    // context. It is carried in the JWT claim by the backend and re-issued on
+    // every role/school switch, so we derive it from the token rather than
+    // from local storage (which could diverge after a school switch).
+    const claims = getTokenClaims()
+    const activeRoleName = claims?.activeRole
+    const activeRole = activeRoleName
+      ? (roles.find((r: any) => r.name === activeRoleName) ?? null)
+      : (roles[0] ?? null)
 
     setState({
       user: stored.user,
@@ -77,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: false,
       activeRole,
       roles,
+      roleNames,
       allMemberships,
       allSchools,
     })
@@ -94,6 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isLoading: false,
       activeRole: null,
       roles: [],
+      roleNames: [],
       allMemberships: [],
       allSchools: [],
     })
@@ -166,7 +178,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [applyAuth, clearAuth])
 
   const switchSchool = useCallback(async (membershipId: string) => {
-    const res = await authApi.switchSchool({ membershipId })
+    const sessionId = getTokenClaims()?.sessionId
+    const res = await authApi.switchSchool({ membershipId, sessionId })
     const { accessToken, refreshToken, membership, school } = res.data
     const stored = loadStoredAuth()
     if (!stored) return
@@ -181,10 +194,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applyAuth(newStored)
   }, [applyAuth])
 
-  const switchRole = useCallback((role: Role) => {
-    localStorage.setItem("schoolpulse:activeRole", role.id)
-    setState((s) => ({ ...s, activeRole: role }))
-  }, [])
+  const switchRole = useCallback(async (role: Role) => {
+    const sessionId = getTokenClaims()?.sessionId
+    // Do NOT optimistically set activeRole. The backend is the source of truth;
+    // the role is only committed once the token is successfully re-issued
+    // (applyAuth derives activeRole from the JWT claim). On failure the UI
+    // keeps the previously authorized role, avoiding a client/backend split.
+    try {
+      const res = await authApi.switchRole({ roleName: role.name })
+      const stored = loadStoredAuth()
+      if (!stored) return
+      const newStored: StoredAuth = {
+        ...stored,
+        accessToken: res.data.accessToken,
+        refreshToken: res.data.refreshToken,
+      }
+      storeAuth(newStored)
+      applyAuth(newStored)
+    } catch {
+      // Leave activeRole as the previously authorized value.
+    }
+  }, [applyAuth])
 
   /**
    * Switches the active membership (and therefore the JWT roles/permissions)
@@ -192,8 +222,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    * e.g. both a Super Admin and a Parent in the same school adopt the
    * Parent context so guardian-scoped endpoints are authorized.
    */
-  const switchContext = useCallback(async (membershipId: string) => {
-    const res = await authApi.switchSchool({ membershipId })
+  const switchContext = useCallback(async (membershipId: string, roleName?: string) => {
+    const res = await authApi.switchSchool({ membershipId, roleName })
     const { accessToken, refreshToken, membership, school } = res.data
     const stored = loadStoredAuth()
     if (!stored) return
@@ -208,8 +238,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     applyAuth(newStored)
   }, [applyAuth])
 
+  const effectiveHasPermission = useCallback(
+    (permission: Permission) =>
+      checkPermission(state.roleNames, permission, state.activeRole?.name ?? null),
+    [state.roleNames, state.activeRole]
+  )
+
   return (
-    <AuthContext.Provider value={{ ...state, login, logout, refreshAuth, switchSchool, switchRole, switchContext }}>
+    <AuthContext.Provider
+      value={{
+        ...state,
+        roleNames: state.roleNames,
+        hasPermission: effectiveHasPermission,
+        login,
+        logout,
+        refreshAuth,
+        switchSchool,
+        switchRole,
+        switchContext,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )

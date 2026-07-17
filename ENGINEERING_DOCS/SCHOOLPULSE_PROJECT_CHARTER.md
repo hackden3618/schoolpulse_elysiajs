@@ -132,6 +132,7 @@ Maintained documentation lives in Markdown files in `ENGINEERING_DOCS`.
 The canonical documents are:
 
 - `README.md`
+- `ENGINEERING_METHOD.md`
 - `SchoolPulse_ProductDocument_v1.1.0.md`
 - `SchoolPulse_Engineering_Spec_v1.1.0.md`
 - `SchoolPulse_SRS_v1.1.0.md`

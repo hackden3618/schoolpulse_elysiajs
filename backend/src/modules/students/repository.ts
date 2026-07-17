@@ -70,7 +70,20 @@ export async function findStudentByAdmission(
 ) {
   return prisma.student.findFirst({
     where: { schoolId, admissionNumber, deletedAt: null },
-  });
+  })
+}
+
+/**
+ * Cross-school lookup by admission number. The C2B paybill reference is the
+ * admission number, but the confirmation webhook is not school-scoped, so we
+ * search every school. Admission numbers are unique enough per school that a
+ * global scan is safe and cheap.
+ */
+export async function findStudentByAdmissionAcrossSchools(admissionNumber: string) {
+  return prisma.student.findFirst({
+    where: { admissionNumber, deletedAt: null },
+    orderBy: { createdAt: "desc" },
+  })
 }
 
 export async function adjustStudentCredit(studentId: string, delta: number) {
@@ -81,11 +94,35 @@ export async function adjustStudentCredit(studentId: string, delta: number) {
 }
 
 export async function getStudentCreditBalance(studentId: string) {
-  const student = await prisma.student.findUnique({
-    where: { id: studentId },
-    select: { creditBalance: true },
+  return calculateStudentCreditBalance(studentId)
+}
+
+/**
+ * Computes a student's credit balance from the payment ledger.
+ * Overpayment surplus credits (isOverpaymentCredit) increase the balance;
+ * credit prepayments (isCreditPrePayment) decrease it.
+ * This is the source of truth — the stored creditBalance field is only a cache.
+ */
+export async function calculateStudentCreditBalance(studentId: string): Promise<number> {
+  const credits = await prisma.payment.findMany({
+    where: {
+      studentId,
+      type: "credit",
+      status: "confirmed",
+    },
+    select: { amount: true, metadata: true },
   })
-  return student ? Number(student.creditBalance) : 0
+
+  let balance = 0
+  for (const c of credits) {
+    const meta = c.metadata as any
+    if (meta?.isOverpaymentCredit) {
+      balance += Number(c.amount)
+    } else if (meta?.isCreditPrePayment) {
+      balance -= Number(c.amount)
+    }
+  }
+  return Math.max(0, balance)
 }
 
 /**

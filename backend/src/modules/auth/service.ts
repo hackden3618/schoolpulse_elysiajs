@@ -116,7 +116,8 @@ export async function login(data: LoginInput) {
 
     const roles = buildRoles(activeMembership);
     const roleNames = roles.map((r: any) => r.name)
-    const accessToken = signToken({ sub: user.id, schoolId, membershipId: activeMembership.id, roles: roleNames })
+    const sessionId = crypto.randomUUID()
+    const accessToken = signToken({ sub: user.id, schoolId, membershipId: activeMembership.id, roles: roleNames, sessionId })
 
     const { hashedPassword: _, ...safeUser } = user
 
@@ -155,7 +156,7 @@ export async function listMemberships(userId: string) {
     return { memberships, schools }
 }
 
-export async function switchSchool(userId: string, data: { membershipId?: string; schoolId?: string }) {
+export async function switchSchool(userId: string, data: { membershipId?: string; schoolId?: string; sessionId?: string; roleName?: string }) {
     const targetId = data.membershipId || data.schoolId;
     if (!targetId) {
         throw AppError.validation("membershipId or schoolId is required");
@@ -175,7 +176,20 @@ export async function switchSchool(userId: string, data: { membershipId?: string
 
     const roles = buildRoles(membership);
     const roleNames = roles.map((r: any) => r.name);
-    const accessToken = signToken({ sub: userId, schoolId: membership.schoolId, membershipId: membership.id, roles: roleNames });
+    const sessionId = data.sessionId || crypto.randomUUID();
+
+    // When a role is supplied, assume it as the active context in a single
+    // re-issue — this lets a user switch directly to a specific role within a
+    // specific school without an intermediate default-role state.
+    const activeRole = data.roleName && roleNames.includes(data.roleName) ? data.roleName : undefined;
+    const accessToken = signToken({
+        sub: userId,
+        schoolId: membership.schoolId,
+        membershipId: membership.id,
+        roles: roleNames,
+        sessionId,
+        ...(activeRole ? { activeRole } : {}),
+    });
 
     const school = await prisma.school.findUnique({
         where: { id: membership.schoolId },
@@ -188,6 +202,44 @@ export async function switchSchool(userId: string, data: { membershipId?: string
         membership: buildMembershipResponse(membership, membership.schoolId, userId, roles),
         school,
     }
+}
+
+/**
+ * Re-issues the session token with the chosen active role. The active role is
+ * recorded in the JWT so every subsequent request carries the assumed role as
+ * part of the execution context, without requiring a logout.
+ */
+export async function switchRole(
+  userId: string,
+  data: { roleName: string; sessionId?: string; membershipId?: string }
+) {
+    const memberships = await repo.findMembershipsByUserId(userId)
+    if (memberships.length === 0) {
+        throw AppError.forbidden("No active school membership found")
+    }
+    // The active membership MUST be one the caller actually holds. The auth
+    // controller pins membershipId to the token's context, so this both
+    // honours the current context and rejects any tampered/foreign id.
+    const activeMembership = data.membershipId
+        ? memberships.find((m: any) => m.id === data.membershipId)
+        : memberships[0]
+    if (!activeMembership) {
+        throw AppError.forbidden("Membership does not belong to this user")
+    }
+    const roleNames = activeMembership.roles.map((r: any) => r.role.name)
+    if (!roleNames.includes(data.roleName)) {
+        throw AppError.forbidden(`Role "${data.roleName}" is not assigned to your active membership`)
+    }
+    const sessionId = data.sessionId || crypto.randomUUID()
+    const accessToken = signToken({
+        sub: userId,
+        schoolId: activeMembership.schoolId,
+        membershipId: activeMembership.id,
+        roles: roleNames,
+        sessionId,
+        activeRole: data.roleName,
+    })
+    return { accessToken, refreshToken: accessToken }
 }
 
 export async function register(data: RegisterInput) {
@@ -352,7 +404,8 @@ export async function refresh(token: string) {
     }
 
     const roleNames = membership.roles.map((r: any) => r.role.name)
-    const accessToken = signToken({ sub: payload.sub, schoolId: payload.schoolId, roles: roleNames })
+    const sessionId = payload.sessionId || crypto.randomUUID()
+    const accessToken = signToken({ sub: payload.sub, schoolId: payload.schoolId, membershipId: membership.id, roles: roleNames, sessionId })
 
     return { accessToken, refreshToken: accessToken }
 }

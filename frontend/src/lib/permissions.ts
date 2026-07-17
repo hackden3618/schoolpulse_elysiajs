@@ -1,7 +1,3 @@
-import { ROLES } from "@/shared/constants";
-
-export const GUARDIAN_ROLE_NAME = "Guardian"
-
 export type Permission =
   | "school:read"
   | "school:write"
@@ -40,7 +36,21 @@ export type Permission =
   | "announcement:send"
   | "communication:history"
   | "audit:read"
-  | "subscription:write";
+  | "subscription:write"
+
+export const ROLES = {
+  PLATFORM_ADMIN: "PlatformAdmin",
+  SUPER_ADMIN: "SuperAdmin",
+  PRINCIPAL: "Principal",
+  DEPUTY_PRINCIPAL: "DeputyPrincipal",
+  ACADEMIC_MASTER: "AcademicMaster",
+  BURSAR: "Bursar",
+  TEACHER: "Teacher",
+  ADMISSIONS: "Admissions",
+  RECEPTION: "Reception",
+  PARENT: "Parent",
+  GUARDIAN: "Guardian",
+} as const
 
 const ROLE_PERMISSIONS: Record<string, Permission[]> = {
   [ROLES.PLATFORM_ADMIN]: [
@@ -154,43 +164,59 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     "payment:record",
     "communication:write",
   ],
-};
-
-export function getRolePermissions(roleName: string): Permission[] {
-  return ROLE_PERMISSIONS[roleName] ?? [];
 }
 
-/**
- * Super Administrator inherits the complete union of all permissions available
- * to any operational role within the school. This is computed as a union over
- * every role definition so that adding a new role automatically extends the
- * Super Admin's effective permission set — no special-case logic required.
- */
+export function getRolePermissions(roleName: string): Permission[] {
+  return ROLE_PERMISSIONS[roleName] ?? []
+}
+
 export const SUPER_ADMIN_PERMISSIONS: Permission[] = Array.from(
   new Set(Object.values(ROLE_PERMISSIONS).flat())
-);
+)
 
+/**
+ * Frontend projection of backend authorization. Never the source of truth —
+ * the backend enforces every permission. This is used only to derive which
+ * navigation entries are visible.
+ */
 export function hasPermission(
   roleNames: string[],
   required: Permission,
   activeRole?: string | null
 ): boolean {
-  // When an active role is assumed, authorization is evaluated against that
-  // role alone — the assumed context refreshes permissions, accessible routes
-  // and cached authorization state. Super Administrator still wins if it is
-  // the active role. The assumed role must be one the caller actually holds;
-  // otherwise a tampered/invalid activeRole claim cannot grant permissions the
-  // user was never assigned.
   if (activeRole) {
     if (activeRole === ROLES.SUPER_ADMIN) {
-      return roleNames.includes(ROLES.SUPER_ADMIN);
+      return roleNames.includes(ROLES.SUPER_ADMIN)
     }
-    if (!roleNames.includes(activeRole)) return false;
-    return getRolePermissions(activeRole).includes(required);
+    if (!roleNames.includes(activeRole)) return false
+    return getRolePermissions(activeRole).includes(required)
   }
 
-  // No assumed role: the union of all assigned roles applies, with Super
-  // Administrator inheriting every permission in the school.
-  if (roleNames.includes(ROLES.SUPER_ADMIN)) return true;
-  return roleNames.some((role) => getRolePermissions(role).includes(required));
+  if (roleNames.includes(ROLES.SUPER_ADMIN)) return true
+  return roleNames.some((role) => getRolePermissions(role).includes(required))
+}
+
+/**
+ * Computes the effective permission set for the current assumed role context.
+ * Used by the UI to derive navigation and show/hide actions.
+ */
+export function getEffectivePermissions(
+  roleNames: string[],
+  activeRole?: string | null
+): Set<Permission> {
+  if (activeRole) {
+    if (activeRole === ROLES.SUPER_ADMIN && roleNames.includes(ROLES.SUPER_ADMIN)) {
+      return new Set(SUPER_ADMIN_PERMISSIONS)
+    }
+    if (!roleNames.includes(activeRole)) return new Set()
+    return new Set(getRolePermissions(activeRole))
+  }
+  if (roleNames.includes(ROLES.SUPER_ADMIN)) {
+    return new Set(SUPER_ADMIN_PERMISSIONS)
+  }
+  const union = new Set<Permission>()
+  for (const role of roleNames) {
+    for (const p of getRolePermissions(role)) union.add(p)
+  }
+  return union
 }
